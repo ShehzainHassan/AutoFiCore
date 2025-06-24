@@ -1,0 +1,20 @@
+@AutoFiCore_HostAddress = http://localhost:5128
+
+### Get all vehicles
+GET {{AutoFiCore_HostAddress}}/vehicle
+
+### Get a specific vehicle
+GET {{AutoFiCore_HostAddress}}/vehicle/1
+
+### Calculate loan
+POST {{AutoFiCore_HostAddress}}/loancalculation
+Content-Type: application/json
+
+{
+  "vehicleId": 1,
+  "loanAmount": 20000,
+  "interestRate": 4.5,
+  "loanTermMonths": 60
+}
+
+###
