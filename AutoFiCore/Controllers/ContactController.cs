@@ -1,6 +1,7 @@
 ﻿using AutoFiCore.Models;
 using AutoFiCore.Services;
 using AutoFiCore.Utilities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AutoFiCore.Controllers
@@ -15,6 +16,7 @@ namespace AutoFiCore.Controllers
         {
             _contactInfoService = contactInfoService;
         }
+        [Authorize]
 
         [HttpPost("add")]
 
