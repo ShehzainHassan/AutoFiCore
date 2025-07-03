@@ -27,6 +27,7 @@ public interface IVehicleService
     Task<Vehicle> UpdateVehicleAsync(Vehicle vehicle);
     Task<bool> DeleteVehicleAsync(int id);
     Task<Questionnaire> SaveQuestionnaireAsync(QuestionnaireDTO dto);
+    Task<List<VehicleOptionsDTO>> GetVehicleOptionsAsync();
 }
 
 public class VehicleService : IVehicleService
@@ -57,6 +58,11 @@ public class VehicleService : IVehicleService
     {
         return await _cachedVehicleRepository.GetDistinctColorsAsync();
     }
+    public async Task<List<VehicleOptionsDTO>> GetVehicleOptionsAsync()
+    {
+        return await _cachedVehicleRepository.GetVehicleOptionsAsync();
+    }
+
     public async Task<VehicleListResult> GetAllVehiclesByStatusAsync(int pageView, int offset, string? status = null)
     {
         return await _repository.GetAllVehiclesByStatusAsync(pageView, offset, status);

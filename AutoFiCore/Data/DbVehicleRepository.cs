@@ -192,6 +192,18 @@ public class DbVehicleRepository : IVehicleRepository
         _dbContext.Vehicles.Remove(vehicle);
         return true;
     }
+    public async Task<List<VehicleOptionsDTO>> GetVehicleOptionsAsync()
+    {
+        return await _dbContext.Vehicles
+            .Select(v => new VehicleOptionsDTO
+            {
+                Make = v.Make,
+                Model = v.Model,
+                Year = v.Year
+            })
+            .Distinct()
+            .ToListAsync();
+    }
     private bool VehicleExists(int id)
     {
         return _dbContext.Vehicles.Any(v => v.Id == id);
