@@ -168,6 +168,7 @@ public class MockVehicleRepository : IVehicleRepository
 
         return await Task.FromResult(makes);
     }
+    
     public async Task<VehicleListResult> GetVehiclesByModelAsync(int pageView, int offset, string model)
     {
         var query = _vehicles.AsQueryable();
@@ -183,6 +184,19 @@ public class MockVehicleRepository : IVehicleRepository
 
         return await Task.FromResult(result);
     }
+    public async Task<List<VehicleOptionsDTO>> GetVehicleOptionsAsync()
+    {
+        return await _vehicles.AsQueryable()
+            .Select(v => new VehicleOptionsDTO
+            {
+                Make = v.Make,
+                Model = v.Model,
+                Year = v.Year
+            })
+            .Distinct()
+            .ToListAsync();
+    }
+
     public async Task<int> GetTotalCountAsync(VehicleFilterDto filterDto)
     {
         var query = _vehicles.AsQueryable();

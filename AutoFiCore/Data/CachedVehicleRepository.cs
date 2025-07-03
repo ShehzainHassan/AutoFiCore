@@ -1,4 +1,5 @@
 ﻿using AutoFiCore.Data;
+using AutoFiCore.Dto;
 using Microsoft.Extensions.Caching.Memory;
 
 public class CachedVehicleRepository
@@ -28,4 +29,22 @@ public class CachedVehicleRepository
 
         return colors;
     }
+    public async Task<List<VehicleOptionsDTO>> GetVehicleOptionsAsync()
+    {
+        const string cacheKey = "vehicle-options";
+
+        if (_cache.TryGetValue(cacheKey, out List<VehicleOptionsDTO>? cachedOptions))
+            return cachedOptions!;
+
+        var options = await _repository.GetVehicleOptionsAsync();
+
+        _cache.Set(cacheKey, options, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1),
+            SlidingExpiration = TimeSpan.FromMinutes(15)
+        });
+
+        return options;
+    }
+
 }

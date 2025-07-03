@@ -95,6 +95,14 @@ public class VehicleController : ControllerBase
         return Ok(vehicles);
        
     }
+
+    [HttpGet("get-vehicle-options")]
+    public async Task<ActionResult<List<VehicleOptionsDTO>>> GetVehicleOptions()
+    {
+        var vehicleOptions = await _vehicleService.GetVehicleOptionsAsync();
+        return Ok(vehicleOptions);
+    }
+
     [HttpGet("colors-count")]
     public async Task<ActionResult<Dictionary<string, int>>> GetColorsCount([FromQuery] VehicleFilterDto filters)
     {
