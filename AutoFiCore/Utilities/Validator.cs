@@ -104,6 +104,18 @@ namespace AutoFiCore.Utilities
 
             return errors;
         }
+        public static string ValidateNewsLetter(string email)
+        {
+            if (!IsValidEmail(email))
+            {
+                return "Email is not in a valid format.";
+            }
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return "'Email' is required.";
+            }
+            return "";
+        }
         public static List<string> ValidateFilters(VehicleFilterDto filters)
         {
             var errors = new List<string>();

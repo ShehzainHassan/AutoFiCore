@@ -5,6 +5,7 @@
         IVehicleRepository Vehicles { get; }
         IUserRepository Users { get; }
         IContactInfoRepository ContactInfo { get; }
+        INewsLetterRepository NewsLetter { get; }
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();
