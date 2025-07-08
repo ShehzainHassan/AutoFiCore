@@ -104,8 +104,8 @@ else
     builder.Services.AddScoped<CachedVehicleRepository>();
     builder.Services.AddScoped<IContactInfoRepository, DbContactInfoRepository>();
     builder.Services.AddScoped<IUserRepository, DbUserRepository>();
+    builder.Services.AddScoped<INewsLetterRepository, DbNewsLetterRepository>();
 }
-
 
 // Register user service
 builder.Services.AddScoped<IUserService, UserService>();
@@ -130,6 +130,9 @@ builder.Services.AddScoped<VehicleServiceHealthCheck>();
 
 // Register contact info service
 builder.Services.AddScoped<IContactInfoService, ContactInfoService>();
+
+// Register news letter service
+builder.Services.AddScoped<INewsLetterService, NewsLetterService>();
 
 // Add services to the container.
 builder.Services.AddControllers();

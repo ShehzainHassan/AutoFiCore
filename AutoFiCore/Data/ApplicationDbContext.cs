@@ -25,6 +25,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Measurements> Measurements { get; set; }
     public DbSet<VehicleOptions> VehicleOptions { get; set; }
 
+    public DbSet<Newsletter> Newsletters { get; set; } = null!;
     public DbSet<UserInteractions> UserInteractions { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -148,6 +149,12 @@ public class ApplicationDbContext : DbContext
         {
             entity.HasKey(v => v.Id);
             entity.Property(v => v.Options).IsRequired();
+        });
+
+        modelBuilder.Entity<Newsletter>(entity =>
+        {
+            entity.HasKey(n => n.Id);
+            entity.Property(n => n.Email).IsRequired().HasMaxLength(25);
         });
 
         // Configure indexes

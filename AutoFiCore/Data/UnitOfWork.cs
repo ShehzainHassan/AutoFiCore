@@ -6,17 +6,18 @@ namespace AutoFiCore.Data
     {
         private readonly ApplicationDbContext _context;
         private IDbContextTransaction? _transaction;
-
         public IVehicleRepository Vehicles { get; }
         public IUserRepository Users { get; }
         public IContactInfoRepository ContactInfo { get; }
 
-        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository)
+        public INewsLetterRepository NewsLetter { get; }
+        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository)
         {
             _context = context;
             Vehicles = vehicleRepository;
             Users = userRepository;
             ContactInfo = contactInfoRepository;
+            NewsLetter = newsLetterRepository;
         }
         public async Task<int> SaveChangesAsync()
         {
