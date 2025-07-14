@@ -6,8 +6,8 @@ namespace AutoFiCore.Data
     public class DbNewsLetterRepository : INewsLetterRepository
     {
         private readonly ApplicationDbContext _dbContext;
-        private readonly ILogger<DbUserRepository> _logger;
-        public DbNewsLetterRepository(ApplicationDbContext dbContext, ILogger<DbUserRepository> logger)
+        private readonly ILogger<DbNewsLetterRepository> _logger;
+        public DbNewsLetterRepository(ApplicationDbContext dbContext, ILogger<DbNewsLetterRepository> logger)
         {
             _dbContext = dbContext;
             _logger = logger;

@@ -140,5 +140,27 @@ namespace AutoFiCore.Utilities
             }
             return errors;
         }
+
+        public static List<string> ValidateAuctionDto(CreateAuctionDTO dto)
+        {
+            var errors = new List<string>();
+
+            if (dto.VehicleId <= 0)
+                errors.Add("VehicleId must be greater than 0.");
+
+            if (dto.StartUtc == default)
+                errors.Add("StartUtc cannot be empty.");
+
+            if (dto.EndUtc == default)
+                errors.Add("EndUtc cannot be empty.");
+
+            if (dto.EndUtc <= dto.StartUtc)
+                errors.Add("EndUtc must be <= StartUtc.");
+
+            if (dto.StartingPrice < 0)
+                errors.Add("Starting price must be non-negative.");
+
+            return errors;
+        }
     }
 }

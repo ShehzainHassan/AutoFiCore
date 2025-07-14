@@ -6,6 +6,7 @@
         IUserRepository Users { get; }
         IContactInfoRepository ContactInfo { get; }
         INewsLetterRepository NewsLetter { get; }
+        IAuctionRepository Auctions { get; }    
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

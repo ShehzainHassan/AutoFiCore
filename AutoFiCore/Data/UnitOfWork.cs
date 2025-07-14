@@ -9,15 +9,16 @@ namespace AutoFiCore.Data
         public IVehicleRepository Vehicles { get; }
         public IUserRepository Users { get; }
         public IContactInfoRepository ContactInfo { get; }
-
+        public IAuctionRepository Auctions { get; }
         public INewsLetterRepository NewsLetter { get; }
-        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository)
+        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository, IAuctionRepository auctions)
         {
             _context = context;
             Vehicles = vehicleRepository;
             Users = userRepository;
             ContactInfo = contactInfoRepository;
             NewsLetter = newsLetterRepository;
+            Auctions = auctions;
         }
         public async Task<int> SaveChangesAsync()
         {
