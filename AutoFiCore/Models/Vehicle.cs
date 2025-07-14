@@ -51,4 +51,6 @@ public class Vehicle
     public Measurements? Measurements { get; set; } = null;
 
     public List<VehicleOptions>? VehicleOptions { get; set; } = null;
- }
+    public Auction? Auction { get; set; }
+
+}

@@ -4,6 +4,7 @@ namespace AutoFiCore.Models
 {
     public class User
     {
+        [Key]
         public int Id { get; set; }
 
         [Required]
@@ -17,6 +18,8 @@ namespace AutoFiCore.Models
         [Required]
         [StringLength(100)]
         public string Password { get; set; } = string.Empty;
+        public ICollection<Bid> Bids { get; set; } = new List<Bid>();
+        public ICollection<Watchlist> Watchlists { get; set; } = new List<Watchlist>();
 
     }
 }

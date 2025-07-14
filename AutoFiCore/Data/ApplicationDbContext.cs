@@ -24,10 +24,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<Questionnaire> Questionnaires { get; set; } = null!;
     public DbSet<Measurements> Measurements { get; set; }
     public DbSet<VehicleOptions> VehicleOptions { get; set; }
-
     public DbSet<Newsletter> Newsletters { get; set; } = null!;
     public DbSet<UserInteractions> UserInteractions { get; set; } = null!;
-
+    public DbSet<Auction> Auctions { get; set; } = null!;
+    public DbSet<Bid> Bids { get; set; } = null!;
+    public DbSet<Watchlist> Watchlists { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -157,6 +158,36 @@ public class ApplicationDbContext : DbContext
             entity.Property(n => n.Email).IsRequired().HasMaxLength(25);
         });
 
+        modelBuilder.Entity<Auction>(entity =>
+        {
+            entity.HasKey(a => a.AuctionId);
+            entity.Property(a => a.VehicleId).IsRequired();
+            entity.Property(a => a.StartUtc).IsRequired();
+            entity.Property(a => a.EndUtc).IsRequired();
+            entity.Property(a => a.StartingPrice).IsRequired();
+            entity.Property(a => a.CurrentPrice).IsRequired();
+            entity.Property(a => a.Status).IsRequired().HasMaxLength(25);
+            entity.Property(a => a.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(a => a.UpdatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        });
+
+        modelBuilder.Entity<Bid>(entity =>
+        {
+            entity.HasKey(b => b.BidId);
+            entity.Property(b => b.Amount).IsRequired();
+            entity.Property(b => b.IsAuto).HasDefaultValue(false);
+            entity.Property(b => b.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<Watchlist>(entity =>
+        {
+            entity.HasKey(w => w.WatchlistId);
+            entity.Property(w => w.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+
+
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Model).HasDatabaseName("IX_Vehicles_Model");
@@ -171,7 +202,16 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Vehicle>().HasIndex(v => new { v.Model, v.Id }).HasDatabaseName("IX_Vehicles_Model_Id");
         modelBuilder.Entity<Vehicle>().HasIndex(v => new { v.Price, v.Id }).HasDatabaseName("IX_Vehicles_Price_Id");
         modelBuilder.Entity<Vehicle>().HasIndex(v => new { v.Year, v.Id }).HasDatabaseName("IX_Vehicles_Year_Id");
-        modelBuilder.Entity<Vehicle>().HasIndex(v => new { v.Make, v.Model, v.Price, v.Year, v.Id}).HasDatabaseName("IX_Vehicles_Make_Model_Price_Year_Id");
+        modelBuilder.Entity<Vehicle>().HasIndex(v => new { v.Make, v.Model, v.Price, v.Year, v.Id }).HasDatabaseName("IX_Vehicles_Make_Model_Price_Year_Id");
+
+        modelBuilder.Entity<Auction>().HasIndex(a => a.VehicleId).IsUnique().HasDatabaseName("IX_Auction_Vehicle_Id_Unique");
+        modelBuilder.Entity<Auction>().HasIndex(a => a.Status);
+
+        modelBuilder.Entity<Bid>().HasIndex(b => b.AuctionId).HasDatabaseName("IX_Bid_AuctionId");
+        modelBuilder.Entity<Bid>().HasIndex(b => b.UserId).HasDatabaseName("IX_Bid_UserId");
+        modelBuilder.Entity<Bid>().HasIndex(b => new { b.AuctionId, b.CreatedUtc }).HasDatabaseName("IX_Bid_AuctionId_CreatedUtc");
+
+        modelBuilder.Entity<Watchlist>().HasIndex(w => new { w.UserId, w.AuctionId }).IsUnique().HasDatabaseName("IX_Watchlist_UserId_AuctionId");
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()
@@ -208,5 +248,33 @@ public class ApplicationDbContext : DbContext
             .HasMany(v => v.VehicleOptions)
             .WithMany(o => o.Vehicle)
             .UsingEntity(j => j.ToTable("Vehicle_VehicleOptions_Mapping"));
+
+        modelBuilder.Entity<Vehicle>()
+            .HasOne(v => v.Auction)
+            .WithOne(a => a.Vehicle)
+            .HasForeignKey<Auction>(a => a.VehicleId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Bid>()
+            .HasOne(b => b.Auction)
+            .WithMany(a => a.Bids)
+            .HasForeignKey(b => b.AuctionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Bid>()
+            .HasOne(b => b.User)
+            .WithMany(u => u.Bids)
+            .HasForeignKey(b => b.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Watchlist>().HasOne(w => w.User)
+            .WithMany(u => u.Watchlists)
+            .HasForeignKey(b => b.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Watchlist>().HasOne(w => w.Auction)
+            .WithMany(a => a.Watchers)
+            .HasForeignKey(w => w.AuctionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
