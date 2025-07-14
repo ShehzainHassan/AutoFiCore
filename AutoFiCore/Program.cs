@@ -105,6 +105,7 @@ else
     builder.Services.AddScoped<IContactInfoRepository, DbContactInfoRepository>();
     builder.Services.AddScoped<IUserRepository, DbUserRepository>();
     builder.Services.AddScoped<INewsLetterRepository, DbNewsLetterRepository>();
+    builder.Services.AddScoped<IAuctionRepository, DbAuctionRepository>();
 }
 
 // Register user service
@@ -133,6 +134,9 @@ builder.Services.AddScoped<IContactInfoService, ContactInfoService>();
 
 // Register news letter service
 builder.Services.AddScoped<INewsLetterService, NewsLetterService>();
+
+// Register auction service
+builder.Services.AddScoped<IAuctionService, AuctionService>();
 
 // Add services to the container.
 builder.Services.AddControllers();
