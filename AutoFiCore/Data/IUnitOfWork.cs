@@ -7,6 +7,8 @@
         IContactInfoRepository ContactInfo { get; }
         INewsLetterRepository NewsLetter { get; }
         IAuctionRepository Auctions { get; }    
+        IBidRepository Bids { get; }
+        IWatchlistRepository Watchlist { get; }
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

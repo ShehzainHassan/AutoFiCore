@@ -162,5 +162,19 @@ namespace AutoFiCore.Utilities
 
             return errors;
         }
+        public static List<string> ValidateBidAmount(decimal amount, decimal startingPrice, decimal currentPrice)
+        {
+            var errors = new List<string>();
+
+            if (amount <= 0)
+                errors.Add("Bid must be greater than 0.");
+            else if (currentPrice == 0 && amount < startingPrice)
+                errors.Add("Bid must be at least the starting price.");
+            else if (currentPrice > 0 && amount <= currentPrice)
+                errors.Add("Bid must be higher than the current price.");
+
+            return errors;
+        }
+
     }
 }

@@ -106,6 +106,8 @@ else
     builder.Services.AddScoped<IUserRepository, DbUserRepository>();
     builder.Services.AddScoped<INewsLetterRepository, DbNewsLetterRepository>();
     builder.Services.AddScoped<IAuctionRepository, DbAuctionRepository>();
+    builder.Services.AddScoped<IBidRepository, DbAuctionRepository>();
+    builder.Services.AddScoped<IWatchlistRepository, DbAuctionRepository>();
 }
 
 // Register user service
