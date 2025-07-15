@@ -1,4 +1,5 @@
 ﻿using AutoFiCore.Dto;
+using AutoFiCore.Mappers;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -8,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AutoFiCore.Controllers
 {
     [ApiController]
-    [Route("[controller]")]
+    [Route("auction")]
     public class AuctionController:ControllerBase
     {
         private readonly IAuctionService _auctionService;
@@ -28,20 +29,10 @@ namespace AutoFiCore.Controllers
                 return BadRequest(new { error = result.Error });
 
             var auction = result.Value!;
-            var response = new AuctionResponseDTO
-            {
-                AuctionId = auction.AuctionId,
-                VehicleId = auction.VehicleId,
-                StartUtc = auction.StartUtc,
-                EndUtc = auction.EndUtc,
-                StartingPrice = auction.StartingPrice,
-                CurrentPrice = auction.CurrentPrice,
-                Status = auction.Status
-            };
-            return Ok(response);
+            return Ok(auction);
         }
 
-        [HttpPut("/auction/{id}")]
+        [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateAuctionStatusDTO dto)
         {
             var result = await _auctionService.UpdateAuctionStatusAsync(id, dto.Status);
@@ -51,5 +42,76 @@ namespace AutoFiCore.Controllers
 
             return Ok(result.Value);
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetAuctions([FromQuery] AuctionQueryParams filters)
+        {
+            var auctions = await _auctionService.GetAuctionsAsync(filters);
+            return Ok(auctions);
+        }
+        
+        
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetAuction(int id)
+        {
+            var result = await _auctionService.GetAuctionByIdAsync(id);
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });
+
+            return Ok(result.Value);
+        }
+
+        [HttpPost("{id}/bids")]
+        public async Task<IActionResult> PlaceBid([FromRoute(Name = "id")] int auctionId, [FromBody] CreateBidDTO dto)
+        {
+            var result = await _auctionService.PlaceBidAsync(auctionId, dto);
+
+            if (!result.IsSuccess)
+                return BadRequest(new { error = result.Error });
+
+            return Ok(result.Value);
+        }
+
+        [HttpGet("{id}/bids")]
+        public async Task<IActionResult> GetBidHistory([FromRoute(Name = "id")] int auctionId)
+        {
+            var result = await _auctionService.GetBidHistoryAsync(auctionId);
+
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });  
+
+            return Ok(result.Value);                             
+        }
+
+        [HttpPost("{id}/watch")]
+        public async Task<IActionResult> AddToWatchlist(int id, [FromQuery] int userId)
+        {
+            var result = await _auctionService.AddToWatchListAsync(userId, id);
+            if (!result.IsSuccess)
+                return BadRequest(new { error = result.Error });
+
+            var watchList = result.Value!;
+            return Ok(watchList);
+        }
+
+        [HttpDelete("{id}/watch")]
+        public async Task<IActionResult> RemoveFromWatchlist(int id, [FromQuery] int userId)
+        {
+            var result = await _auctionService.RemoveFromWatchListAsync(userId, id);
+            if (!result.IsSuccess)
+                return BadRequest(new {error = result.Error});  
+            return Ok(result.Value);
+        }
+
+        [HttpGet("user/{userId}/watchlist")]
+        public async Task<IActionResult> GetUserWatchlist(int userId)
+        {
+            var watchlists = await _auctionService.GetUserWatchListAsync(userId);
+
+            if (!watchlists.IsSuccess)
+                return NotFound(new { error = watchlists.Error });
+            return Ok(watchlists.Value);
+        }
+
     }
 }

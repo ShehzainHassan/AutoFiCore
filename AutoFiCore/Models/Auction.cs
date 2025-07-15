@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace AutoFiCore.Models
 {
@@ -10,6 +11,8 @@ namespace AutoFiCore.Models
 
         [Required]
         public int VehicleId { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public Vehicle Vehicle { get; set; } = null!;
 
         [Required]
