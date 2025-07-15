@@ -61,6 +61,14 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .AsNoTracking()
             .ToListAsync();
     }
+    public async Task<List<Bid>> GetBidsByUserIdAsync(int userId)
+    {
+        return await _dbContext.Bids
+            .Where(b => b.UserId == userId)
+            .OrderByDescending(b => b.CreatedUtc)
+            .AsNoTracking()
+            .ToListAsync();
+    }
 
     public async Task<Bid?> GetHighestBidAsync(int auctionId)
     {
@@ -114,6 +122,12 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .ToListAsync();
     }
 
+    public async Task<List<Watchlist>> GetAuctionWatchersAsync(int auctionId)
+    {
+        return await _dbContext.Watchlists
+            .Where(w => w.AuctionId == auctionId)
+            .ToListAsync();
+    }
 
     public Task<bool> IsWatchingAsync(int userId, int auctionId)
     {
