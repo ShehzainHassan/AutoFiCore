@@ -129,6 +129,16 @@ namespace AutoFiCore.Controllers
 
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<User>> GetUserById(int id)
+        {
+            var user = await _userService.GetUserByIdAsync(id);
+            if (user == null)
+                return NotFound($"User with ID {id} not found");
+            return Ok(user);
+
+        }
+
         [Authorize]
         [HttpPost("save-search")]
         public async Task<ActionResult<UserSavedSearch>> SaveUserSearch([FromBody] UserSavedSearch search)

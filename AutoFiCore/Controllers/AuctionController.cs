@@ -61,6 +61,7 @@ namespace AutoFiCore.Controllers
             return Ok(result.Value);
         }
 
+        [Authorize]
         [HttpPost("{id}/bids")]
         public async Task<IActionResult> PlaceBid([FromRoute(Name = "id")] int auctionId, [FromBody] CreateBidDTO dto)
         {
@@ -81,6 +82,17 @@ namespace AutoFiCore.Controllers
                 return NotFound(new { error = result.Error });  
 
             return Ok(result.Value);                             
+        }
+
+        [HttpGet("userBids/{id}")]
+        public async Task<IActionResult> GetUserBidHistory([FromRoute(Name = "id")] int userId)
+        {
+            var result = await _auctionService.GetUserBidHistoryAsync(userId);
+
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });
+
+            return Ok(result.Value);
         }
 
         [HttpPost("{id}/watch")]
@@ -107,6 +119,17 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> GetUserWatchlist(int userId)
         {
             var watchlists = await _auctionService.GetUserWatchListAsync(userId);
+
+            if (!watchlists.IsSuccess)
+                return NotFound(new { error = watchlists.Error });
+            return Ok(watchlists.Value);
+        }
+
+
+        [HttpGet("{auctionId}/watchers")]
+        public async Task<IActionResult> GetAuctionWatchers(int auctionId)
+        {
+            var watchlists = await _auctionService.GetAuctionWatchersAsync(auctionId);
 
             if (!watchlists.IsSuccess)
                 return NotFound(new { error = watchlists.Error });

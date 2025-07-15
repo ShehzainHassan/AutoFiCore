@@ -6,6 +6,7 @@ namespace AutoFiCore.Data
     {
         Task<Bid> AddBidAsync(Bid bid);
         Task<List<Bid>> GetBidsByAuctionIdAsync(int auctionId);
+        Task<List<Bid>> GetBidsByUserIdAsync(int userId);
         Task<Bid?> GetHighestBidAsync(int auctionId);
     }
 }

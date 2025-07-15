@@ -20,6 +20,8 @@ namespace AutoFiCore.Services
         Task<Result<string>> AddToWatchListAsync(int userId, int auctionId);
         Task<Result<string>> RemoveFromWatchListAsync(int userId, int auctionId);
         Task<Result<List<WatchlistDTO>>> GetUserWatchListAsync(int userId);
+        Task<Result<List<BidDTO>>> GetUserBidHistoryAsync(int userId);
+        Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId);
     }
     public class AuctionService : IAuctionService
     {
@@ -166,6 +168,26 @@ namespace AutoFiCore.Services
             return Result<List<BidDTO>>.Success(dtos);
         }
 
+        public async Task<Result<List<BidDTO>>> GetUserBidHistoryAsync(int userId)
+        {
+            if (await _uow.Users.GetUserByIdAsync(userId) is null)
+                return Result<List<BidDTO>>.Failure("User not found.");
+
+            var bids = await _uow.Bids.GetBidsByUserIdAsync(userId);
+
+            var dtos = bids.Select(b => new BidDTO
+            {
+                BidId = b.BidId,
+                AuctionId = b.AuctionId,
+                UserId = b.UserId,
+                Amount = b.Amount,
+                IsAuto = b.IsAuto,
+                PlacedAt = b.CreatedUtc
+            }).ToList();
+
+            return Result<List<BidDTO>>.Success(dtos);
+        }
+
         public async Task<Result<string>> AddToWatchListAsync(int userId, int auctionId)
         {
             if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
@@ -198,6 +220,24 @@ namespace AutoFiCore.Services
                 return Result<List<WatchlistDTO>>.Failure("User not found.");
 
             var watchlists = await _uow.Watchlist.GetUserWatchlistAsync(userId);
+
+            var dtos = watchlists.Select(w => new WatchlistDTO
+            {
+                WatchlistId = w.WatchlistId,
+                UserId = w.UserId,
+                AuctionId = w.AuctionId,
+                CreatedUtc = w.CreatedUtc
+            }).ToList();
+
+            return Result<List<WatchlistDTO>>.Success(dtos);
+        }
+
+        public async Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId)
+        {
+            if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
+                return Result<List<WatchlistDTO>>.Failure("Auction not found.");
+
+            var watchlists = await _uow.Watchlist.GetAuctionWatchersAsync(auctionId);
 
             var dtos = watchlists.Select(w => new WatchlistDTO
             {
