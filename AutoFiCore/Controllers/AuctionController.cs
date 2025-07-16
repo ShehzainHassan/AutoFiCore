@@ -20,7 +20,7 @@ namespace AutoFiCore.Controllers
         }
 
         //[Authorize(Roles = "Admin")]
-        [HttpPost("create-auction")]
+        [HttpPost]
         public async Task<IActionResult> CreateAuction([FromBody] CreateAuctionDTO dto)
         {
             var result = await _auctionService.CreateAuctionAsync(dto);

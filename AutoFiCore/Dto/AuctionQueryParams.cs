@@ -1,8 +1,11 @@
-﻿namespace AutoFiCore.Dto
+﻿using System.Text.Json.Serialization;
+
+namespace AutoFiCore.Dto
 {
     public class AuctionQueryParams
     {
-        public string? Status { get; set; }
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public AuctionStatus? Status { get; set; }
         public string? Make { get; set; }
         public decimal? MinPrice { get; set; }
         public decimal? MaxPrice { get; set; }

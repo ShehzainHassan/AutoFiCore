@@ -22,7 +22,7 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     }
     public Task<bool> VehicleHasAuction(int vehicleId) => _dbContext.Auctions.AnyAsync(a => a.VehicleId == vehicleId);
 
-    public async Task<Auction?> UpdateAuctionStatusAsync(int auctionId, string status)
+    public async Task<Auction?> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
     {
         var auction = await _dbContext.Auctions.FindAsync(auctionId);
         if (auction == null)

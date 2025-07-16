@@ -27,7 +27,8 @@ namespace AutoFiCore.Models
         public decimal CurrentPrice { get; set; }
 
         [Required]
-        public string Status { get; set; } = string.Empty;
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public AuctionStatus Status { get; set; } = AuctionStatus.Active;
 
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
