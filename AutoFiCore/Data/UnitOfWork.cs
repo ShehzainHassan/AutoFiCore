@@ -13,7 +13,9 @@ namespace AutoFiCore.Data
         public IBidRepository Bids { get; }
         public IWatchlistRepository Watchlist { get; }
         public INewsLetterRepository NewsLetter { get; }
-        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository, IAuctionRepository auctions, IBidRepository bids, IWatchlistRepository watchlist)
+
+        public IAutoBidRepository AutoBid { get; }
+        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository, IAuctionRepository auctions, IBidRepository bids, IWatchlistRepository watchlist, IAutoBidRepository autoBid)
         {
             _context = context;
             Vehicles = vehicleRepository;
@@ -23,6 +25,7 @@ namespace AutoFiCore.Data
             Auctions = auctions;
             Bids = bids;
             Watchlist = watchlist;
+            AutoBid = autoBid;
         }
         public async Task<int> SaveChangesAsync()
         {

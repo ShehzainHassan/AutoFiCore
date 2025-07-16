@@ -29,6 +29,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Auction> Auctions { get; set; } = null!;
     public DbSet<Bid> Bids { get; set; } = null!;
     public DbSet<Watchlist> Watchlists { get; set; } = null!;
+    public DbSet<AutoBid> AutoBids { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -186,7 +187,28 @@ public class ApplicationDbContext : DbContext
             entity.Property(w => w.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
+        modelBuilder.Entity<AutoBid>(entity =>
+        {
+            entity.HasKey(ab => ab.Id);
+            entity.Property(ab => ab.MaxBidAmount).IsRequired();
+            entity.Property(ab => ab.CurrentBidAmount).IsRequired();
+            entity.Property(ab => ab.IsActive).IsRequired();
+            entity.Property(ab => ab.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(ab => ab.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
 
+        modelBuilder.Entity<BidStrategy>(entity =>
+        {
+            entity.HasKey(b => b.Id);
+            entity.Property(b => b.Type).IsRequired();
+            entity.Property(b => b.BidDelaySeconds).IsRequired();
+            entity.Property(b => b.MaxBidsPerMinute).IsRequired();
+            entity.Property(b => b.PreferredBidTiming).IsRequired();
+            entity.Property(b => b.SuccessfulBids).IsRequired().HasDefaultValue(0);
+            entity.Property(b => b.FailedBids).IsRequired().HasDefaultValue(0);
+            entity.Property(b => b.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(b => b.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
 
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
@@ -212,6 +234,12 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Bid>().HasIndex(b => new { b.AuctionId, b.CreatedUtc }).HasDatabaseName("IX_Bid_AuctionId_CreatedUtc");
 
         modelBuilder.Entity<Watchlist>().HasIndex(w => new { w.UserId, w.AuctionId }).IsUnique().HasDatabaseName("IX_Watchlist_UserId_AuctionId");
+
+        modelBuilder.Entity<AutoBid>().HasIndex(ab => new { ab.UserId, ab.AuctionId }).IsUnique().HasDatabaseName("UX_AutoBid_User_Auction");
+        modelBuilder.Entity<AutoBid>().HasIndex(ab => new { ab.AuctionId, ab.IsActive, ab.MaxBidAmount }).HasDatabaseName("IX_AutoBid_ActiveByAuction");
+
+        modelBuilder.Entity<BidStrategy>().HasIndex(b => b.Type).HasDatabaseName("IX_BidStrategy_Type");
+        modelBuilder.Entity<BidStrategy>().HasIndex(b => b.PreferredBidTiming).HasDatabaseName("IX_BidStrategy_Timing");
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()
@@ -276,5 +304,15 @@ public class ApplicationDbContext : DbContext
             .WithMany(a => a.Watchers)
             .HasForeignKey(w => w.AuctionId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AutoBid>()
+            .HasOne(ab => ab.Auction)
+            .WithMany(a => a.AutoBids)
+            .HasForeignKey(ab => ab.AuctionId);
+
+        modelBuilder.Entity<AutoBid>()
+            .HasOne(ab => ab.User)
+            .WithMany(u => u.AutoBids)
+            .HasForeignKey(ab => ab.UserId);
     }
 }

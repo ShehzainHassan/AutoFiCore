@@ -1,5 +1,6 @@
 ﻿using AutoFiCore.Data;
 using AutoFiCore.Models;
+using AutoFiCore.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
+using AutoFiCore.Enums;
 
 namespace AutoFiCore.Models
 {
@@ -35,6 +36,7 @@ namespace AutoFiCore.Models
 
         public ICollection<Bid> Bids { get; set; } = new List<Bid>();
         public ICollection<Watchlist> Watchers { get; set; } = new List<Watchlist>();
+        public ICollection<AutoBid> AutoBids { get; set; } = new List<AutoBid>();
 
     }
 }

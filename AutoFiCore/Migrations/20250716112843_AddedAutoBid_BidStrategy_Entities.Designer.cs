@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using AutoFiCore.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AutoFiCore.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250716112843_AddedAutoBid_BidStrategy_Entities")]
+    partial class AddedAutoBid_BidStrategy_Entities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -71,7 +74,7 @@ namespace AutoFiCore.Migrations
                     b.HasIndex("AuctionId", "IsActive", "MaxBidAmount")
                         .HasDatabaseName("IX_AutoBid_ActiveByAuction");
 
-                    b.ToTable("AutoBids");
+                    b.ToTable("autoBids");
                 });
 
             modelBuilder.Entity("AutoFiCore.Models.Auction", b =>

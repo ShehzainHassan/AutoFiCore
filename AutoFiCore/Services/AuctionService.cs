@@ -5,7 +5,10 @@ using AutoFiCore.Models;
 using AutoFiCore.Queries;
 using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;
+using AutoFiCore.Enums;
 using System;
+using Microsoft.AspNetCore.SignalR;
+using AutoFiCore.Hubs;
 
 namespace AutoFiCore.Services
 {
@@ -27,10 +30,12 @@ namespace AutoFiCore.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AuctionService> _logger;
-        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log)
+        private readonly IHubContext<AuctionHub> _hub;
+        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IHubContext<AuctionHub> hub)
         {
             _uow = uow;
             _logger = log;
+            _hub = hub;
         }
 
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
@@ -139,6 +144,8 @@ namespace AutoFiCore.Services
                 IsAuto = bid.IsAuto,
                 PlacedAt = bid.CreatedUtc
             };
+
+            await _uow.SaveChangesAsync();
 
             return Result<BidDTO>.Success(bidDto);
         }

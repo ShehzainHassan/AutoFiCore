@@ -9,6 +9,7 @@
         IAuctionRepository Auctions { get; }    
         IBidRepository Bids { get; }
         IWatchlistRepository Watchlist { get; }
+        IAutoBidRepository AutoBid { get; }
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

@@ -1,5 +1,6 @@
 ﻿using AutoFiCore.Dto;
 using AutoFiCore.Models;
+using AutoFiCore.Enums;
 
 namespace AutoFiCore.Data
 {
