@@ -95,6 +95,7 @@ namespace AutoFiCore.Controllers
             return Ok(result.Value);
         }
 
+        [Authorize]
         [HttpPost("{id}/watch")]
         public async Task<IActionResult> AddToWatchlist(int id, [FromQuery] int userId)
         {
@@ -106,6 +107,7 @@ namespace AutoFiCore.Controllers
             return Ok(watchList);
         }
 
+        [Authorize]
         [HttpDelete("{id}/watch")]
         public async Task<IActionResult> RemoveFromWatchlist(int id, [FromQuery] int userId)
         {
