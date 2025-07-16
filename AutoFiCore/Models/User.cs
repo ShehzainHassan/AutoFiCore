@@ -20,6 +20,7 @@ namespace AutoFiCore.Models
         public string Password { get; set; } = string.Empty;
         public ICollection<Bid> Bids { get; set; } = new List<Bid>();
         public ICollection<Watchlist> Watchlists { get; set; } = new List<Watchlist>();
+        public ICollection<AutoBid> AutoBids { get; set; } = new List<AutoBid>();
 
     }
 }

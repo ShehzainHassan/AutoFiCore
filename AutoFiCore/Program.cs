@@ -10,6 +10,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using QuestPDF.Infrastructure;
 using AutoFiCore.Utilities;
+using AutoFiCore.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,6 +109,7 @@ else
     builder.Services.AddScoped<IAuctionRepository, DbAuctionRepository>();
     builder.Services.AddScoped<IBidRepository, DbAuctionRepository>();
     builder.Services.AddScoped<IWatchlistRepository, DbAuctionRepository>();
+    builder.Services.AddScoped<IAutoBidRepository, DbAutoBidRepository>();
 }
 
 // Register user service
@@ -140,6 +142,12 @@ builder.Services.AddScoped<INewsLetterService, NewsLetterService>();
 // Register auction service
 builder.Services.AddScoped<IAuctionService, AuctionService>();
 
+// Register auto bid service
+builder.Services.AddScoped<IAutoBidService, AutoBidService>();
+
+// Register SignalR service
+builder.Services.AddSignalR();
+
 // Add services to the container.
 builder.Services.AddControllers();
 
@@ -169,6 +177,8 @@ var app = builder.Build();
 
 app.MapHealthChecks("/health");
 app.MapHealthChecks("/health/ready");
+app.MapHub<AuctionHub>("/hubs/auction");
+
 
 StartupValidator.ValidateEnvironment(builder.Configuration, app.Environment);
 

@@ -1,4 +1,6 @@
-﻿namespace AutoFiCore.Dto
+﻿using AutoFiCore.Enums;
+
+namespace AutoFiCore.Dto
 {
     public class CreateAuctionDTO
     {
