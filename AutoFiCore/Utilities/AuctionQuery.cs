@@ -8,8 +8,8 @@ public static class AuctionQuery
 {
     public static IQueryable<Auction> ApplyFilters(IQueryable<Auction> source, AuctionQueryParams filters)
     {
-        if (!string.IsNullOrWhiteSpace(filters.Status))
-            source = source.Where(a => a.Status == filters.Status);
+        if (filters.Status.HasValue)
+            source = source.Where(a => a.Status == filters.Status.Value);
 
         if (!string.IsNullOrWhiteSpace(filters.Make))
             source = source.Where(a => a.Vehicle.Make == filters.Make);

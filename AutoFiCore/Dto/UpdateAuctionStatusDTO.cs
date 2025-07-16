@@ -1,8 +1,11 @@
-﻿namespace AutoFiCore.Dto
+﻿using System.Text.Json.Serialization;
+
+namespace AutoFiCore.Dto
 {
     public class UpdateAuctionStatusDTO
     {
-        public string Status { get; set; } = string.Empty;
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public AuctionStatus Status { get; set; } = AuctionStatus.Active;
 
     }
 }

@@ -33,6 +33,7 @@ public class ApplicationDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+
         //Configure constraints
         modelBuilder.Entity<Vehicle>(entity =>
         {
@@ -166,10 +167,9 @@ public class ApplicationDbContext : DbContext
             entity.Property(a => a.EndUtc).IsRequired();
             entity.Property(a => a.StartingPrice).IsRequired();
             entity.Property(a => a.CurrentPrice).IsRequired();
-            entity.Property(a => a.Status).IsRequired().HasMaxLength(25);
+            entity.Property(a => a.Status).IsRequired().HasMaxLength(25).HasConversion<string>();
             entity.Property(a => a.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
             entity.Property(a => a.UpdatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
         });
 
         modelBuilder.Entity<Bid>(entity =>

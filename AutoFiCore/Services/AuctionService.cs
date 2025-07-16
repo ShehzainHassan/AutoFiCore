@@ -11,8 +11,8 @@ namespace AutoFiCore.Services
 {
     public interface IAuctionService
     {
-        Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto);        
-        Task<Result<Auction>> UpdateAuctionStatusAsync(int auctionId, string status);
+        Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto);
+        Task<Result<AuctionDTO?>> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status);
         Task<List<AuctionDTO>> GetAuctionsAsync(AuctionQueryParams filters);
         Task<Result<AuctionDTO?>> GetAuctionByIdAsync(int id);
         Task<Result<BidDTO>> PlaceBidAsync(int auctionId, CreateBidDTO dto);
@@ -53,14 +53,12 @@ namespace AutoFiCore.Services
                 EndUtc = dto.EndUtc,
                 StartingPrice = dto.StartingPrice,
                 CurrentPrice = 0,
-                Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status,
+                Status = dto.Status ?? AuctionStatus.Active,
                 CreatedUtc = DateTime.UtcNow,
                 UpdatedUtc = DateTime.UtcNow
             };
 
             var allowedStatuses = new[] { "Active", "Ended", "Cancelled" };
-            if (!allowedStatuses.Contains(dto.Status))
-                return Result<AuctionDTO>.Failure("Invalid status.");
 
             var createdAuction = await _uow.Auctions.AddAuctionAsync(auction);
             await _uow.SaveChangesAsync();
@@ -68,18 +66,16 @@ namespace AutoFiCore.Services
             return Result<AuctionDTO>.Success(dtoResult);
         }
 
-        public async Task<Result<Auction>> UpdateAuctionStatusAsync(int auctionId, string status)
+        public async Task<Result<AuctionDTO?>> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
         {
-            var allowedStatuses = new[] { "Active", "Ended", "Cancelled" }; 
-            if (!allowedStatuses.Contains(status))
-                return Result<Auction>.Failure("Invalid status.");
-
-            var auction = await _uow.Auctions.UpdateAuctionStatusAsync(auctionId, status);
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
             if (auction == null)
-                return Result<Auction>.Failure("Auction not found.");
+                return Result<AuctionDTO?>.Failure("Auction not found.");
+
+            await _uow.Auctions.UpdateAuctionStatusAsync(auctionId, status);
 
             await _uow.SaveChangesAsync();
-            return Result<Auction>.Success(auction);
+            return Result<AuctionDTO?>.Success(AuctionMapper.ToDTO(auction));
         }
 
         public async Task<List<AuctionDTO>> GetAuctionsAsync(AuctionQueryParams filters)
@@ -112,7 +108,7 @@ namespace AutoFiCore.Services
             if (user == null)
                 return Result<BidDTO>.Failure("User not found.");
 
-            if (auction.Status != "Active" || auction.EndUtc <= DateTime.UtcNow)
+            if (auction.Status != AuctionStatus.Active || auction.EndUtc <= DateTime.UtcNow)
                 return Result<BidDTO>.Failure("Auction has ended.");
 
             var errs = Validator.ValidateBidAmount(dto.Amount, auction.StartingPrice, auction.CurrentPrice);
