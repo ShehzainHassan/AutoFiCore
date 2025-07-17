@@ -6,44 +6,23 @@ namespace AutoFiCore.Hubs
 {
     public class AuctionHub : Hub
     {
-        private static readonly Dictionary<int, List<string>> _userConnections = new();
-        public Task JoinGroup(string groupName) =>
-            Groups.AddToGroupAsync(Context.ConnectionId, groupName);
-        public Task LeaveGroup(string groupName) =>
-            Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
-        public async Task NotifyOutbid(int auctionId, int bidderUserId)
+        public async Task NotifyNewBid(int auctionId)
         {
-            var groupName = $"auction-{auctionId}";
-
-            await Clients.Group(groupName)
-                         .SendAsync("ReceiveOutbidNotification",
-                                    "You got outbid.",
-                                    bidderUserId);
+            await Clients.Group($"auction-{auctionId}")
+                .SendAsync("ReceiveNewBid", auctionId);
         }
         public override async Task OnConnectedAsync()
         {
-            var userId = GetUserId();
-            if (!_userConnections.ContainsKey(userId))
-                _userConnections[userId] = new List<string>();
-
-            _userConnections[userId].Add(Context.ConnectionId);
-            await base.OnConnectedAsync();
-        }
-        public override async Task OnDisconnectedAsync(Exception? ex)
-        {
-            var userId = GetUserId();
-            if (_userConnections.TryGetValue(userId, out var list))
+            var httpContext = Context.GetHttpContext();
+            if (httpContext != null)
             {
-                list.Remove(Context.ConnectionId);
-                if (list.Count == 0) _userConnections.Remove(userId);
+                var auctionId = httpContext.Request.Query["auctionId"];
+                if (int.TryParse(auctionId, out int id))
+                {
+                    await Groups.AddToGroupAsync(Context.ConnectionId, $"auction-{id}");
+                }
             }
-            await base.OnDisconnectedAsync(ex);
-        }
-        private int GetUserId()
-        {
-            var claim = Context.User?.FindFirst("id")
-                      ?? Context.User?.FindFirst(ClaimTypes.NameIdentifier);
-            return int.TryParse(claim?.Value, out var id) ? id : -1;
+            await base.OnConnectedAsync();
         }
     }
 }
