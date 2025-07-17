@@ -128,7 +128,6 @@ namespace AutoFiCore.Services
             await _uow.Bids.AddBidAsync(bid);
 
             await _uow.Auctions.UpdateCurrentPriceAsync(auctionId);
-
             await _uow.SaveChangesAsync();
 
             var bidDto = new BidDTO
@@ -141,12 +140,22 @@ namespace AutoFiCore.Services
                 PlacedAt = bid.CreatedUtc
             };
 
-            await _uow.SaveChangesAsync();
+            if (auction.ReservePrice.HasValue && !auction.IsReserveMet && bid.Amount >= auction.ReservePrice.Value)
+            {
+                auction.IsReserveMet = true;
+                auction.ReserveMetAt = DateTime.UtcNow;
+                await _uow.SaveChangesAsync();
 
-            await _hub.Clients.Group($"auction-{bid.AuctionId}").SendAsync("ReceiveNewBid", bid.AuctionId);
+                await _hub.Clients.Group($"auction-{auctionId}")
+                    .SendAsync("ReservePriceMet");
+            }
+
+            await _hub.Clients.Group($"auction-{bid.AuctionId}")
+                .SendAsync("ReceiveNewBid", bid.AuctionId);
 
             return Result<BidDTO>.Success(bidDto);
         }
+
         public async Task<Result<List<BidDTO>>> GetBidHistoryAsync(int auctionId)
         {
             if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
