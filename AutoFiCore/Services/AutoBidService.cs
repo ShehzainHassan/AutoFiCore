@@ -59,7 +59,7 @@ namespace AutoFiCore.Services
                     var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
                     if (autoBid.UserId != highestBidder)
                     {
-                        var nextBidAmount = newBidAmount + 1;
+                        var nextBidAmount = newBidAmount + 500;
                         var createBidDto = new CreateBidDTO
                         {
                             Amount = nextBidAmount,
