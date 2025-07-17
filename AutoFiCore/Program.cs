@@ -1,16 +1,17 @@
-using Microsoft.EntityFrameworkCore;
+using AutoFiCore.BackgroundServices;
 using AutoFiCore.Data;
+using AutoFiCore.Hubs;
 using AutoFiCore.Middleware;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
-using Polly;
-using Polly.Retry;
+using AutoFiCore.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using Polly;
+using Polly.Retry;
 using QuestPDF.Infrastructure;
-using AutoFiCore.Utilities;
-using AutoFiCore.Hubs;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -148,8 +149,13 @@ builder.Services.AddScoped<IAutoBidService, AutoBidService>();
 // Register SignalR service
 builder.Services.AddSignalR();
 
+// Register background service
+builder.Services.AddHostedService<AutoBidBackgroundService>();
+
 // Add services to the container.
 builder.Services.AddControllers();
+
+
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();

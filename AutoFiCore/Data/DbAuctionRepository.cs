@@ -79,6 +79,18 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .FirstOrDefaultAsync();
     }
 
+    public async Task<int?> GetHighestBidderIdAsync(int auctionId)
+    {
+        var highestBid = await _dbContext.Bids
+            .Where(b => b.AuctionId == auctionId)
+            .OrderByDescending(b => b.Amount)
+            .Select(b => b.UserId)
+            .FirstOrDefaultAsync();
+
+        return highestBid == 0 ? null : highestBid;
+    }
+
+
     public async Task UpdateCurrentPriceAsync(int auctionId)
     {
         var highestBid = await _dbContext.Bids
@@ -133,6 +145,13 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     public Task<bool> IsWatchingAsync(int userId, int auctionId)
     {
         return _dbContext.Watchlists.AnyAsync(w => w.UserId == userId && w.AuctionId == auctionId);
+    }
+    public async Task<List<Auction>> GetAuctionsWithActiveAutoBidsAsync()
+    {
+        return await _dbContext.Auctions
+            .Where(a => a.Status == AuctionStatus.Active &&
+                        _dbContext.AutoBids.Any(ab => ab.AuctionId == a.AuctionId && ab.IsActive))
+            .ToListAsync();
     }
 
 }

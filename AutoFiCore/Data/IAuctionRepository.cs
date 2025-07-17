@@ -12,5 +12,6 @@ namespace AutoFiCore.Data
         IQueryable<Auction> Query();
         Task<Auction?> GetAuctionByIdAsync(int id);
         Task UpdateCurrentPriceAsync(int auctionId);
+        Task<List<Auction>> GetAuctionsWithActiveAutoBidsAsync();
     }
 }

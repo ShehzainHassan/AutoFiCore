@@ -13,23 +13,93 @@ namespace AutoFiCore.Services
         Task<Result<AutoBidDTO>> CancelAutoBidAsync(int id, int userId);
         Task<List<AutoBidDTO>> GetActiveAutoBidsForUserAsync(int userId);
         Task<AutoBidSummaryDto?> GetAuctionAutoBidSummaryAsync(int auctionId);
+        Task ProcessAutoBidTrigger(int auctionId, decimal newBidAmount);
     }
     public class AutoBidService:IAutoBidService
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AutoBidService> _log;
+        private readonly IAuctionService _auctionService;
 
-        public AutoBidService(IUnitOfWork uow, ILogger<AutoBidService> log)
+        public AutoBidService(IUnitOfWork uow, ILogger<AutoBidService> log, IAuctionService auctionService)
         {
             _uow = uow;
             _log = log;
-        }
+            _auctionService = auctionService;
+        }   
+        public async Task ProcessAutoBidTrigger(int auctionId, decimal newBidAmount)
+        {
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            if (auction == null || auction.Status != AuctionStatus.Active)
+            {
+                _log.LogWarning("Auction with {AuctionId} not found", auctionId);
+                return;
+            }
 
+            if (auction.Status !=AuctionStatus.Active)
+            {
+                _log.LogWarning("Auction is not active");
+                return;
+            }
+
+            var autoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
+
+            var eligibleAutoBids = await _uow.AutoBid.GetEligibleAutoBidsAsync(auctionId, newBidAmount);
+
+            if (!eligibleAutoBids.Any())
+            {
+                _log.LogInformation("No eligible auto-bids found for auction {AuctionId} after bid amount {BidAmount}.", auctionId, newBidAmount);
+                return;
+            }
+
+            foreach (var autoBid in eligibleAutoBids)
+            {
+                try
+                {
+                    var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
+                    if (autoBid.UserId != highestBidder)
+                    {
+                        var nextBidAmount = newBidAmount + 1;
+                        var createBidDto = new CreateBidDTO
+                        {
+                            Amount = nextBidAmount,
+                            UserId = autoBid.UserId,
+                            IsAuto = true
+                        };
+
+                        var result = await _auctionService.PlaceBidAsync(auctionId, createBidDto);
+                        if (result.IsSuccess)
+                        {
+                            _log.LogInformation("Auto-bid placed by user {UserId} on auction {AuctionId} for {Amount}", autoBid.UserId, auctionId, nextBidAmount);
+                            break;
+                        }
+                        else
+                        {
+                            _log.LogWarning("Auto-bid failed for user {UserId} on auction {AuctionId}: {Reason}", autoBid.UserId, auctionId, result.Error);
+                        }
+
+                    }
+                    else
+                    {
+                        _log.LogWarning("User {UserId} on auction {AuctionId} is already highest bidder. Skipping auto-bid", autoBid.UserId, auctionId);
+
+                    }
+
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "Exception while processing auto-bid for user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
+                }
+            }
+        }
         public async Task<Result<AutoBidDTO>> CreateAutoBidAsync(CreateAutoBidDTO dto, int userId)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(dto.AuctionId);
             if (auction == null || auction.Status != AuctionStatus.Active)
                 return Result<AutoBidDTO>.Failure("Auction not found or not active.");
+
+            if (auction.CurrentPrice == 0 && dto.MaxBidAmount < auction.StartingPrice)
+                return Result<AutoBidDTO>.Failure("MaxBidAmount must be greater than starting price.");
 
             if (dto.MaxBidAmount <= auction.CurrentPrice)
                 return Result<AutoBidDTO>.Failure("MaxBidAmount must be greater than current price.");
@@ -42,6 +112,7 @@ namespace AutoFiCore.Services
                 UserId = userId,
                 AuctionId = dto.AuctionId,
                 MaxBidAmount = dto.MaxBidAmount,
+                CurrentBidAmount = 0,
                 BidStrategyType = dto.BidStrategyType,
                 IsActive = dto.IsActive,
                 CreatedAt = DateTime.UtcNow,
