@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Models;
+﻿using AutoFiCore.Enums;
+using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Polly;
 
@@ -51,6 +52,13 @@ namespace AutoFiCore.Data
                 .Where(ab => ab.AuctionId == auctionId && ab.IsActive)
                 .ToListAsync();
         }
-
+        public async Task<List<AutoBid>> GetEligibleAutoBidsAsync(int auctionId, decimal currentBid)
+        {
+            var autoBids = await GetActiveAutoBidsByAuctionIdAsync(auctionId);
+            return autoBids
+                .Where(ab => ab.MaxBidAmount > currentBid)
+                .OrderBy(ab => ab.CreatedAt)
+                .ToList();
+        }
     }
 }

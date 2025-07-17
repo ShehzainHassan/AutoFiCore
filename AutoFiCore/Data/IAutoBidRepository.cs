@@ -8,5 +8,6 @@
         Task SetInactiveAsync(int autoBidId);
         Task<List<AutoBid>> GetActiveAutoBidsByUserAsync(int userId);
         Task<List<AutoBid>> GetActiveAutoBidsByAuctionIdAsync(int auctionId);
+        Task<List<AutoBid>> GetEligibleAutoBidsAsync(int auctionId, decimal currentBid);
     }
 }

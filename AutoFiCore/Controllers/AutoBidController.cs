@@ -20,7 +20,7 @@ public class AutoBidController : ControllerBase
     [Authorize]
     public async Task<IActionResult> CreateAutoBid([FromBody] CreateAutoBidDTO dto)
     {
-        var userId = 24;
+        var userId = 25;
         var result = await _autoBidService.CreateAutoBidAsync(dto, userId);
 
         if (!result.IsSuccess)
