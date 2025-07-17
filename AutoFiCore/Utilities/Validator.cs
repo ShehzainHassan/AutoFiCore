@@ -155,7 +155,7 @@ namespace AutoFiCore.Utilities
                 errors.Add("EndUtc cannot be empty.");
 
             if (dto.EndUtc <= dto.StartUtc)
-                errors.Add("EndUtc must be <= StartUtc.");
+                errors.Add("EndUtc must be > StartUtc.");
 
             if (dto.StartingPrice < 0)
                 errors.Add("Starting price must be non-negative.");

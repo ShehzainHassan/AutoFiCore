@@ -70,7 +70,6 @@ namespace AutoFiCore.Services
             var dtoResult = AuctionMapper.ToDTO(auction);
             return Result<AuctionDTO>.Success(dtoResult);
         }
-
         public async Task<Result<AuctionDTO?>> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
@@ -82,7 +81,6 @@ namespace AutoFiCore.Services
             await _uow.SaveChangesAsync();
             return Result<AuctionDTO?>.Success(AuctionMapper.ToDTO(auction));
         }
-
         public async Task<List<AuctionDTO>> GetAuctionsAsync(AuctionQueryParams filters)
         {
             var query = _uow.Auctions.Query().Include(a => a.Vehicle).Include(a => a.Bids);
@@ -92,7 +90,6 @@ namespace AutoFiCore.Services
 
             return auctions.Select(AuctionMapper.ToDTO).ToList();
         }
-
         public async Task<Result<AuctionDTO?>> GetAuctionByIdAsync(int id)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(id);
@@ -102,7 +99,6 @@ namespace AutoFiCore.Services
 
             return Result<AuctionDTO?>.Success(AuctionMapper.ToDTO(auction));
         }
-
         public async Task<Result<BidDTO>> PlaceBidAsync(int auctionId, CreateBidDTO dto)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
@@ -147,10 +143,10 @@ namespace AutoFiCore.Services
 
             await _uow.SaveChangesAsync();
 
+            await _hub.Clients.Group($"auction-{bid.AuctionId}").SendAsync("ReceiveNewBid", bid.AuctionId);
+
             return Result<BidDTO>.Success(bidDto);
         }
-
-
         public async Task<Result<List<BidDTO>>> GetBidHistoryAsync(int auctionId)
         {
             if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
@@ -170,7 +166,6 @@ namespace AutoFiCore.Services
 
             return Result<List<BidDTO>>.Success(dtos);
         }
-
         public async Task<Result<List<BidDTO>>> GetUserBidHistoryAsync(int userId)
         {
             if (await _uow.Users.GetUserByIdAsync(userId) is null)
@@ -190,7 +185,6 @@ namespace AutoFiCore.Services
 
             return Result<List<BidDTO>>.Success(dtos);
         }
-
         public async Task<Result<string>> AddToWatchListAsync(int userId, int auctionId)
         {
             if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
@@ -203,7 +197,6 @@ namespace AutoFiCore.Services
             await _uow.SaveChangesAsync();
             return Result<string>.Success("Auction added to watchlist.");
         }
-
         public async Task<Result<string>> RemoveFromWatchListAsync(int userId, int auctionId)
         {
             if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
@@ -216,7 +209,6 @@ namespace AutoFiCore.Services
             await _uow.SaveChangesAsync();
             return Result<string>.Success("Removed auction from watchlist.");
         }
-
         public async Task<Result<List<WatchlistDTO>>> GetUserWatchListAsync(int userId)
         {
             if (await _uow.Users.GetUserByIdAsync(userId) is null)
@@ -234,7 +226,6 @@ namespace AutoFiCore.Services
 
             return Result<List<WatchlistDTO>>.Success(dtos);
         }
-
         public async Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId)
         {
             if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
@@ -252,8 +243,5 @@ namespace AutoFiCore.Services
 
             return Result<List<WatchlistDTO>>.Success(dtos);
         }
-
-
-
     }
 }
