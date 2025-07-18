@@ -352,7 +352,7 @@ app.UseCors(MyAllowSpecificOrigins);
 // Add our execution time logging middleware
 app.UseRequestExecutionTimeLogging();
 
-//app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 
 app.UseAuthentication();
 
@@ -360,7 +360,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.Run();
+await app.RunAsync();
 
 // Helper method to convert Railway DATABASE_URL to Npgsql connection string
 static string ConvertRailwayDatabaseUrl(string databaseUrl)
