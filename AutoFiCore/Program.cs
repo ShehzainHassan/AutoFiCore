@@ -82,15 +82,35 @@ if (string.IsNullOrEmpty(databaseSettings.ConnectionString))
     var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
     if (!string.IsNullOrEmpty(databaseUrl))
     {
-        databaseSettings.ConnectionString = databaseUrl;
+        try
+        {
+            // Convert Railway DATABASE_URL format to Npgsql connection string
+            databaseSettings.ConnectionString = ConvertRailwayDatabaseUrl(databaseUrl);
+            Console.WriteLine($"Using converted DATABASE_URL for connection");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error converting DATABASE_URL: {ex.Message}");
+            Console.WriteLine($"Original DATABASE_URL format: {databaseUrl}");
+            throw new InvalidOperationException($"Failed to convert DATABASE_URL to valid connection string: {ex.Message}");
+        }
+    }
+    else
+    {
+        Console.WriteLine("No DATABASE_URL environment variable found");
+        throw new InvalidOperationException("No database connection string configured. Set DATABASE_URL environment variable or configure ConnectionString in appsettings.json");
     }
 }
 
 builder.Services.AddSingleton(databaseSettings);
 
+// Add health checks with proper error handling
 builder.Services.AddHealthChecks()
-    .AddNpgSql(databaseSettings.ConnectionString, name: "database")
+    .AddNpgSql(databaseSettings.ConnectionString, name: "database", timeout: TimeSpan.FromSeconds(30))
     .AddCheck<VehicleServiceHealthCheck>("vehicle-service");
+
+// Log connection string info for debugging (without sensitive data)
+Console.WriteLine($"Database connection configured - Host: {GetHostFromConnectionString(databaseSettings.ConnectionString)}");
 
 // Configure API settings
 var apiSettings = builder.Configuration.GetSection("ApiSettings").Get<ApiSettings>()
@@ -268,3 +288,75 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Helper method to convert Railway DATABASE_URL to Npgsql connection string
+static string ConvertRailwayDatabaseUrl(string databaseUrl)
+{
+    if (string.IsNullOrEmpty(databaseUrl))
+    {
+        throw new ArgumentException("Database URL cannot be null or empty");
+    }
+
+    try
+    {
+        // Parse the DATABASE_URL (format: postgresql://username:password@host:port/database)
+        var uri = new Uri(databaseUrl);
+        
+        if (uri.Scheme != "postgresql" && uri.Scheme != "postgres")
+        {
+            throw new ArgumentException($"Invalid database URL scheme: {uri.Scheme}. Expected 'postgresql' or 'postgres'");
+        }
+
+        // Extract components
+        var host = uri.Host;
+        var port = uri.Port != -1 ? uri.Port : 5432;
+        var database = uri.AbsolutePath.TrimStart('/');
+        var username = uri.UserInfo?.Split(':')[0];
+        var password = uri.UserInfo?.Split(':').Length > 1 ? uri.UserInfo.Split(':')[1] : "";
+
+        // Handle URL decoding for special characters
+        if (!string.IsNullOrEmpty(password))
+        {
+            password = Uri.UnescapeDataString(password);
+        }
+        if (!string.IsNullOrEmpty(username))
+        {
+            username = Uri.UnescapeDataString(username);
+        }
+        if (!string.IsNullOrEmpty(database))
+        {
+            database = Uri.UnescapeDataString(database);
+        }
+
+        // Build Npgsql connection string
+        var connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};";
+        
+        // Add SSL settings for production (Railway requires SSL)
+        connectionString += "SSL Mode=Require;Trust Server Certificate=true;";
+
+        return connectionString;
+    }
+    catch (UriFormatException ex)
+    {
+        throw new ArgumentException($"Invalid DATABASE_URL format: {ex.Message}", ex);
+    }
+    catch (Exception ex)
+    {
+        throw new ArgumentException($"Error parsing DATABASE_URL: {ex.Message}", ex);
+    }
+}
+
+// Helper method to safely extract host from connection string for logging
+static string GetHostFromConnectionString(string connectionString)
+{
+    try
+    {
+        var parts = connectionString.Split(';');
+        var hostPart = parts.FirstOrDefault(p => p.StartsWith("Host=", StringComparison.OrdinalIgnoreCase));
+        return hostPart?.Split('=')[1] ?? "Unknown";
+    }
+    catch
+    {
+        return "Unknown";
+    }
+}
