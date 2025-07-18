@@ -57,24 +57,21 @@ builder.Logging.SetMinimumLevel(LogLevel.Information);
 
 var MyAllowSpecificOrigins = "_MyAllowSubdomainPolicy";
 
+// Configure CORS settings
+var corsSettings = builder.Configuration.GetSection("CorsSettings").Get<CorsSettings>()
+    ?? new CorsSettings();
+builder.Services.AddSingleton(corsSettings);
+
+var allowedOrigins = corsSettings.GetAllowedOrigins();
+Console.WriteLine($"CORS configured with {allowedOrigins.Count} allowed origins");
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(MyAllowSpecificOrigins,
     policy =>
     {
         policy
-            .WithOrigins(
-                "http://localhost:3000",
-                "http://localhost:3001", 
-                "http://localhost:5173",
-                "http://localhost:5174",
-                "http://localhost:4200",
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:3001",
-                "http://127.0.0.1:5173",
-                "http://127.0.0.1:5174",
-                "http://127.0.0.1:4200"
-            )
+            .WithOrigins(allowedOrigins.ToArray())
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials();
