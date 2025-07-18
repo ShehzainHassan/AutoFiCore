@@ -13,7 +13,38 @@ using Polly.Retry;
 using QuestPDF.Infrastructure;
 using System.Text;
 
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder;
+try
+{
+    builder = WebApplication.CreateBuilder(args);
+}
+catch (InvalidDataException ex) when (ex.Message.Contains("appsettings.json"))
+{
+    // Fallback: Create builder without appsettings.json if it's corrupted
+    Console.WriteLine("WARNING: appsettings.json appears to be corrupted. Using environment variables only.");
+    var options = new WebApplicationOptions
+    {
+        Args = args,
+        ContentRootPath = AppContext.BaseDirectory
+    };
+    builder = WebApplication.CreateBuilder(options);
+    
+    // Add minimal configuration manually for Railway deployment
+    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["Logging:LogLevel:Default"] = "Information",
+        ["AllowedHosts"] = "*",
+        ["ApiSettings:UseMockApi"] = "false",
+        ["DatabaseSettings:ConnectionString"] = "",
+        ["DatabaseSettings:MaxRetryCount"] = "3",
+        ["DatabaseSettings:RetryDelaySeconds"] = "5",
+        ["DatabaseSettings:CommandTimeoutSeconds"] = "30",
+        ["Jwt:Secret"] = "",
+        ["Jwt:Issuer"] = "AutoFiCore",
+        ["Jwt:Audience"] = "AutoFiCoreClient",
+        ["Jwt:ExpirationInMinutes"] = "60"
+    });
+}
 
 QuestPDF.Settings.License = LicenseType.Community;
 
