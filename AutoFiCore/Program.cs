@@ -81,50 +81,62 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Configure database settings
-var databaseSettings = builder.Configuration.GetSection("DatabaseSettings").Get<DatabaseSettings>()
-    ?? throw new InvalidOperationException("Database settings are not configured properly.");
-
-// Override with environment variables if available (for Railway deployment)
-if (string.IsNullOrEmpty(databaseSettings.ConnectionString))
-{
-    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
-    if (!string.IsNullOrEmpty(databaseUrl))
-    {
-        try
-        {
-            // Convert Railway DATABASE_URL format to Npgsql connection string
-            databaseSettings.ConnectionString = ConvertRailwayDatabaseUrl(databaseUrl);
-            Console.WriteLine($"Using converted DATABASE_URL for connection");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error converting DATABASE_URL: {ex.Message}");
-            Console.WriteLine($"Original DATABASE_URL format: {databaseUrl}");
-            throw new InvalidOperationException($"Failed to convert DATABASE_URL to valid connection string: {ex.Message}");
-        }
-    }
-    else
-    {
-        Console.WriteLine("No DATABASE_URL environment variable found");
-        throw new InvalidOperationException("No database connection string configured. Set DATABASE_URL environment variable or configure ConnectionString in appsettings.json");
-    }
-}
-
-builder.Services.AddSingleton(databaseSettings);
-
-// Add health checks with proper error handling
-builder.Services.AddHealthChecks()
-    .AddNpgSql(databaseSettings.ConnectionString, name: "database", timeout: TimeSpan.FromSeconds(10))
-    .AddCheck<VehicleServiceHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
-
-// Log connection string info for debugging (without sensitive data)
-Console.WriteLine($"Database connection configured - Host: {GetHostFromConnectionString(databaseSettings.ConnectionString)}");
-
-// Configure API settings
+// Configure API settings first to determine if we need database
 var apiSettings = builder.Configuration.GetSection("ApiSettings").Get<ApiSettings>()
     ?? new ApiSettings { UseMockApi = false };
 builder.Services.AddSingleton(apiSettings);
+
+// Configure database settings only if not using mock API
+DatabaseSettings databaseSettings = new DatabaseSettings();
+if (!apiSettings.UseMockApi)
+{
+    databaseSettings = builder.Configuration.GetSection("DatabaseSettings").Get<DatabaseSettings>()
+        ?? throw new InvalidOperationException("Database settings are not configured properly.");
+
+    // Override with environment variables if available (for Railway deployment)
+    if (string.IsNullOrEmpty(databaseSettings.ConnectionString))
+    {
+        var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+        if (!string.IsNullOrEmpty(databaseUrl))
+        {
+            try
+            {
+                // Convert Railway DATABASE_URL format to Npgsql connection string
+                databaseSettings.ConnectionString = ConvertRailwayDatabaseUrl(databaseUrl);
+                Console.WriteLine($"Using converted DATABASE_URL for connection");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error converting DATABASE_URL: {ex.Message}");
+                Console.WriteLine($"Original DATABASE_URL format: {databaseUrl}");
+                throw new InvalidOperationException($"Failed to convert DATABASE_URL to valid connection string: {ex.Message}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("No DATABASE_URL environment variable found");
+            throw new InvalidOperationException("No database connection string configured. Set DATABASE_URL environment variable or configure ConnectionString in appsettings.json");
+        }
+    }
+
+    // Add health checks with proper error handling
+    builder.Services.AddHealthChecks()
+        .AddNpgSql(databaseSettings.ConnectionString, name: "database", timeout: TimeSpan.FromSeconds(10))
+        .AddCheck<VehicleServiceHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
+
+    // Log connection string info for debugging (without sensitive data)
+    Console.WriteLine($"Database connection configured - Host: {GetHostFromConnectionString(databaseSettings.ConnectionString)}");
+}
+else
+{
+    // Mock API mode - add basic health checks without database
+    builder.Services.AddHealthChecks()
+        .AddCheck<VehicleServiceHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
+    
+    Console.WriteLine("Using Mock API - database connection not required");
+}
+
+builder.Services.AddSingleton(databaseSettings);
 
 // Configure Entity Framework Core logging and DbContext
 builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
