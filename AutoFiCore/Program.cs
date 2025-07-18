@@ -106,8 +106,8 @@ builder.Services.AddSingleton(databaseSettings);
 
 // Add health checks with proper error handling
 builder.Services.AddHealthChecks()
-    .AddNpgSql(databaseSettings.ConnectionString, name: "database", timeout: TimeSpan.FromSeconds(30))
-    .AddCheck<VehicleServiceHealthCheck>("vehicle-service");
+    .AddNpgSql(databaseSettings.ConnectionString, name: "database", timeout: TimeSpan.FromSeconds(10))
+    .AddCheck<VehicleServiceHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
 
 // Log connection string info for debugging (without sensitive data)
 Console.WriteLine($"Database connection configured - Host: {GetHostFromConnectionString(databaseSettings.ConnectionString)}");
@@ -250,10 +250,65 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
+// Configure Railway port binding
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+var railwayUrl = $"http://0.0.0.0:{port}";
+
+// Override ASPNETCORE_URLS for Railway deployment
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("RAILWAY_ENVIRONMENT")))
+{
+    builder.WebHost.UseUrls(railwayUrl);
+    Console.WriteLine($"Railway deployment detected - binding to {railwayUrl}");
+}
+else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PORT")))
+{
+    builder.WebHost.UseUrls(railwayUrl);
+    Console.WriteLine($"PORT environment variable detected - binding to {railwayUrl}");
+}
+
 var app = builder.Build();
 
-app.MapHealthChecks("/health");
-app.MapHealthChecks("/health/ready");
+// Configure health check endpoints with detailed logging
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        
+        context.Response.ContentType = "application/json";
+        
+        var response = new
+        {
+            status = report.Status.ToString(),
+            checks = report.Entries.Select(x => new
+            {
+                name = x.Key,
+                status = x.Value.Status.ToString(),
+                description = x.Value.Description,
+                duration = x.Value.Duration.TotalMilliseconds
+            }),
+            totalDuration = report.TotalDuration.TotalMilliseconds
+        };
+        
+        logger.LogInformation("Health check completed with status: {Status}", report.Status);
+        
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(response));
+    }
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = async (context, report) =>
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation("Readiness check completed with status: {Status}", report.Status);
+        
+        context.Response.ContentType = "text/plain";
+        await context.Response.WriteAsync(report.Status.ToString());
+    }
+});
+
 app.MapHub<AuctionHub>("/hubs/auction");
 
 
