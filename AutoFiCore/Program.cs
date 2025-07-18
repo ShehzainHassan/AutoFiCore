@@ -44,6 +44,17 @@ builder.Services.AddCors(options =>
 // Configure database settings
 var databaseSettings = builder.Configuration.GetSection("DatabaseSettings").Get<DatabaseSettings>()
     ?? throw new InvalidOperationException("Database settings are not configured properly.");
+
+// Override with environment variables if available (for Railway deployment)
+if (string.IsNullOrEmpty(databaseSettings.ConnectionString))
+{
+    var databaseUrl = Environment.GetEnvironmentVariable("DATABASE_URL");
+    if (!string.IsNullOrEmpty(databaseUrl))
+    {
+        databaseSettings.ConnectionString = databaseUrl;
+    }
+}
+
 builder.Services.AddSingleton(databaseSettings);
 
 builder.Services.AddHealthChecks()
@@ -164,8 +175,13 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 var jwtSecret = builder.Configuration["Jwt:Secret"];
+// Override with environment variable if available (for Railway deployment)
 if (string.IsNullOrEmpty(jwtSecret))
-    throw new InvalidOperationException("JWT Secret key is missing in configuration.");
+{
+    jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
+}
+if (string.IsNullOrEmpty(jwtSecret))
+    throw new InvalidOperationException("JWT Secret key is missing in configuration and JWT_SECRET environment variable.");
 
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>

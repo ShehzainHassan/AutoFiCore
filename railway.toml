@@ -1,0 +1,33 @@
+[build]
+# Use Docker for the build process
+builder = "dockerfile"
+# Dockerfile path (relative to project root)
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Health check endpoint
+healthcheckPath = "/health"
+# Health check timeout in seconds
+healthcheckTimeout = 30
+# Restart policy
+restartPolicyType = "on-failure"
+# Maximum restart attempts
+restartPolicyMaxRetries = 3
+
+[environments.production]
+# Environment variables specific to production
+[environments.production.variables]
+ASPNETCORE_ENVIRONMENT = "Production"
+ASPNETCORE_URLS = "http://+:$PORT"
+
+[environments.staging]
+# Environment variables specific to staging
+[environments.staging.variables]
+ASPNETCORE_ENVIRONMENT = "Staging"
+ASPNETCORE_URLS = "http://+:$PORT"
+
+# Build configuration
+[build.watchPatterns]
+# Watch for changes in these directories/files
+include = ["AutoFiCore/**"]
+ignore = ["**/bin/**", "**/obj/**", "**/*.md", "**/Tests/**"] 
