@@ -4,7 +4,7 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 # Set working directory
 WORKDIR /app
 
-# Copy main project file and restore dependencies
+# Copy project file and restore dependencies
 COPY AutoFiCore/AutoFiCore.csproj ./AutoFiCore/
 WORKDIR /app/AutoFiCore
 RUN dotnet restore
@@ -13,9 +13,9 @@ RUN dotnet restore
 WORKDIR /app
 COPY AutoFiCore/ ./AutoFiCore/
 
-# Build and publish the application
+# Build and publish the application (targeting the .csproj directly, not the solution)
 WORKDIR /app/AutoFiCore
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN dotnet publish AutoFiCore.csproj -c Release -o /app/publish --no-restore
 
 # Use the official ASP.NET runtime image for final stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime

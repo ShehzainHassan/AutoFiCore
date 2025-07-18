@@ -14,7 +14,7 @@
 
         private static void ValidateProductionSecrets(IConfiguration config)
         {
-            var requiredEnvVars = new[] { "DATABASE_CONNECTION_STRING", "JWT_SECRET" };
+            var requiredEnvVars = new[] { "DATABASE_URL", "JWT_SECRET" };
 
             var missing = requiredEnvVars
                 .Where(v => string.IsNullOrEmpty(Environment.GetEnvironmentVariable(v)))
@@ -29,6 +29,11 @@
         private static void ValidateSecuritySettings(IConfiguration config)
         {
             var jwtSecret = config["Jwt:Secret"];
+            // Check environment variable if config value is empty (for Railway deployment)
+            if (string.IsNullOrEmpty(jwtSecret))
+            {
+                jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
+            }
 
             if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
             {
