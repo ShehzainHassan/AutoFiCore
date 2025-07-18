@@ -38,8 +38,7 @@ USER dotnetuser
 # Expose port (Railway automatically assigns PORT env var)
 EXPOSE 8080
 
-# Set environment variables
-ENV ASPNETCORE_URLS=http://+:8080
+# Set environment variables (ASPNETCORE_URLS will be set by Railway via $PORT)
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DOTNET_RUNNING_IN_CONTAINER=true
 
