@@ -62,11 +62,26 @@ builder.Services.AddCors(options =>
     options.AddPolicy(MyAllowSpecificOrigins,
     policy =>
     {
+        if (builder.Environment.IsDevelopment())
+        {
             // Development: Allow localhost origins
+            policy
+                .WithOrigins(
+                    "http://localhost:3000",
+                )
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .AllowCredentials();
+        }
+        else
+        {
+            // Production: Allow any origin (you can specify your frontend domain instead)
             policy
                 .AllowAnyOrigin()
                 .AllowAnyMethod()
-                .AllowAnyHeader()
+                .AllowAnyHeader();
+                // Note: AllowCredentials() cannot be used with AllowAnyOrigin()
+        }
     });
 });
 
