@@ -3,6 +3,8 @@
 builder = "dockerfile"
 # Dockerfile path (relative to project root)
 dockerfilePath = "Dockerfile"
+# Watch patterns for rebuilds
+watchPatterns = ["AutoFiCore/**"]
 
 [deploy]
 # Health check endpoint
@@ -10,7 +12,7 @@ healthcheckPath = "/health"
 # Health check timeout in seconds
 healthcheckTimeout = 30
 # Restart policy
-restartPolicyType = "on-failure"
+restartPolicyType = "always"
 # Maximum restart attempts
 restartPolicyMaxRetries = 3
 
@@ -24,10 +26,4 @@ ASPNETCORE_URLS = "http://+:$PORT"
 # Environment variables specific to staging
 [environments.staging.variables]
 ASPNETCORE_ENVIRONMENT = "Staging"
-ASPNETCORE_URLS = "http://+:$PORT"
-
-# Build configuration
-[build.watchPatterns]
-# Watch for changes in these directories/files
-include = ["AutoFiCore/**"]
-ignore = ["**/bin/**", "**/obj/**", "**/*.md", "**/Tests/**"] 
+ASPNETCORE_URLS = "http://+:$PORT" 
