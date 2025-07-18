@@ -1,2 +1,0 @@
-# Only track large data files with LFS, not configuration files
-Data/car-features.json filter=lfs diff=lfs merge=lfs -text
