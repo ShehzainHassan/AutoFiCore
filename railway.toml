@@ -21,6 +21,7 @@ restartPolicyMaxRetries = 3
 [environments.production.variables]
 ASPNETCORE_ENVIRONMENT = "Production"
 ASPNETCORE_URLS = "http://+:$PORT"
+DOTNET_RUNNING_IN_CONTAINER = "true"
 
 [environments.staging]
 # Environment variables specific to staging

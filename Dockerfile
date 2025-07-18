@@ -4,21 +4,17 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 # Set working directory
 WORKDIR /app
 
-# Copy csproj files and restore dependencies
-COPY AutoFiCore/*.csproj AutoFiCore/
-COPY AutoFiCore.Tests/*.csproj AutoFiCore.Tests/
+# Copy main project file and restore dependencies
+COPY AutoFiCore/AutoFiCore.csproj ./AutoFiCore/
 WORKDIR /app/AutoFiCore
 RUN dotnet restore
 
 # Copy source code
 WORKDIR /app
-COPY AutoFiCore/ AutoFiCore/
+COPY AutoFiCore/ ./AutoFiCore/
 
-# Build the application
+# Build and publish the application
 WORKDIR /app/AutoFiCore
-RUN dotnet build -c Release --no-restore
-
-# Publish the application
 RUN dotnet publish -c Release -o /app/publish --no-restore
 
 # Use the official ASP.NET runtime image for final stage
@@ -45,6 +41,7 @@ EXPOSE 8080
 # Set environment variables
 ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_RUNNING_IN_CONTAINER=true
 
 # Start the application
 ENTRYPOINT ["dotnet", "AutoFiCore.dll"] 
