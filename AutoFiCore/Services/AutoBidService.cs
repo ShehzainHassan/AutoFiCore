@@ -182,15 +182,15 @@ namespace AutoFiCore.Services
             await _uow.AutoBid.SetInactiveAsync(userId, auctionId);
             await _uow.SaveChangesAsync();
 
-          _log.LogInformation("Auto-bid and bid strategy removed for user {UserId} on auction {AuctionId}", userId, auctionId);
+            _log.LogInformation("Auto-bid and bid strategy removed for user {UserId} on auction {AuctionId}", userId, auctionId);
 
             return Result<string>.Success("Auto-bid cancelled and bid strategy deleted successfully");
         }
         public async Task<Result<string>> UpdateAutoBidAsync(int auctionId, int userId, UpdateAutoBidDTO dto)
         {
             var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
-            
-          
+
+
             if (autoBid == null)
                 return Result<string>.Failure("Auto-bid not found");
 
@@ -215,7 +215,7 @@ namespace AutoFiCore.Services
             {
                 autoBid.BidStrategyType = (BidStrategyType)dto.BidStrategyType.Value;
             }
-            
+
             else if (dto.BidStrategyType.HasValue)
             {
                 return Result<string>.Failure("Invalid bid strategy type.");
@@ -238,7 +238,7 @@ namespace AutoFiCore.Services
 
             _log.LogInformation("Auto-bid updated for (auction {Auction})", autoBid.AuctionId);
             return Result<string>.Success("Auto-bid updated successfully");
-        } 
+        }
         public async Task<AutoBidSummaryDto?> GetAuctionAutoBidSummaryAsync(int auctionId)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);

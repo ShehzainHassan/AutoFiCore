@@ -9,7 +9,7 @@ namespace AutoFiCore.Dto
         public DateTime StartUtc { get; set; }
         public DateTime EndUtc { get; set; }
         public decimal StartingPrice { get; set; }
-        public decimal? ReservePrice { get; set; } 
+        public decimal? ReservePrice { get; set; }
         public AuctionStatus? Status { get; set; }
     }
 }

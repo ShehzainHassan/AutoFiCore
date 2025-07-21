@@ -1,4 +1,4 @@
-﻿using AutoFiCore.Data;
+using AutoFiCore.Data;
 using AutoFiCore.Dto;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
