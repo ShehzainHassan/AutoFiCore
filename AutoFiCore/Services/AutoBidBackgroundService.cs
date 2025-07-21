@@ -1,4 +1,5 @@
 ﻿using AutoFiCore.Data;
+using AutoFiCore.Models;
 using AutoFiCore.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -36,6 +37,11 @@ namespace AutoFiCore.BackgroundServices
 
                         var activeAuctions = await uow.Auctions.GetAuctionsWithActiveAutoBidsAsync();
 
+                        if (activeAuctions.Count == 0)
+                        {
+                           _logger.LogInformation("No autobids found");
+                            return;
+                        }
                         foreach (var auction in activeAuctions)
                         {
                             if (auction.CurrentPrice == 0)

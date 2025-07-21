@@ -13,8 +13,8 @@ namespace AutoFiCore.Data
         public IBidRepository Bids { get; }
         public IWatchlistRepository Watchlist { get; }
         public INewsLetterRepository NewsLetter { get; }
-
         public IAutoBidRepository AutoBid { get; }
+
         public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository, IAuctionRepository auctions, IBidRepository bids, IWatchlistRepository watchlist, IAutoBidRepository autoBid)
         {
             _context = context;

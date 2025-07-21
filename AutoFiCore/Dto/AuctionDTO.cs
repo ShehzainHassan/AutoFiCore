@@ -7,6 +7,7 @@ namespace AutoFiCore.Dto
     {
         public int AuctionId { get; set; }
         public decimal StartingPrice { get; set; }
+        public decimal? ReservePrice { get; set; }
         public decimal CurrentPrice { get; set; }
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public AuctionStatus Status { get; set; } = AuctionStatus.Active;

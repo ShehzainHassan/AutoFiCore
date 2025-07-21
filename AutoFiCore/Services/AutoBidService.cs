@@ -2,20 +2,22 @@
 using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Mappers;
+using AutoFiCore.Models;
 using AutoFiCore.Utilities;
 
 namespace AutoFiCore.Services
 {
     public interface IAutoBidService
     {
-        Task<Result<AutoBidDTO>> CreateAutoBidAsync(CreateAutoBidDTO dto, int userId);
-        Task<Result<AutoBidDTO>> UpdateAutoBidAsync(int id, UpdateAutoBidDTO dto, int userId);
-        Task<Result<AutoBidDTO>> CancelAutoBidAsync(int id, int userId);
-        Task<List<AutoBidDTO>> GetActiveAutoBidsForUserAsync(int userId);
+        Task<Result<CreateAutoBidDTO>> CreateAutoBidAsync(CreateAutoBidDTO dto);
+        Task<Result<string>> UpdateAutoBidAsync(int auctionId, int userId, UpdateAutoBidDTO dto);
+        Task<Result<string>> CancelAutoBidAsync(int auctionId, int userId);
         Task<AutoBidSummaryDto?> GetAuctionAutoBidSummaryAsync(int auctionId);
         Task ProcessAutoBidTrigger(int auctionId, decimal newBidAmount);
+        Task<Result<bool>> IsAutoBidSetAsync(int auctionId, int userId);
+        Task<Result<CreateAutoBidDTO?>> GetAutoBidWithStrategyAsync(int userId, int auctionId);
     }
-    public class AutoBidService:IAutoBidService
+    public class AutoBidService : IAutoBidService
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AutoBidService> _log;
@@ -26,17 +28,17 @@ namespace AutoFiCore.Services
             _uow = uow;
             _log = log;
             _auctionService = auctionService;
-        }   
+        }
         public async Task ProcessAutoBidTrigger(int auctionId, decimal newBidAmount)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
-            if (auction == null || auction.Status != AuctionStatus.Active)
+            if (auction == null)
             {
                 _log.LogWarning("Auction with {AuctionId} not found", auctionId);
                 return;
             }
 
-            if (auction.Status !=AuctionStatus.Active)
+            if (auction.Status != AuctionStatus.Active)
             {
                 _log.LogWarning("Auction is not active");
                 return;
@@ -92,24 +94,51 @@ namespace AutoFiCore.Services
                 }
             }
         }
-        public async Task<Result<AutoBidDTO>> CreateAutoBidAsync(CreateAutoBidDTO dto, int userId)
+        public async Task<Result<CreateAutoBidDTO>> CreateAutoBidAsync(CreateAutoBidDTO dto)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(dto.AuctionId);
             if (auction == null || auction.Status != AuctionStatus.Active)
-                return Result<AutoBidDTO>.Failure("Auction not found or not active.");
+                return Result<CreateAutoBidDTO>.Failure("Auction not found or not active.");
 
             if (auction.CurrentPrice == 0 && dto.MaxBidAmount < auction.StartingPrice)
-                return Result<AutoBidDTO>.Failure("MaxBidAmount must be greater than starting price.");
+                return Result<CreateAutoBidDTO>.Failure("MaxBidAmount must be greater than starting price.");
 
             if (dto.MaxBidAmount <= auction.CurrentPrice)
-                return Result<AutoBidDTO>.Failure("MaxBidAmount must be greater than current price.");
+                return Result<CreateAutoBidDTO>.Failure("MaxBidAmount must be greater than current price.");
 
-            if (await _uow.AutoBid.IsActiveAsync(userId, dto.AuctionId))
-                return Result<AutoBidDTO>.Failure("An active auto-bid already exists for this auction.");
+            var existingAutoBid = await _uow.AutoBid.GetAutoBidWithStrategyAsync(dto.UserId, dto.AuctionId);
+
+            if (existingAutoBid != null)
+            {
+                var updateDto = new UpdateAutoBidDTO
+                {
+                    MaxBidAmount = dto.MaxBidAmount,
+                    BidStrategyType = (int?)dto.BidStrategyType,
+                    IsActive = dto.IsActive
+                };
+
+                var updateResult = await UpdateAutoBidAsync(dto.AuctionId, dto.UserId, updateDto);
+
+                var existingStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, dto.AuctionId);
+                if (existingStrategy != null)
+                {
+                    existingStrategy.Type = dto.BidStrategyType;
+                    existingStrategy.PreferredBidTiming = dto.PreferredBidTiming;
+                    existingStrategy.BidDelaySeconds = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.BidDelaySeconds;
+                    existingStrategy.MaxBidsPerMinute = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.MaxBidsPerMinute;
+                    existingStrategy.UpdatedAt = DateTime.UtcNow;
+                }
+
+                await _uow.SaveChangesAsync();
+
+                return updateResult.IsSuccess
+                    ? Result<CreateAutoBidDTO>.Success(dto)
+                    : Result<CreateAutoBidDTO>.Failure(updateResult.Error ?? "Failed to update AutoBid.");
+            }
 
             var ab = new AutoBid
             {
-                UserId = userId,
+                UserId = dto.UserId,
                 AuctionId = dto.AuctionId,
                 MaxBidAmount = dto.MaxBidAmount,
                 CurrentBidAmount = 0,
@@ -119,53 +148,64 @@ namespace AutoFiCore.Services
                 UpdatedAt = DateTime.UtcNow
             };
 
+            var bidStrategy = new BidStrategy
+            {
+                UserId = dto.UserId,
+                AuctionId = dto.AuctionId,
+                Type = dto.BidStrategyType,
+                BidDelaySeconds = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.BidDelaySeconds,
+                MaxBidsPerMinute = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.MaxBidsPerMinute,
+                PreferredBidTiming = dto.PreferredBidTiming,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+            };
+
             await _uow.AutoBid.AddAutoBidAsync(ab);
+            await _uow.AutoBid.AddBidStrategyAsync(bidStrategy);
             await _uow.SaveChangesAsync();
 
-            _log.LogInformation("Auto-bid created for (auction {Auction})",ab.AuctionId);
+            _log.LogInformation("Auto-bid created for auction {Auction}", ab.AuctionId);
 
-            return Result<AutoBidDTO>.Success(AutoBidMapper.ToDTO(ab));
+            return Result<CreateAutoBidDTO>.Success(dto);
         }
-        public async Task<Result<AutoBidDTO>> CancelAutoBidAsync(int id, int userId)
+
+        public async Task<Result<string>> CancelAutoBidAsync(int auctionId, int userId)
         {
-            var autoBid = await _uow.AutoBid.GetByIdAsync(id);
+            var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
 
             if (autoBid == null)
-                return Result<AutoBidDTO>.Failure("Auto-bid not found");
-
-            if (autoBid.UserId != userId)
-                return Result<AutoBidDTO>.Failure("User Id does not match. Access denied.");
+                return Result<string>.Failure("Auto-bid not found");
 
             if (!autoBid.IsActive)
-                return Result<AutoBidDTO>.Failure("Auto bid is already inactive");
+                return Result<string>.Failure("Auto-bid is already inactive");
 
-            await _uow.AutoBid.SetInactiveAsync(id);
-          
+            await _uow.AutoBid.SetInactiveAsync(userId, auctionId);
             await _uow.SaveChangesAsync();
 
-            _log.LogInformation("Auto-bid cancelled for (auction {Auction})", autoBid.AuctionId);
-            return Result<AutoBidDTO>.Success(AutoBidMapper.ToDTO(autoBid));
+          _log.LogInformation("Auto-bid and bid strategy removed for user {UserId} on auction {AuctionId}", userId, auctionId);
 
+            return Result<string>.Success("Auto-bid cancelled and bid strategy deleted successfully");
         }
-        public async Task<Result<AutoBidDTO>> UpdateAutoBidAsync(int id, UpdateAutoBidDTO dto, int userId)
+        public async Task<Result<string>> UpdateAutoBidAsync(int auctionId, int userId, UpdateAutoBidDTO dto)
         {
-            var autoBid = await _uow.AutoBid.GetByIdAsync(id);
+            var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
             
+          
             if (autoBid == null)
-                return Result<AutoBidDTO>.Failure("Auto-bid not found");
+                return Result<string>.Failure("Auto-bid not found");
 
             if (autoBid.UserId != userId)
-                return Result<AutoBidDTO>.Failure("User Id does not match. Access denied.");
+                return Result<string>.Failure("User Id does not match. Access denied.");
 
             var auction = await _uow.Auctions.GetAuctionByIdAsync(autoBid.AuctionId);
             if (auction == null)
-                return Result<AutoBidDTO>.Failure("Auction not found");
+                return Result<string>.Failure("Auction not found");
 
             if (auction.Status != AuctionStatus.Active)
-                return Result<AutoBidDTO>.Failure("Auction is not active.");
+                return Result<string>.Failure("Auction is not active.");
 
             if (dto.MaxBidAmount < auction.CurrentPrice)
-                return Result<AutoBidDTO>.Failure("MaxBidAmount cannot be less than current bid.");
+                return Result<string>.Failure("MaxBidAmount cannot be less than current bid.");
 
             if (dto.MaxBidAmount.HasValue)
                 autoBid.MaxBidAmount = dto.MaxBidAmount.Value;
@@ -175,25 +215,30 @@ namespace AutoFiCore.Services
             {
                 autoBid.BidStrategyType = (BidStrategyType)dto.BidStrategyType.Value;
             }
+            
             else if (dto.BidStrategyType.HasValue)
             {
-                return Result<AutoBidDTO>.Failure("Invalid bid strategy type.");
+                return Result<string>.Failure("Invalid bid strategy type.");
             }
             if (dto.IsActive.HasValue)
                 autoBid.IsActive = dto.IsActive.Value;
             autoBid.UpdatedAt = DateTime.UtcNow;
+            var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(userId, auctionId);
+            if (bidStrategy != null)
+            {
+                if (dto.BidStrategyType.HasValue &&
+                    Enum.IsDefined(typeof(BidStrategyType), dto.BidStrategyType.Value))
+                {
+                    bidStrategy.Type = (BidStrategyType)dto.BidStrategyType.Value;
+                }
 
+                bidStrategy.UpdatedAt = DateTime.UtcNow;
+            }
             await _uow.SaveChangesAsync();
 
             _log.LogInformation("Auto-bid updated for (auction {Auction})", autoBid.AuctionId);
-            return Result<AutoBidDTO>.Success(AutoBidMapper.ToDTO(autoBid));
-        }
-        public async Task<List<AutoBidDTO>> GetActiveAutoBidsForUserAsync(int userId)
-        {
-            var autoBids = await _uow.AutoBid.GetActiveAutoBidsByUserAsync(userId);
-
-            return autoBids.Select(AutoBidMapper.ToDTO).ToList();
-        }
+            return Result<string>.Success("Auto-bid updated successfully");
+        } 
         public async Task<AutoBidSummaryDto?> GetAuctionAutoBidSummaryAsync(int auctionId)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
@@ -221,6 +266,34 @@ namespace AutoFiCore.Services
 
             return summary;
         }
+        public async Task<Result<bool>> IsAutoBidSetAsync(int auctionId, int userId)
+        {
+            var user = await _uow.Users.GetUserByIdAsync(userId);
+            if (user == null)
+                return Result<bool>.Failure("User not found");
+
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            if (auction == null)
+                return Result<bool>.Failure("Auction not found");
+
+            bool isActive = await _uow.AutoBid.IsActiveAsync(userId, auctionId);
+            return Result<bool>.Success(isActive);
+        }
+        public async Task<Result<CreateAutoBidDTO?>> GetAutoBidWithStrategyAsync(int userId, int auctionId)
+        {
+            var user = await _uow.Users.GetUserByIdAsync(userId);
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+
+            if (user == null)
+                return Result<CreateAutoBidDTO?>.Failure("User not found");
+
+            if (auction == null)
+                return Result<CreateAutoBidDTO?>.Failure("Auction not found");
+
+            var result = await _uow.AutoBid.GetAutoBidWithStrategyAsync(userId, auctionId);
+            return Result<CreateAutoBidDTO?>.Success(result);
+        }
+
 
     }
 }

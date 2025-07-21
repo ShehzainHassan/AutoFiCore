@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using AutoFiCore.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AutoFiCore.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250718122631_Updated_BidStrategies_Entity")]
+    partial class Updated_BidStrategies_Entity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -64,7 +67,9 @@ namespace AutoFiCore.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId", "AuctionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_AutoBid_User_Auction");
 
                     b.HasIndex("AuctionId", "IsActive", "MaxBidAmount")
                         .HasDatabaseName("IX_AutoBid_ActiveByAuction");
@@ -179,10 +184,13 @@ namespace AutoFiCore.Migrations
 
             modelBuilder.Entity("AutoFiCore.Models.BidStrategy", b =>
                 {
-                    b.Property<int>("AuctionId")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
-                    b.Property<int>("UserId")
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AuctionId")
                         .HasColumnType("integer");
 
                     b.Property<int?>("BidDelaySeconds")
@@ -217,15 +225,15 @@ namespace AutoFiCore.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
-                    b.HasKey("AuctionId", "UserId");
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuctionId");
 
                     b.HasIndex("PreferredBidTiming")
                         .HasDatabaseName("IX_BidStrategy_Timing");
 
                     b.HasIndex("Type")
                         .HasDatabaseName("IX_BidStrategy_Type");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("BidStrategies");
                 });
@@ -828,15 +836,7 @@ namespace AutoFiCore.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("AutoFiCore.Models.User", "User")
-                        .WithMany("BidStrategies")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("Auction");
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("AutoFiCore.Models.Drivetrain", b =>
@@ -961,8 +961,6 @@ namespace AutoFiCore.Migrations
             modelBuilder.Entity("AutoFiCore.Models.User", b =>
                 {
                     b.Navigation("AutoBids");
-
-                    b.Navigation("BidStrategies");
 
                     b.Navigation("Bids");
 
