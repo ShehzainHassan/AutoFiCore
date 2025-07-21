@@ -1,0 +1,30 @@
+[build]
+# Use Docker for the build process
+builder = "dockerfile"
+# Dockerfile path (relative to project root)
+dockerfilePath = "Dockerfile"
+# Watch patterns for rebuilds
+watchPatterns = ["AutoFiCore/**"]
+
+[deploy]
+# Health check endpoint
+healthcheckPath = "/health"
+# Health check timeout in seconds
+healthcheckTimeout = 30
+# Restart policy
+restartPolicyType = "always"
+# Maximum restart attempts
+restartPolicyMaxRetries = 3
+
+[environments.production]
+# Environment variables specific to production
+[environments.production.variables]
+ASPNETCORE_ENVIRONMENT = "Production"
+ASPNETCORE_URLS = "http://+:$PORT"
+DOTNET_RUNNING_IN_CONTAINER = "true"
+
+[environments.staging]
+# Environment variables specific to staging
+[environments.staging.variables]
+ASPNETCORE_ENVIRONMENT = "Staging"
+ASPNETCORE_URLS = "http://+:$PORT" 

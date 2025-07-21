@@ -1,4 +1,4 @@
-﻿using AutoFiCore.Models;
+using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Polly;
 
@@ -17,5 +17,5 @@ namespace AutoFiCore.Data
         Task<List<AutoBid>> GetEligibleAutoBidsAsync(int auctionId, decimal currentBid);
         Task<BidStrategy> AddBidStrategyAsync(BidStrategy bidStrategy);
         public void UpdateBidStrategy(BidStrategy updatedStrategy);
-    } 
+    }
 }

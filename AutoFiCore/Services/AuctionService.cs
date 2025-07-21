@@ -51,7 +51,6 @@ namespace AutoFiCore.Services
             if (await _uow.Auctions.VehicleHasAuction(dto.VehicleId))
                 return Result<AuctionDTO>.Failure("An auction already exists for this vehicle");
 
-            
             var auction = new Auction
             {
                 VehicleId = dto.VehicleId,

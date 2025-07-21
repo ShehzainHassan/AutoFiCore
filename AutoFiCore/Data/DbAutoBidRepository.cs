@@ -5,7 +5,7 @@ using Polly;
 
 namespace AutoFiCore.Data
 {
-    public class DbAutoBidRepository:IAutoBidRepository
+    public class DbAutoBidRepository : IAutoBidRepository
     {
         private readonly ApplicationDbContext _dbContext;
         private readonly ILogger<DbAutoBidRepository> _logger;

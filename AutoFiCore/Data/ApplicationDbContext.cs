@@ -200,7 +200,7 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<BidStrategy>(entity =>
         {
-            entity.HasKey(b => new { b.AuctionId, b.UserId});
+            entity.HasKey(b => new { b.AuctionId, b.UserId });
             entity.Property(b => b.Type).IsRequired();
             entity.Property(b => b.PreferredBidTiming).IsRequired();
             entity.Property(b => b.SuccessfulBids).IsRequired().HasDefaultValue(0);

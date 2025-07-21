@@ -39,7 +39,7 @@ namespace AutoFiCore.BackgroundServices
 
                         if (activeAuctions.Count == 0)
                         {
-                           _logger.LogInformation("No autobids found");
+                            _logger.LogInformation("No autobids found");
                             return;
                         }
                         foreach (var auction in activeAuctions)
