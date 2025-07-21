@@ -21,6 +21,7 @@ namespace AutoFiCore.Models
         public ICollection<Bid> Bids { get; set; } = new List<Bid>();
         public ICollection<Watchlist> Watchlists { get; set; } = new List<Watchlist>();
         public ICollection<AutoBid> AutoBids { get; set; } = new List<AutoBid>();
+        public ICollection<BidStrategy> BidStrategies { get; set; } = new List<BidStrategy>();
 
     }
 }

@@ -11,6 +11,7 @@ namespace AutoFiCore.Mappers
             {
                 AuctionId = auction.AuctionId,
                 StartingPrice = auction.StartingPrice,
+                ReservePrice = auction.ReservePrice,
                 CurrentPrice = auction.CurrentPrice,
                 Status = auction.Status,
                 StartUtc = auction.StartUtc,

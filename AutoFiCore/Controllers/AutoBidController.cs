@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Dto;
+﻿using AutoFiCore.Data;
+using AutoFiCore.Dto;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -10,18 +11,19 @@ using System.Security.Claims;
 public class AutoBidController : ControllerBase
 {
     private readonly IAutoBidService _autoBidService;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public AutoBidController(IAutoBidService autoBidService)
+    public AutoBidController(IAutoBidService autoBidService, IUnitOfWork unitOfWork)
     {
         _autoBidService = autoBidService;
+        _unitOfWork = unitOfWork;
     }
 
     [HttpPost]
     [Authorize]
     public async Task<IActionResult> CreateAutoBid([FromBody] CreateAutoBidDTO dto)
     {
-        var userId = 25;
-        var result = await _autoBidService.CreateAutoBidAsync(dto, userId);
+        var result = await _autoBidService.CreateAutoBidAsync(dto);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = result.Error });
@@ -29,12 +31,11 @@ public class AutoBidController : ControllerBase
         return Ok(result.Value);
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("update/auction/{auctionId}/user/{userId}")]
     [Authorize]
-    public async Task<IActionResult> UpdateAutoBid(int id, [FromBody] UpdateAutoBidDTO dto)
+    public async Task<IActionResult> UpdateAutoBid(int auctionId, int userId, [FromBody] UpdateAutoBidDTO dto)
     {
-        var userId = 24; 
-        var result = await _autoBidService.UpdateAutoBidAsync(id, dto, userId);
+        var result = await _autoBidService.UpdateAutoBidAsync(auctionId, userId, dto);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = result.Error });
@@ -42,28 +43,37 @@ public class AutoBidController : ControllerBase
         return Ok(result.Value);
     }
 
-    [HttpDelete("{id}")]
+    [HttpDelete("{auctionId}/user/{userId}")]
     [Authorize]
-    public async Task<IActionResult> CancelAutoBid(int id)
+    public async Task<IActionResult> CancelAutoBid(int userId, int auctionId)
     {
-        var userId = 24;
-        var result = await _autoBidService.CancelAutoBidAsync(id, userId);
+        var result = await _autoBidService.CancelAutoBidAsync(auctionId, userId);
 
         if (!result.IsSuccess)
             return BadRequest(new { error = result.Error });
 
-        return Ok(new {message = "Auto-bid cancelled successfully"});
+        return Ok(new { message = "Auto-bid cancelled successfully" });
     }
 
-    [HttpGet("user/{userId}")]
-    public async Task<ActionResult<List<AutoBidDTO>>> GetActiveAutoBidsForUser(int userId)
+    [HttpGet("auction/{auctionId}/user/{userId}")]
+    public async Task<ActionResult<bool>> IsAutoBidSet(int auctionId, int userId)
     {
-        var result = await _autoBidService.GetActiveAutoBidsForUserAsync(userId);
+        var result = await _autoBidService.IsAutoBidSetAsync(auctionId, userId);
+        if (!result.IsSuccess)
+            return BadRequest(new { error = result.Error });
 
-        if (result == null || !result.Any())
-            return NotFound("No active auto-bids found for this user.");
+        return Ok(result.Value);
+    }
 
-        return Ok(result);
+    [HttpGet("{auctionId}/user/{userId}")]
+    public async Task<IActionResult> GetAutoBidWithStrategy(int userId, int auctionId)
+    {
+        var result = await _autoBidService.GetAutoBidWithStrategyAsync(userId, auctionId);
+
+        if (!result.IsSuccess)
+            return NotFound(new { message = result.Error });
+
+        return Ok(result.Value);
     }
 
     [HttpGet("/api/auction/{auctionId}/autobids")]
@@ -75,6 +85,4 @@ public class AutoBidController : ControllerBase
 
         return Ok(summary);
     }
-
-
 }

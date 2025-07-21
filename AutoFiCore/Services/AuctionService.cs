@@ -51,6 +51,7 @@ namespace AutoFiCore.Services
             if (await _uow.Auctions.VehicleHasAuction(dto.VehicleId))
                 return Result<AuctionDTO>.Failure("An auction already exists for this vehicle");
 
+            
             var auction = new Auction
             {
                 VehicleId = dto.VehicleId,
@@ -58,12 +59,12 @@ namespace AutoFiCore.Services
                 EndUtc = dto.EndUtc,
                 StartingPrice = dto.StartingPrice,
                 CurrentPrice = 0,
+                ReservePrice = dto.ReservePrice ?? dto.StartingPrice,
+                IsReserveMet = false,
                 Status = dto.Status ?? AuctionStatus.Active,
                 CreatedUtc = DateTime.UtcNow,
                 UpdatedUtc = DateTime.UtcNow
             };
-
-            var allowedStatuses = new[] { "Active", "Ended", "Cancelled" };
 
             var createdAuction = await _uow.Auctions.AddAuctionAsync(auction);
             await _uow.SaveChangesAsync();
@@ -155,7 +156,6 @@ namespace AutoFiCore.Services
 
             return Result<BidDTO>.Success(bidDto);
         }
-
         public async Task<Result<List<BidDTO>>> GetBidHistoryAsync(int auctionId)
         {
             if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
