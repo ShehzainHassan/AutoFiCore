@@ -162,19 +162,28 @@ namespace AutoFiCore.Utilities
 
             return errors;
         }
-        public static List<string> ValidateBidAmount(decimal amount, decimal startingPrice, decimal currentPrice)
+        public static List<string> ValidateBidAmount(decimal amount, decimal startingPrice, decimal currentPrice, int bidCount)
         {
             var errors = new List<string>();
 
             if (amount <= 0)
+            {
                 errors.Add("Bid must be greater than 0.");
-            else if (currentPrice == 0 && amount < startingPrice)
-                errors.Add("Bid must be at least the starting price.");
-            else if (currentPrice > 0 && amount <= currentPrice)
-                errors.Add("Bid must be higher than the current price.");
+                return errors;
+            }
+
+            decimal minimumIncrement = BidIncrementCalculator.GetMinimumIncrement(currentPrice, bidCount);
+            decimal minimumBid = currentPrice > 0 ? currentPrice + minimumIncrement : startingPrice;
+
+            if (amount < minimumBid)
+            {
+                errors.Add($"Bid must be at least {minimumBid:C}.");
+            }
 
             return errors;
         }
+
+
 
     }
 }
