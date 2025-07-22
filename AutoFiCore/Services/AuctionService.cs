@@ -25,6 +25,7 @@ namespace AutoFiCore.Services
         Task<Result<List<WatchlistDTO>>> GetUserWatchListAsync(int userId);
         Task<Result<List<BidDTO>>> GetUserBidHistoryAsync(int userId);
         Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId);
+        Task<Result<int?>> GetHighestBidderIdAsync(int auctionId);
     }
     public class AuctionService : IAuctionService
     {
@@ -37,7 +38,6 @@ namespace AutoFiCore.Services
             _logger = log;
             _hub = hub;
         }
-
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
         {
             var errors = Validator.ValidateAuctionDto(dto);
@@ -102,7 +102,6 @@ namespace AutoFiCore.Services
             var dtoResult = AuctionMapper.ToDTO(auction);
             return Result<AuctionDTO>.Success(dtoResult);
         }
-
         public async Task<Result<AuctionDTO?>> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
@@ -292,5 +291,15 @@ namespace AutoFiCore.Services
 
             return Result<List<WatchlistDTO>>.Success(dtos);
         }
+        public async Task<Result<int?>> GetHighestBidderIdAsync(int auctionId)
+        {
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            if (auction == null)
+                return Result<int?>.Failure("Auction not found");
+
+            var highestBidderId = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
+            return Result<int?>.Success(highestBidderId);
+        }
+
     }
 }
