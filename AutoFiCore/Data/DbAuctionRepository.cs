@@ -35,6 +35,22 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         _dbContext.Auctions.Update(auction);
         return auction;
     }
+    public async Task<Auction?> UpdateReserveStatusAsync(int auctionId)
+    {
+        var auction = await _dbContext.Auctions.FindAsync(auctionId);
+        if (auction == null)
+            return null;
+
+        auction.IsReserveMet = true;
+        auction.ReserveMetAt = DateTime.UtcNow;
+        auction.UpdatedUtc = DateTime.UtcNow;
+
+        _dbContext.Auctions.Update(auction);
+        await _dbContext.SaveChangesAsync();
+
+        return auction;
+    }
+
     public IQueryable<Auction> Query()
     {
         return _dbContext.Auctions.AsQueryable().Include(a => a.Vehicle);
@@ -70,7 +86,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .AsNoTracking()
             .ToListAsync();
     }
-
     public async Task<Bid?> GetHighestBidAsync(int auctionId)
     {
         return await _dbContext.Bids
@@ -78,7 +93,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .OrderByDescending(b => b.Amount)
             .FirstOrDefaultAsync();
     }
-
     public async Task<int?> GetHighestBidderIdAsync(int auctionId)
     {
         var highestBid = await _dbContext.Bids
@@ -89,8 +103,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
 
         return highestBid == 0 ? null : highestBid;
     }
-
-
     public async Task UpdateCurrentPriceAsync(int auctionId)
     {
         var highestBid = await _dbContext.Bids
@@ -105,7 +117,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
                 .SetProperty(a => a.CurrentPrice, a => highestBid)
                 .SetProperty(a => a.UpdatedUtc, a => DateTime.UtcNow));
     }
-
     public async Task AddToWatchlistAsync(int userId, int auctionId)
     {
         if (!await IsWatchingAsync(userId, auctionId))
@@ -115,7 +126,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             await _dbContext.SaveChangesAsync();
         }
     }
-
     public async Task RemoveFromWatchlistAsync(int userId, int auctionId)
     {
         var entry = await _dbContext.Watchlists
@@ -127,14 +137,12 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             await _dbContext.SaveChangesAsync();
         }
     }
-
     public async Task<List<Watchlist>> GetUserWatchlistAsync(int userId)
     {
         return await _dbContext.Watchlists
             .Where(w => w.UserId == userId)
             .ToListAsync();
     }
-
     public async Task<List<Watchlist>> GetAuctionWatchersAsync(int auctionId)
     {
         return await _dbContext.Watchlists

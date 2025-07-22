@@ -51,25 +51,58 @@ namespace AutoFiCore.Services
             if (await _uow.Auctions.VehicleHasAuction(dto.VehicleId))
                 return Result<AuctionDTO>.Failure("An auction already exists for this vehicle");
 
+            var now = DateTime.UtcNow;
+            bool isFutureStart = dto.StartUtc > now;
+
+            DateTime? previewTime = dto.PreviewStartTime.HasValue ? dto.PreviewStartTime : null;
+
+            if (previewTime.HasValue && previewTime.Value >= dto.StartUtc)
+                return Result<AuctionDTO>.Failure("PreviewTime must be earlier than StartUtc");
+
+            if (dto.ReservePrice.HasValue && dto.ReservePrice.Value < dto.StartingPrice)
+                return Result<AuctionDTO>.Failure("ReservePrice must be greater than or equal to StartingPrice");
+
+            AuctionStatus status;
+            if (isFutureStart)
+            {
+                if (previewTime.HasValue && previewTime.Value <= now)
+                    status = AuctionStatus.PreviewMode;
+                else
+                    status = AuctionStatus.Scheduled;
+            }
+            else
+            {
+                status = AuctionStatus.Active;
+            }
+
+            decimal reservePrice = dto.ReservePrice ?? dto.StartingPrice;
+            bool isReserveMet = reservePrice <= dto.StartingPrice;
+            DateTime? reserveMetAt = isReserveMet ? now : null;
+
             var auction = new Auction
             {
                 VehicleId = dto.VehicleId,
                 StartUtc = dto.StartUtc,
+                ScheduledStartTime = dto.StartUtc,
                 EndUtc = dto.EndUtc,
                 StartingPrice = dto.StartingPrice,
                 CurrentPrice = 0,
-                ReservePrice = dto.ReservePrice ?? dto.StartingPrice,
-                IsReserveMet = false,
-                Status = dto.Status ?? AuctionStatus.Active,
-                CreatedUtc = DateTime.UtcNow,
-                UpdatedUtc = DateTime.UtcNow
+                ReservePrice = reservePrice,
+                IsReserveMet = isReserveMet,
+                ReserveMetAt = reserveMetAt,
+                Status = status,
+                PreviewStartTime = previewTime,
+                CreatedUtc = now,
+                UpdatedUtc = now
             };
 
             var createdAuction = await _uow.Auctions.AddAuctionAsync(auction);
             await _uow.SaveChangesAsync();
+
             var dtoResult = AuctionMapper.ToDTO(auction);
             return Result<AuctionDTO>.Success(dtoResult);
         }
+
         public async Task<Result<AuctionDTO?>> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
@@ -83,10 +116,17 @@ namespace AutoFiCore.Services
         }
         public async Task<List<AuctionDTO>> GetAuctionsAsync(AuctionQueryParams filters)
         {
-            var query = _uow.Auctions.Query().Include(a => a.Vehicle).Include(a => a.Bids);
+            var query = _uow.Auctions.Query()
+                .Include(a => a.Vehicle)
+                .Include(a => a.Bids);
+
             var filteredQuery = AuctionQuery.ApplyFilters(query, filters);
             var sortedQuery = AuctionQuery.ApplySorting(filteredQuery, filters);
-            var auctions = await sortedQuery.AsNoTracking().ToListAsync();
+
+            var auctions = await sortedQuery
+                .Where(a => a.Status != AuctionStatus.Scheduled)
+                .AsNoTracking()
+                .ToListAsync();
 
             return auctions.Select(AuctionMapper.ToDTO).ToList();
         }
@@ -144,6 +184,7 @@ namespace AutoFiCore.Services
             {
                 auction.IsReserveMet = true;
                 auction.ReserveMetAt = DateTime.UtcNow;
+                await _uow.Auctions.UpdateReserveStatusAsync(auctionId);
                 await _uow.SaveChangesAsync();
 
                 await _hub.Clients.Group($"auction-{auctionId}")

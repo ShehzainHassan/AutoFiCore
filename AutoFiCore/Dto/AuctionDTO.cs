@@ -13,6 +13,8 @@ namespace AutoFiCore.Dto
         public AuctionStatus Status { get; set; } = AuctionStatus.Active;
         public DateTime StartUtc { get; set; }
         public DateTime EndUtc { get; set; }
+        public DateTime ScheduledStartTime { get; set; }
+        public DateTime? PreviewStartTime { get; set; }
         public VehicleDTO? Vehicle { get; set; }
         public DateTime UpdatedUtc { get; set; }
         public List<BidDTO>? Bids { get; set; }

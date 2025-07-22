@@ -1,62 +1,88 @@
-//using AutoFiCore.Data;
-//using AutoFiCore.Enums;
-//using Microsoft.EntityFrameworkCore;
+using AutoFiCore.Data;
+using AutoFiCore.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
-//using System;
+public class AuctionScheduler : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<AuctionScheduler> _logger;
 
-//public class AuctionScheduler : BackgroundService
-//{
-//    private readonly IServiceScopeFactory _scopeFactory;
-//    private readonly ILogger<AuctionScheduler> _logger;
+    public AuctionScheduler(IServiceScopeFactory scopeFactory, ILogger<AuctionScheduler> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _logger = logger;
+    }
 
-//    public AuctionScheduler(IServiceScopeFactory scopeFactory, ILogger<AuctionScheduler> logger)
-//    {
-//        _scopeFactory = scopeFactory;
-//        _logger = logger;
-//    }
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("Auction Scheduler started.");
 
-//    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-//    {
-//        while (!stoppingToken.IsCancellationRequested)
-//        {
-//            try
-//            {
-//                using var scope = _scopeFactory.CreateScope();
-//                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var nowUtc = DateTime.UtcNow;
 
-//                var now = DateTime.UtcNow;
+                // Scheduled -> PreviewMode
+                var toPreview = await dbContext.Auctions
+                    .Where(a => a.Status == AuctionStatus.Scheduled
+                        && a.PreviewStartTime.HasValue
+                        && a.PreviewStartTime.Value <= nowUtc)
+                    .ToListAsync(stoppingToken);
 
-//                var toPreview = await dbContext.Auctions
-//                    .Where(a => a.Status == AuctionStatus.Scheduled &&
-//                                a.PreviewStartTime <= now)
-//                    .ToListAsync(stoppingToken);
+                foreach (var auction in toPreview)
+                {
+                    auction.Status = AuctionStatus.PreviewMode;
+                    _logger.LogInformation($"Auction {auction.AuctionId} moved to PreviewMode at {nowUtc}.");
+                    // TODO: Send notification or SignalR event for preview start
+                }
 
-//                foreach (var auction in toPreview)
-//                {
-//                    auction.Status = AuctionStatus.PreviewMode;
-//                    _logger.LogInformation($"Auction {auction.AuctionId} moved to PreviewMode.");
-//                }
+                // Scheduled -> Active (if no preview time)
+                var toActivateDirectly = await dbContext.Auctions
+                    .Where(a => a.Status == AuctionStatus.Scheduled
+                        && !a.PreviewStartTime.HasValue
+                        && a.ScheduledStartTime <= nowUtc)
+                    .ToListAsync(stoppingToken);
 
-//                var toActivate = await dbContext.Auctions
-//                    .Where(a => a.Status == AuctionStatus.PreviewMode &&
-//                                a.ScheduledStartTime <= now)
-//                    .ToListAsync(stoppingToken);
+                foreach (var auction in toActivateDirectly)
+                {
+                    auction.Status = AuctionStatus.Active;
+                    auction.StartUtc = nowUtc;
+                    _logger.LogInformation($"Auction {auction.AuctionId} (no preview) activated at {nowUtc}.");
+                    // TODO: Send notification or SignalR event for auction start
+                }
 
-//                foreach (var auction in toActivate)
-//                {
-//                    auction.Status = AuctionStatus.Active;
-//                    auction.StartUtc = now;
-//                    _logger.LogInformation($"Auction {auction.AuctionId} activated.");
-//                }
+                // PreviewMode -> Active
+                var toActivate = await dbContext.Auctions
+                    .Where(a => a.Status == AuctionStatus.PreviewMode
+                        && a.ScheduledStartTime <= nowUtc)
+                    .ToListAsync(stoppingToken);
 
-//                await dbContext.SaveChangesAsync(stoppingToken);
-//            }
-//            catch (Exception ex)
-//            {
-//                _logger.LogError(ex, "Error running AuctionScheduler.");
-//            }
+                foreach (var auction in toActivate)
+                {
+                    auction.Status = AuctionStatus.Active;
+                    auction.StartUtc = nowUtc;
+                    _logger.LogInformation($"Auction {auction.AuctionId} moved from PreviewMode to Active at {nowUtc}.");
+                    // TODO: Send notification or SignalR event for auction start
+                }
 
-//            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
-//        }
-//    }
-//}
+                await dbContext.SaveChangesAsync(stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in AuctionScheduler.");
+            }
+
+            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
+        }
+    }
+}

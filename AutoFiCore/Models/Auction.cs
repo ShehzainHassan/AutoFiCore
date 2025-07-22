@@ -26,19 +26,16 @@ namespace AutoFiCore.Models
 
         [Range(0, double.MaxValue)]
         public decimal CurrentPrice { get; set; }
-
         public decimal? ReservePrice { get; set; }
         public bool IsReserveMet { get; set; } = false;
-
         public DateTime? ReserveMetAt { get; set; }
 
         [Required]
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public AuctionStatus Status { get; set; } = AuctionStatus.Active;
-
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
-        public DateTime? ScheduledStartTime { get; set; }
+        public DateTime ScheduledStartTime { get; set; }
         public DateTime? PreviewStartTime { get; set; }
         public ICollection<Bid> Bids { get; set; } = new List<Bid>();
         public ICollection<Watchlist> Watchers { get; set; } = new List<Watchlist>();

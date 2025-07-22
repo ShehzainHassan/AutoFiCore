@@ -16,6 +16,8 @@ namespace AutoFiCore.Mappers
                 Status = auction.Status,
                 StartUtc = auction.StartUtc,
                 EndUtc = auction.EndUtc,
+                PreviewStartTime = auction.PreviewStartTime,
+                ScheduledStartTime = auction.ScheduledStartTime,
                 UpdatedUtc = auction.UpdatedUtc,
                 Vehicle = auction.Vehicle == null ? null : new VehicleDTO
                 {
