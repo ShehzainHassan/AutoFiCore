@@ -54,14 +54,17 @@ namespace AutoFiCore.Services
                 return;
             }
 
+            decimal minimumIncrement = BidIncrementCalculator.GetMinimumIncrement(auction.CurrentPrice, auction.Bids.Count);
+
             foreach (var autoBid in eligibleAutoBids)
             {
                 try
                 {
                     var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
-                    if (autoBid.UserId != highestBidder)
+                    var nextBidAmount = newBidAmount + minimumIncrement;
+
+                    if (autoBid.UserId != highestBidder && autoBid.MaxBidAmount >= nextBidAmount)
                     {
-                        var nextBidAmount = newBidAmount + 500;
                         var createBidDto = new CreateBidDTO
                         {
                             Amount = nextBidAmount,
@@ -168,7 +171,6 @@ namespace AutoFiCore.Services
 
             return Result<CreateAutoBidDTO>.Success(dto);
         }
-
         public async Task<Result<string>> CancelAutoBidAsync(int auctionId, int userId)
         {
             var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);

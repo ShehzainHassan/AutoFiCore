@@ -151,7 +151,7 @@ namespace AutoFiCore.Services
             if (auction.Status != AuctionStatus.Active || auction.EndUtc <= DateTime.UtcNow)
                 return Result<BidDTO>.Failure("Auction has ended.");
 
-            var errs = Validator.ValidateBidAmount(dto.Amount, auction.StartingPrice, auction.CurrentPrice);
+            var errs = Validator.ValidateBidAmount(dto.Amount, auction.StartingPrice, auction.CurrentPrice, auction.Bids.Count);
             if (errs.Any())
                 return Result<BidDTO>.Failure(string.Join("; ", errs));
 
@@ -165,7 +165,6 @@ namespace AutoFiCore.Services
             };
 
             await _uow.Bids.AddBidAsync(bid);
-
             await _uow.Auctions.UpdateCurrentPriceAsync(auctionId);
             await _uow.SaveChangesAsync();
 
@@ -188,6 +187,16 @@ namespace AutoFiCore.Services
 
                 await _hub.Clients.Group($"auction-{auctionId}")
                     .SendAsync("ReservePriceMet");
+            }
+
+            var timeRemaining = auction.EndUtc - DateTime.UtcNow;
+            if (timeRemaining.TotalMinutes <= auction.TriggerMinutes && auction.ExtensionCount < auction.MaxExtensions)
+            {
+                await _uow.Auctions.UpdateAuctionEndTimeAsync(auctionId, auction.ExtensionMinutes);
+                await _uow.SaveChangesAsync();
+
+                await _hub.Clients.Group($"auction-{auctionId}")
+                    .SendAsync("AuctionExtended", auctionId);
             }
 
             await _hub.Clients.Group($"auction-{bid.AuctionId}")

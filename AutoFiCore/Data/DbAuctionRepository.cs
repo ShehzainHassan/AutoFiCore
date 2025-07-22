@@ -1,8 +1,9 @@
 ﻿using AutoFiCore.Data;
-using AutoFiCore.Models;
 using AutoFiCore.Enums;
+using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Polly;
 
 public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlistRepository
 {
@@ -22,7 +23,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         return auction;
     }
     public Task<bool> VehicleHasAuction(int vehicleId) => _dbContext.Auctions.AnyAsync(a => a.VehicleId == vehicleId);
-
     public async Task<Auction?> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
     {
         var auction = await _dbContext.Auctions.FindAsync(auctionId);
@@ -50,7 +50,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
 
         return auction;
     }
-
     public IQueryable<Auction> Query()
     {
         return _dbContext.Auctions.AsQueryable().Include(a => a.Vehicle);
@@ -116,6 +115,17 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .ExecuteUpdateAsync(u => u
                 .SetProperty(a => a.CurrentPrice, a => highestBid)
                 .SetProperty(a => a.UpdatedUtc, a => DateTime.UtcNow));
+    }
+    public async Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes)
+    {
+        var auction = await _dbContext.Auctions.FindAsync(auctionId);
+        if (auction == null)
+            return null;
+        auction.EndUtc = auction.EndUtc.AddMinutes(extensionMinutes);
+        auction.ExtensionCount++;
+
+        _dbContext.Auctions.Update(auction);
+        return auction;
     }
     public async Task AddToWatchlistAsync(int userId, int auctionId)
     {
