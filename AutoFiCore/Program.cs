@@ -352,7 +352,7 @@ app.UseCors(MyAllowSpecificOrigins);
 // Add our execution time logging middleware
 app.UseRequestExecutionTimeLogging();
 
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 app.UseAuthentication();
 

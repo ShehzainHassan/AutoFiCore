@@ -74,28 +74,6 @@ namespace AutoFiCore.Data
                 )
                 .FirstOrDefaultAsync();
         }
-        public async Task<List<CreateAutoBidDTO>> GetActiveAutoBidsWithStrategyByUserAsync(int userId)
-        {
-            return await _dbContext.AutoBids
-                .Where(ab => ab.UserId == userId && ab.IsActive)
-                .Join(
-                    _dbContext.BidStrategies,
-                    ab => new { ab.UserId, ab.AuctionId },
-                    bs => new { bs.UserId, bs.AuctionId },
-                    (ab, bs) => new CreateAutoBidDTO
-                    {
-                        AuctionId = ab.AuctionId,
-                        MaxBidAmount = ab.MaxBidAmount,
-                        UserId = ab.UserId,
-                        IsActive = ab.IsActive,
-                        BidStrategyType = ab.BidStrategyType,
-                        BidDelaySeconds = bs.BidDelaySeconds,
-                        MaxBidsPerMinute = bs.MaxBidsPerMinute,
-                        PreferredBidTiming = bs.PreferredBidTiming
-                    }
-                )
-                .ToListAsync();
-        }
         public async Task<List<AutoBid>> GetActiveAutoBidsByAuctionIdAsync(int auctionId)
         {
             return await _dbContext.AutoBids
@@ -109,10 +87,6 @@ namespace AutoFiCore.Data
                 .Where(ab => ab.MaxBidAmount > currentBid)
                 .OrderBy(ab => ab.CreatedAt)
                 .ToList();
-        }
-        public void UpdateBidStrategy(BidStrategy updatedStrategy)
-        {
-            _dbContext.BidStrategies.Update(updatedStrategy);
         }
     }
 }
