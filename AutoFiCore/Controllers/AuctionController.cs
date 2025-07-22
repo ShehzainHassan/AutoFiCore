@@ -138,5 +138,15 @@ namespace AutoFiCore.Controllers
             return Ok(watchlists.Value);
         }
 
+        [HttpGet("highest-bidder/{auctionId}")]
+        public async Task<IActionResult> GetHighestBidderId(int auctionId)
+        {
+            var highestId = await _auctionService.GetHighestBidderIdAsync(auctionId);
+
+            if (!highestId.IsSuccess)
+                return NotFound(new { error = highestId.Error });
+            return Ok(highestId.Value);
+        }
+
     }
 }
