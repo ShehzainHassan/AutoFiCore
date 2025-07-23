@@ -151,7 +151,8 @@ namespace AutoFiCore.Services
             if (auction.Status != AuctionStatus.Active || auction.EndUtc <= DateTime.UtcNow)
                 return Result<BidDTO>.Failure("Auction has ended.");
 
-            var errs = Validator.ValidateBidAmount(dto.Amount, auction.StartingPrice, auction.CurrentPrice, auction.Bids.Count);
+            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
+            var errs = Validator.ValidateBidAmount(dto.Amount, auction.StartingPrice, auction.CurrentPrice, bids.Count);
             if (errs.Any())
                 return Result<BidDTO>.Failure(string.Join("; ", errs));
 
@@ -165,7 +166,7 @@ namespace AutoFiCore.Services
             };
 
             await _uow.Bids.AddBidAsync(bid);
-            await _uow.Auctions.UpdateCurrentPriceAsync(auctionId);
+            await _uow.Auctions.UpdateCurrentPriceAsync(auctionId, dto.Amount);
             await _uow.SaveChangesAsync();
 
             var bidDto = new BidDTO

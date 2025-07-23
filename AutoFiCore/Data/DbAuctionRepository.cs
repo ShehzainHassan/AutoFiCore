@@ -102,18 +102,12 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
 
         return highestBid == 0 ? null : highestBid;
     }
-    public async Task UpdateCurrentPriceAsync(int auctionId)
+    public async Task UpdateCurrentPriceAsync(int auctionId, decimal newPrice)
     {
-        var highestBid = await _dbContext.Bids
-            .Where(b => b.AuctionId == auctionId)
-            .OrderByDescending(b => b.Amount)
-            .Select(b => b.Amount)
-            .FirstOrDefaultAsync();       
-
         await _dbContext.Auctions
             .Where(a => a.AuctionId == auctionId)
             .ExecuteUpdateAsync(u => u
-                .SetProperty(a => a.CurrentPrice, a => highestBid)
+                .SetProperty(a => a.CurrentPrice, a => newPrice)
                 .SetProperty(a => a.UpdatedUtc, a => DateTime.UtcNow));
     }
     public async Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes)
@@ -159,7 +153,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .Where(w => w.AuctionId == auctionId)
             .ToListAsync();
     }
-
     public Task<bool> IsWatchingAsync(int userId, int auctionId)
     {
         return _dbContext.Watchlists.AnyAsync(w => w.UserId == userId && w.AuctionId == auctionId);
@@ -171,5 +164,4 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
                         _dbContext.AutoBids.Any(ab => ab.AuctionId == a.AuctionId && ab.IsActive))
             .ToListAsync();
     }
-
 }

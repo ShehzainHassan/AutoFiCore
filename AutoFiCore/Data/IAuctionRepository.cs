@@ -11,7 +11,7 @@ namespace AutoFiCore.Data
         Task<Auction?> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status);
         IQueryable<Auction> Query();
         Task<Auction?> GetAuctionByIdAsync(int id);
-        Task UpdateCurrentPriceAsync(int auctionId);
+        Task UpdateCurrentPriceAsync(int auctionId, decimal newPrice);
         Task<List<Auction>> GetAuctionsWithActiveAutoBidsAsync();
         Task<Auction?> UpdateReserveStatusAsync(int auctionId);
         Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes);

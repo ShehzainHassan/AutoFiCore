@@ -80,13 +80,5 @@ namespace AutoFiCore.Data
                 .Where(ab => ab.AuctionId == auctionId && ab.IsActive)
                 .ToListAsync();
         }
-        public async Task<List<AutoBid>> GetEligibleAutoBidsAsync(int auctionId, decimal currentBid)
-        {
-            var autoBids = await GetActiveAutoBidsByAuctionIdAsync(auctionId);
-            return autoBids
-                .Where(ab => ab.MaxBidAmount > currentBid)
-                .OrderBy(ab => ab.CreatedAt)
-                .ToList();
-        }
     }
 }

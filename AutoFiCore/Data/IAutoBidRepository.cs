@@ -13,7 +13,6 @@ namespace AutoFiCore.Data
         Task<BidStrategy?> GetBidStrategyByUserAndAuctionAsync(int userId, int auctionId);
         Task<CreateAutoBidDTO?> GetAutoBidWithStrategyAsync(int userId, int auctionId);
         Task<List<AutoBid>> GetActiveAutoBidsByAuctionIdAsync(int auctionId);
-        Task<List<AutoBid>> GetEligibleAutoBidsAsync(int auctionId, decimal currentBid);
         Task<BidStrategy> AddBidStrategyAsync(BidStrategy bidStrategy);
     }
 }

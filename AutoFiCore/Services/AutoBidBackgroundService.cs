@@ -4,6 +4,8 @@ using AutoFiCore.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Diagnostics;
+using System.Drawing;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -28,7 +30,7 @@ namespace AutoFiCore.BackgroundServices
             {
                 try
                 {
-                    _logger.LogInformation("Running auto-bid check...");
+                    _logger.LogInformation("Running auto-bid check... at {Time}", DateTime.UtcNow);
 
                     using (var scope = _scopeFactory.CreateScope())
                     {
@@ -36,18 +38,17 @@ namespace AutoFiCore.BackgroundServices
                         var autoBidService = scope.ServiceProvider.GetRequiredService<IAutoBidService>();
 
                         var activeAuctions = await uow.Auctions.GetAuctionsWithActiveAutoBidsAsync();
-
+                     
                         if (activeAuctions.Count == 0)
                         {
-                            _logger.LogInformation("No autobids found");
-                            return;
+                            _logger.LogInformation("No active autobids found");
+                            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                            continue;
                         }
                         foreach (var auction in activeAuctions)
                         {
-                            if (auction.CurrentPrice == 0)
-                                await autoBidService.ProcessAutoBidTrigger(auction.AuctionId, auction.StartingPrice);
-                            else
-                                await autoBidService.ProcessAutoBidTrigger(auction.AuctionId, auction.CurrentPrice);
+                            var basePrice = auction.CurrentPrice == 0 ? auction.StartingPrice : auction.CurrentPrice;
+                            await autoBidService.ProcessAutoBidTrigger(auction.AuctionId, basePrice);
                         }
                     }
 
