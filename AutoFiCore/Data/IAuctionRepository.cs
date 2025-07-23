@@ -8,6 +8,7 @@ namespace AutoFiCore.Data
     {
         Task<Auction> AddAuctionAsync(Auction auction);
         Task<bool> VehicleHasAuction(int vehicleId);
+        void UpdateAuction(Auction auction);
         Task<Auction?> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status);
         IQueryable<Auction> Query();
         Task<Auction?> GetAuctionByIdAsync(int id);

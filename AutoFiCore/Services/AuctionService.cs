@@ -52,23 +52,12 @@ namespace AutoFiCore.Services
                 return Result<AuctionDTO>.Failure("An auction already exists for this vehicle");
 
             var now = DateTime.UtcNow;
-            bool isFutureStart = dto.StartUtc > now;
-
-            DateTime? previewTime = dto.PreviewStartTime.HasValue ? dto.PreviewStartTime : null;
-
-            if (previewTime.HasValue && previewTime.Value >= dto.StartUtc)
-                return Result<AuctionDTO>.Failure("PreviewTime must be earlier than StartUtc");
-
-            if (dto.ReservePrice.HasValue && dto.ReservePrice.Value < dto.StartingPrice)
-                return Result<AuctionDTO>.Failure("ReservePrice must be greater than or equal to StartingPrice");
+            var previewTime = dto.PreviewStartTime ?? dto.StartUtc;
 
             AuctionStatus status;
-            if (isFutureStart)
+            if (dto.StartUtc > now)
             {
-                if (previewTime.HasValue && previewTime.Value <= now)
-                    status = AuctionStatus.PreviewMode;
-                else
-                    status = AuctionStatus.Scheduled;
+                status = previewTime <= now ? AuctionStatus.PreviewMode : AuctionStatus.Scheduled;
             }
             else
             {

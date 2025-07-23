@@ -237,6 +237,9 @@ builder.Services.AddHostedService<AutoBidBackgroundService>();
 // Register auction scheduler background service
 builder.Services.AddHostedService<AuctionScheduler>();
 
+// Register auction scheduler service
+builder.Services.AddScoped<IAuctionSchedulerService, AuctionScheduler>();
+
 // Add services to the container.
 builder.Services.AddControllers();
 

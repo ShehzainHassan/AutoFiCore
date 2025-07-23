@@ -160,6 +160,12 @@ namespace AutoFiCore.Utilities
             if (dto.StartingPrice < 0)
                 errors.Add("Starting price must be non-negative.");
 
+            if (dto.PreviewStartTime > dto.StartUtc)
+                errors.Add("PreviewTime must be earlier than StartUtc");
+
+            if (dto.ReservePrice.HasValue && dto.ReservePrice.Value < dto.StartingPrice)
+                errors.Add("ReservePrice must be greater than or equal to StartingPrice");
+
             return errors;
         }
         public static List<string> ValidateBidAmount(decimal amount, decimal startingPrice, decimal currentPrice, int bidCount)
@@ -182,8 +188,5 @@ namespace AutoFiCore.Utilities
 
             return errors;
         }
-
-
-
     }
 }

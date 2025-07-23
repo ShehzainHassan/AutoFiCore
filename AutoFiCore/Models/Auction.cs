@@ -37,7 +37,7 @@ namespace AutoFiCore.Models
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
         public DateTime ScheduledStartTime { get; set; }
-        public DateTime? PreviewStartTime { get; set; }
+        public DateTime PreviewStartTime { get; set; }
         public int ExtensionMinutes { get; set; } = AuctionDefaults.TIME_TO_EXTEND;
         public int TriggerMinutes { get; set; } = AuctionDefaults.TRIGGER_TIME;
         public int ExtensionCount { get; set; } = 0;

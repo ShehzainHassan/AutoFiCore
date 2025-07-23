@@ -270,4 +270,8 @@ public class MockVehicleRepository : IVehicleRepository
         await SaveVehiclesToFile();
         return true;
     }
+    public bool VehicleExists(int id)
+    {
+        return _vehicles.Any(v => v.Id == id);
+    }
 } 
