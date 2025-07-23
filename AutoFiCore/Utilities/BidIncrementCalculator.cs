@@ -1,5 +1,4 @@
 ﻿using AutoFiCore.Enums;
-using AutoFiCore.Models;
 
 public static class BidIncrementCalculator
 {
@@ -11,32 +10,36 @@ public static class BidIncrementCalculator
         if (currentPrice < 25000) return 500m;
         return 1000m;
     }
-
-    public static decimal GetMinimumIncrement(decimal currentPrice, int bidCount)
+    public static decimal GetMinimumIncrement(decimal currentPrice, int bidCount, BidStrategyType strategy)
     {
         decimal baseIncrement = GetMinimumIncrement(currentPrice);
 
-        if (bidCount >= 20)
-            return baseIncrement * 2m;
-
-        if (bidCount >= 10)
-            return baseIncrement * 1.5m;
-
-        return baseIncrement;
-    }
-
-    public static decimal GetIncrementByStrategy(decimal currentPrice, int bidCount, BidStrategyType strategy)
-    {
-        decimal minInc = GetMinimumIncrement(currentPrice, bidCount);
         switch (strategy)
         {
-            case BidStrategyType.Aggressive:
-                return minInc * 2m;
-            case BidStrategyType.Incremental:
-                return minInc * 1.25m;
             case BidStrategyType.Conservative:
+                return baseIncrement;
+
+            case BidStrategyType.Aggressive:
+                if (bidCount >= 20) return baseIncrement * 3m;
+                if (bidCount >= 10) return baseIncrement * 2.5m;
+                return baseIncrement * 2m;
+
+            case BidStrategyType.Incremental:
+                if (bidCount >= 20) return baseIncrement * 2m;
+                if (bidCount >= 10) return baseIncrement * 1.5m;
+                return baseIncrement;
+
             default:
-                return minInc;
+                return baseIncrement;
         }
+    }
+
+    public static decimal GetMinimumIncrement(decimal currentPrice, int bidCount)
+    {
+        return GetMinimumIncrement(currentPrice, bidCount, BidStrategyType.Conservative);
+    }
+    public static decimal GetIncrementByStrategy(decimal currentPrice, int bidCount, BidStrategyType strategy)
+    {
+        return GetMinimumIncrement(currentPrice, bidCount, strategy);
     }
 }

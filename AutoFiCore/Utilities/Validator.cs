@@ -178,8 +178,14 @@ namespace AutoFiCore.Utilities
                 return errors;
             }
 
+            if (startingPrice < 0 || currentPrice < 0)
+            {
+                errors.Add("Invalid auction price data.");
+                return errors;
+            }
+
             decimal minimumIncrement = BidIncrementCalculator.GetMinimumIncrement(currentPrice, bidCount);
-            decimal minimumBid = currentPrice > 0 ? currentPrice + minimumIncrement : startingPrice;
+            decimal minimumBid = currentPrice > 0 ? currentPrice + minimumIncrement : startingPrice + minimumIncrement;
 
             if (amount < minimumBid)
             {
