@@ -44,26 +44,26 @@ namespace AutoFiCore.Services
                 return;
             }
 
-            var autoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
+            var auctionsWithAutoBids = await _uow.Auctions.GetAuctionsWithActiveAutoBidsAsync();
 
-            var eligibleAutoBids = await _uow.AutoBid.GetEligibleAutoBidsAsync(auctionId, newBidAmount);
+            _log.LogInformation("Found {Count} auctions with active autobids ", auctionsWithAutoBids.Count);
 
-            if (!eligibleAutoBids.Any())
-            {
-                _log.LogInformation("No eligible auto-bids found for auction {AuctionId} after bid amount {BidAmount}.", auctionId, newBidAmount);
-                return;
-            }
+            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
+            var bidCount = bids.Count;
 
-            decimal minimumIncrement = BidIncrementCalculator.GetMinimumIncrement(auction.CurrentPrice, auction.Bids.Count);
+            var auctionAutoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
 
-            foreach (var autoBid in eligibleAutoBids)
+            foreach (var autoBid in auctionAutoBids)
             {
                 try
                 {
                     var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
-                    var nextBidAmount = newBidAmount + minimumIncrement;
+                    var increment = BidIncrementCalculator.GetIncrementByStrategy(newBidAmount, bidCount, autoBid.BidStrategyType);
+                    var nextBidAmount = newBidAmount + increment;
 
-                    if (autoBid.UserId != highestBidder && autoBid.MaxBidAmount >= nextBidAmount)
+                    _log.LogInformation("Processing auto-bids for auction {AuctionId} with bid {BidAmount}", auctionId, newBidAmount);
+
+                    if (nextBidAmount <= autoBid.MaxBidAmount && autoBid.UserId != highestBidder)
                     {
                         var createBidDto = new CreateBidDTO
                         {
@@ -82,14 +82,11 @@ namespace AutoFiCore.Services
                         {
                             _log.LogWarning("Auto-bid failed for user {UserId} on auction {AuctionId}: {Reason}", autoBid.UserId, auctionId, result.Error);
                         }
-
                     }
                     else
                     {
                         _log.LogWarning("User {UserId} on auction {AuctionId} is already highest bidder. Skipping auto-bid", autoBid.UserId, auctionId);
-
                     }
-
                 }
                 catch (Exception ex)
                 {
@@ -295,7 +292,5 @@ namespace AutoFiCore.Services
             var result = await _uow.AutoBid.GetAutoBidWithStrategyAsync(userId, auctionId);
             return Result<CreateAutoBidDTO?>.Success(result);
         }
-
-
     }
 }

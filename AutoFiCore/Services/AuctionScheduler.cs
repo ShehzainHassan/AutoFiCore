@@ -42,8 +42,8 @@ public class AuctionScheduler : BackgroundService
                 foreach (var auction in toPreview)
                 {
                     auction.Status = AuctionStatus.PreviewMode;
-                    _logger.LogInformation($"Auction {auction.AuctionId} moved to PreviewMode at {nowUtc}.");
-                    // TODO: Send notification or SignalR event for preview start
+                    _logger.LogInformation($"Auction with id {auction.AuctionId} moved from Scheduled to PreviewMode at {nowUtc}.");
+                    // TODO: Send SignalR event for preview start
                 }
 
                 // Scheduled -> Active (if no preview time)
@@ -57,8 +57,8 @@ public class AuctionScheduler : BackgroundService
                 {
                     auction.Status = AuctionStatus.Active;
                     auction.StartUtc = nowUtc;
-                    _logger.LogInformation($"Auction {auction.AuctionId} (no preview) activated at {nowUtc}.");
-                    // TODO: Send notification or SignalR event for auction start
+                    _logger.LogInformation($"Auction with id {auction.AuctionId} moved from Scheduled to Active at {nowUtc}.");
+                    // TODO: Send SignalR event for auction start
                 }
 
                 // PreviewMode -> Active
@@ -71,17 +71,27 @@ public class AuctionScheduler : BackgroundService
                 {
                     auction.Status = AuctionStatus.Active;
                     auction.StartUtc = nowUtc;
-                    _logger.LogInformation($"Auction {auction.AuctionId} moved from PreviewMode to Active at {nowUtc}.");
-                    // TODO: Send notification or SignalR event for auction start
+                    _logger.LogInformation($"Auction with id {auction.AuctionId} moved from PreviewMode to Active at {nowUtc}.");
+                    // TODO: Send SignalR event for auction start
                 }
 
+                // Active -> Ended
+                var toEnd = await dbContext.Auctions
+                    .Where(a => a.Status == AuctionStatus.Active && a.EndUtc <= nowUtc)
+                    .ToListAsync(stoppingToken);
+
+                foreach (var auction in toEnd)
+                {
+                    auction.Status = AuctionStatus.Ended;
+                    _logger.LogInformation($"Auction with id {auction.AuctionId} moved from Active to Ended at {nowUtc}.");
+                    // TODO: Send SignalR event for auction end
+                }
                 await dbContext.SaveChangesAsync(stoppingToken);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in AuctionScheduler.");
             }
-
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
         }
     }

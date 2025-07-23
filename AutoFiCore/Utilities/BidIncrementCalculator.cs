@@ -1,4 +1,7 @@
-﻿public static class BidIncrementCalculator
+﻿using AutoFiCore.Enums;
+using AutoFiCore.Models;
+
+public static class BidIncrementCalculator
 {
     public static decimal GetMinimumIncrement(decimal currentPrice)
     {
@@ -11,8 +14,6 @@
 
     public static decimal GetMinimumIncrement(decimal currentPrice, int bidCount)
     {
-        if (bidCount == 0)
-            return currentPrice;
         decimal baseIncrement = GetMinimumIncrement(currentPrice);
 
         if (bidCount >= 20)
@@ -22,5 +23,20 @@
             return baseIncrement * 1.5m;
 
         return baseIncrement;
+    }
+
+    public static decimal GetIncrementByStrategy(decimal currentPrice, int bidCount, BidStrategyType strategy)
+    {
+        decimal minInc = GetMinimumIncrement(currentPrice, bidCount);
+        switch (strategy)
+        {
+            case BidStrategyType.Aggressive:
+                return minInc * 2m;
+            case BidStrategyType.Incremental:
+                return minInc * 1.25m;
+            case BidStrategyType.Conservative:
+            default:
+                return minInc;
+        }
     }
 }

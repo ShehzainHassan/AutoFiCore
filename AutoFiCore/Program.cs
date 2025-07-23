@@ -55,6 +55,8 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Information);
 
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore", LogLevel.Warning);
+
 var MyAllowSpecificOrigins = "_MyAllowSubdomainPolicy";
 
 // Configure CORS settings
@@ -150,12 +152,12 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
     });
 
     // Only log SQL queries in development
-    if (builder.Environment.IsDevelopment())
-    {
-        options.LogTo(Console.WriteLine, LogLevel.Information)
-               .EnableSensitiveDataLogging()
-               .EnableDetailedErrors();
-    }
+    //if (builder.Environment.IsDevelopment())
+    //{
+    //    options.LogTo(Console.WriteLine, LogLevel.Information)
+    //           .EnableSensitiveDataLogging()
+    //           .EnableDetailedErrors();
+    //}
 });
 
 // Configure retry policy for database operations
@@ -351,7 +353,7 @@ app.UseCors(MyAllowSpecificOrigins);
 // Add our execution time logging middleware
 app.UseRequestExecutionTimeLogging();
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseAuthentication();
 
