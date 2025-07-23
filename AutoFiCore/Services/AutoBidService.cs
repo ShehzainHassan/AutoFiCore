@@ -61,6 +61,7 @@ namespace AutoFiCore.Services
                     var increment = BidIncrementCalculator.GetIncrementByStrategy(newBidAmount, bidCount, autoBid.BidStrategyType);
                     var nextBidAmount = newBidAmount + increment;
 
+                 
                     _log.LogInformation("Processing auto-bids for auction {AuctionId} with bid {BidAmount}", auctionId, newBidAmount);
 
                     if (nextBidAmount <= autoBid.MaxBidAmount && autoBid.UserId != highestBidder)

@@ -142,7 +142,6 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
 
         auction.VehicleId = dto.VehicleId;
         auction.StartUtc = dto.StartUtc;
-        auction.ScheduledStartTime = dto.StartUtc;
         auction.EndUtc = dto.EndUtc;
         auction.PreviewStartTime = previewTime;
         auction.StartingPrice = dto.StartingPrice;
