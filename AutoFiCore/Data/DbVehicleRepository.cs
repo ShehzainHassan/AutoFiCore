@@ -204,7 +204,7 @@ public class DbVehicleRepository : IVehicleRepository
             .Distinct()
             .ToListAsync();
     }
-    private bool VehicleExists(int id)
+    public bool VehicleExists(int id)
     {
         return _dbContext.Vehicles.Any(v => v.Id == id);
     }

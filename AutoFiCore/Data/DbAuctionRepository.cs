@@ -22,7 +22,11 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         await _dbContext.SaveChangesAsync();
         return auction;
     }
-    public Task<bool> VehicleHasAuction(int vehicleId) => _dbContext.Auctions.AnyAsync(a => a.VehicleId == vehicleId);
+    public Task<bool> VehicleHasAuction(int vehicleId)
+    {
+        return _dbContext.Auctions
+            .AnyAsync(a => a.VehicleId == vehicleId && a.Status != AuctionStatus.Scheduled);
+    }
     public async Task<Auction?> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
     {
         var auction = await _dbContext.Auctions.FindAsync(auctionId);
@@ -163,5 +167,9 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .Where(a => a.Status == AuctionStatus.Active &&
                         _dbContext.AutoBids.Any(ab => ab.AuctionId == a.AuctionId && ab.IsActive))
             .ToListAsync();
+    }
+    public void UpdateAuction(Auction auction)
+    {
+        _dbContext.Auctions.Update(auction);
     }
 }

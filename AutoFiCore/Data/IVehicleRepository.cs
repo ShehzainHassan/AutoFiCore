@@ -23,5 +23,6 @@ public interface IVehicleRepository
     Task<Dictionary<string, int>> GetColorsCountsAsync(VehicleFilterDto filterDto);
     Task<Questionnaire> SaveQuestionnaireAsync(QuestionnaireDTO dto);
     Task<List<VehicleOptionsDTO>> GetVehicleOptionsAsync();
+    public bool VehicleExists(int id);
 
 }
