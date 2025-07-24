@@ -148,20 +148,20 @@ namespace AutoFiCore.Utilities
             if (dto.VehicleId <= 0)
                 errors.Add("VehicleId must be greater than 0.");
 
-            if (dto.StartUtc == default)
-                errors.Add("StartUtc cannot be empty.");
+            if (dto.ScheduledStartTime == default)
+                errors.Add("ScheduledStartTime cannot be empty.");
 
             if (dto.EndUtc == default)
                 errors.Add("EndUtc cannot be empty.");
 
-            if (dto.EndUtc <= dto.StartUtc)
-                errors.Add("EndUtc must be > StartUtc.");
+            if (dto.EndUtc <= dto.ScheduledStartTime)
+                errors.Add("EndUtc must be > ScheduledStartTime.");
 
             if (dto.StartingPrice < 0)
                 errors.Add("Starting price must be non-negative.");
 
-            if (dto.PreviewStartTime > dto.StartUtc)
-                errors.Add("PreviewTime must be earlier than StartUtc");
+            if (dto.PreviewStartTime > dto.ScheduledStartTime)
+                errors.Add("PreviewTime must be earlier than ScheduledStartTime");
 
             if (dto.ReservePrice.HasValue && dto.ReservePrice.Value < dto.StartingPrice)
                 errors.Add("ReservePrice must be greater than or equal to StartingPrice");
@@ -185,7 +185,7 @@ namespace AutoFiCore.Utilities
             }
 
             decimal minimumIncrement = BidIncrementCalculator.GetMinimumIncrement(currentPrice, bidCount);
-            decimal minimumBid = currentPrice > 0 ? currentPrice + minimumIncrement : startingPrice + minimumIncrement;
+            decimal minimumBid = currentPrice > 0 ? currentPrice + minimumIncrement : startingPrice;
 
             if (amount < minimumBid)
             {

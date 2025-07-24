@@ -52,10 +52,10 @@ namespace AutoFiCore.Services
                 return Result<AuctionDTO>.Failure("An auction already exists for this vehicle");
 
             var now = DateTime.UtcNow;
-            var previewTime = dto.PreviewStartTime ?? dto.StartUtc;
+            var previewTime = dto.PreviewStartTime ?? dto.ScheduledStartTime;
 
             AuctionStatus status;
-            if (dto.StartUtc > now)
+            if (dto.ScheduledStartTime > now)
             {
                 status = previewTime <= now ? AuctionStatus.PreviewMode : AuctionStatus.Scheduled;
             }
@@ -71,8 +71,8 @@ namespace AutoFiCore.Services
             var auction = new Auction
             {
                 VehicleId = dto.VehicleId,
-                StartUtc = dto.StartUtc,
-                ScheduledStartTime = dto.StartUtc,
+                ScheduledStartTime = dto.ScheduledStartTime,
+                StartUtc = dto.ScheduledStartTime,
                 EndUtc = dto.EndUtc,
                 StartingPrice = dto.StartingPrice,
                 CurrentPrice = 0,
