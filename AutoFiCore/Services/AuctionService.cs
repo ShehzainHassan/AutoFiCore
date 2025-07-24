@@ -31,11 +31,13 @@ namespace AutoFiCore.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AuctionService> _logger;
+        private readonly IAuctionNotifier _notifier;
         private readonly IHubContext<AuctionHub> _hub;
-        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IHubContext<AuctionHub> hub)
+        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IAuctionNotifier auctionNotifier, IHubContext<AuctionHub> hub)
         {
             _uow = uow;
             _logger = log;
+            _notifier = auctionNotifier;
             _hub = hub;
         }
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
@@ -175,8 +177,8 @@ namespace AutoFiCore.Services
                 await _uow.Auctions.UpdateReserveStatusAsync(auctionId);
                 await _uow.SaveChangesAsync();
 
-                await _hub.Clients.Group($"auction-{auctionId}")
-                    .SendAsync("ReservePriceMet");
+                //await _hub.Clients.Group($"auction-{auctionId}")
+                //    .SendAsync("ReservePriceMet");
             }
 
             var timeRemaining = auction.EndUtc - DateTime.UtcNow;
@@ -185,12 +187,13 @@ namespace AutoFiCore.Services
                 await _uow.Auctions.UpdateAuctionEndTimeAsync(auctionId, auction.ExtensionMinutes);
                 await _uow.SaveChangesAsync();
 
-                await _hub.Clients.Group($"auction-{auctionId}")
-                    .SendAsync("AuctionExtended", auctionId);
+                //await _hub.Clients.Group($"auction-{auctionId}")
+                //    .SendAsync("AuctionExtended", auctionId);
             }
 
-            await _hub.Clients.Group($"auction-{bid.AuctionId}")
-                .SendAsync("ReceiveNewBid", bid.AuctionId);
+            // await _hub.Clients.Group($"auction-{bid.AuctionId}")
+            //                 .SendAsync("ReceiveNewBid", bid.AuctionId);
+            await _notifier.NotifyNewBid(auctionId);
 
             return Result<BidDTO>.Success(bidDto);
         }
