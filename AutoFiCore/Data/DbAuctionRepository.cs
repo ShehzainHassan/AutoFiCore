@@ -99,7 +99,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
 
         return highestBid ?? startingPrice;
     }
-
     public async Task<int?> GetHighestBidderIdAsync(int auctionId)
     {
         var highestBid = await _dbContext.Bids

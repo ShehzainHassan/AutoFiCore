@@ -9,6 +9,7 @@ public class CreateAutoBidDTO
     public bool IsActive { get; set; } = true;
     public int? BidDelaySeconds { get; set; } = 5;
     public int? MaxBidsPerMinute { get; set; } = 10;
+    public int? MaxSpreadBids { get; set; }
     public PreferredBidTiming PreferredBidTiming { get; set; } = PreferredBidTiming.Immediate;
     public DateTime UpdatedAt { get; set; }
 

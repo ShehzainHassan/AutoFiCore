@@ -32,13 +32,11 @@ namespace AutoFiCore.Services
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AuctionService> _logger;
         private readonly IAuctionNotifier _notifier;
-        private readonly IHubContext<AuctionHub> _hub;
-        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IAuctionNotifier auctionNotifier, IHubContext<AuctionHub> hub)
+        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IAuctionNotifier auctionNotifier)
         {
             _uow = uow;
             _logger = log;
             _notifier = auctionNotifier;
-            _hub = hub;
         }
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
         {
@@ -153,7 +151,7 @@ namespace AutoFiCore.Services
                 UserId = dto.UserId,
                 Amount = dto.Amount,
                 IsAuto = dto.IsAuto ?? false,
-                CreatedUtc = DateTime.UtcNow
+                CreatedUtc = DateTime.UtcNow,
             };
 
             await _uow.Bids.AddBidAsync(bid);

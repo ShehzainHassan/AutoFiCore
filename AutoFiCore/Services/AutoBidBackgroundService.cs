@@ -47,12 +47,12 @@ namespace AutoFiCore.BackgroundServices
                         }
                         foreach (var auction in activeAuctions)
                         {
-                            var basePrice = auction.CurrentPrice == 0 ? auction.StartingPrice : auction.CurrentPrice;
-                            await autoBidService.ProcessAutoBidTrigger(auction.AuctionId, basePrice);
+                            decimal highestBid = await uow.Bids.GetHighestBidAmountAsync(auction.AuctionId, auction.StartingPrice);
+                            await autoBidService.ProcessAutoBidTrigger(auction.AuctionId, highestBid);
                         }
                     }
 
-                    await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
                 }
                 catch (Exception ex)
                 {

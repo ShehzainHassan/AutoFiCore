@@ -22,7 +22,137 @@ namespace AutoFiCore.Services
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AutoBidService> _log;
         private readonly IAuctionService _auctionService;
+        private static readonly Random _random = new();
 
+        private async Task<bool> CanPlaceImmediateBid(AutoBid autoBid, int auctionId)
+        {
+            var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(autoBid.UserId, auctionId);
+            if (bidStrategy == null)
+            {
+                return false;
+            }
+
+            var now = DateTime.UtcNow;
+
+            var userBids = await _uow.Bids.GetBidsByUserIdAsync(autoBid.UserId);
+
+            var auctionBids = userBids
+                .Where(b => b.AuctionId == auctionId)
+                .OrderByDescending(b => b.CreatedUtc)
+                .ToList();
+
+            if (!auctionBids.Any()) return true;
+
+            var lastBid = auctionBids.First();
+
+            var timeSinceLastBid = (now - lastBid.CreatedUtc).TotalSeconds;
+
+            if (timeSinceLastBid < bidStrategy.BidDelaySeconds)
+                return false;
+
+            var oneMinuteAgo = now.AddMinutes(-1);
+            var bidsInLastMinute = auctionBids.Count(b => b.CreatedUtc > oneMinuteAgo);
+
+            return bidsInLastMinute < bidStrategy.MaxBidsPerMinute;
+        }
+        private async Task PlaceAutoBid(AutoBid autoBid, int auctionId, decimal amount)
+        {
+            var result = await _auctionService.PlaceBidAsync(auctionId, new CreateBidDTO
+            {
+                Amount = amount,
+                UserId = autoBid.UserId,
+                IsAuto = true
+            });
+
+            if (result.IsSuccess)
+            {
+                _log.LogInformation("Auto-bid placed by user {UserId} on auction {AuctionId} for {Amount}", autoBid.UserId, auctionId, amount);
+            }
+            else
+            {
+                _log.LogWarning("Auto-bid failed for user {UserId} on auction {AuctionId}: {Reason}", autoBid.UserId, auctionId, result.Error);
+            }
+        }
+        private async Task<bool> CanPlaceSpreadBid(AutoBid autoBid, int auctionId)
+        {
+            var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(autoBid.UserId, auctionId);
+            if (bidStrategy == null)
+            {
+                _log.LogWarning("No bid strategy found for user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
+                return false;
+            }
+
+            var allUserBids = await _uow.Bids.GetBidsByUserIdAsync(autoBid.UserId);
+            var auctionUserAutoBids = allUserBids
+                .Where(b => b.AuctionId == auctionId && b.IsAuto)
+                .OrderByDescending(b => b.CreatedUtc)
+                .ToList();
+
+            if (auctionUserAutoBids.Count >= bidStrategy.MaxSpreadBids)
+            {
+                _log.LogInformation("User {UserId} reached MaxSpreadBids ({MaxBids}) for auction {AuctionId}",
+                    autoBid.UserId, bidStrategy.MaxSpreadBids, auctionId);
+                return false;
+            }
+
+            if (!auctionUserAutoBids.Any())
+                return true;
+
+            var allAuctionBids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
+            if (allAuctionBids == null || !allAuctionBids.Any())
+            {
+                _log.LogInformation("No bids found on auction {AuctionId}", auctionId);
+                return false;
+            }
+
+            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
+            var latestBid = bids.OrderByDescending(b => b.CreatedUtc).FirstOrDefault();
+
+            if (latestBid == null)
+            {
+                _log.LogInformation("No bids found for auction {AuctionId}", auctionId);
+                return false;
+            }
+
+            var now = DateTime.UtcNow;
+
+            var requiredNextBidTime = latestBid.CreatedUtc.AddMinutes(10);
+
+            _log.LogInformation("User {UserId}'s next spread bid is at {NextBidTime}",
+                autoBid.UserId, requiredNextBidTime.ToString("HH:mm:ss"));
+
+            if (now >= requiredNextBidTime)
+            {
+                return true;
+            }
+
+            return false;
+
+        }
+        private BidStrategy CreateBidStrategyFromDto(CreateAutoBidDTO dto, DateTime now)
+        {
+            return new BidStrategy
+            {
+                UserId = dto.UserId,
+                AuctionId = dto.AuctionId,
+                Type = dto.BidStrategyType,
+                PreferredBidTiming = dto.PreferredBidTiming,
+                BidDelaySeconds = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.BidDelaySeconds,
+                MaxBidsPerMinute = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.MaxBidsPerMinute,
+                MaxSpreadBids = dto.PreferredBidTiming == PreferredBidTiming.SpreadEvenly ? dto.MaxSpreadBids : null,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+        }
+        private void UpdateBidStrategyFromDto(BidStrategy strategy, CreateAutoBidDTO dto, DateTime now)
+        {
+            strategy.Type = dto.BidStrategyType;
+            strategy.PreferredBidTiming = dto.PreferredBidTiming;
+            strategy.BidDelaySeconds = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.BidDelaySeconds;
+            strategy.MaxBidsPerMinute = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.MaxBidsPerMinute;
+            strategy.MaxSpreadBids = dto.PreferredBidTiming == PreferredBidTiming.SpreadEvenly ? dto.MaxSpreadBids : null;
+            strategy.UpdatedAt = now;
+        }
         public AutoBidService(IUnitOfWork uow, ILogger<AutoBidService> log, IAuctionService auctionService)
         {
             _uow = uow;
@@ -48,45 +178,61 @@ namespace AutoFiCore.Services
 
             _log.LogInformation("Found {Count} auctions with active autobids ", auctionsWithAutoBids.Count);
 
-            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
-            var bidCount = bids.Count;
+            var bidCount = (await _uow.Bids.GetBidsByAuctionIdAsync(auctionId)).Count;
+            var autoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
+            var sortedAutoBids = autoBids.OrderBy(ab => ab.CreatedAt).ToList();
+            var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
+            var timeLeft = auction.EndUtc - DateTime.UtcNow;
 
-            var auctionAutoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
-
-            foreach (var autoBid in auctionAutoBids)
+            foreach (var autoBid in sortedAutoBids)
             {
                 try
                 {
-                    var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
+                    if (autoBid.UserId == highestBidder)
+                    {
+                        _log.LogInformation("User {UserId} is already highest bidder on auction {AuctionId}. Skipping auto-bid", autoBid.UserId, autoBid.AuctionId);
+                        continue;
+                    }
+                    var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(autoBid.UserId, auctionId);
                     var increment = BidIncrementCalculator.GetIncrementByStrategy(newBidAmount, bidCount, autoBid.BidStrategyType);
                     var nextBidAmount = newBidAmount + increment;
 
-                 
-                    _log.LogInformation("Processing auto-bids for auction {AuctionId} with bid {BidAmount}", auctionId, newBidAmount);
-                   
-                    if (nextBidAmount <= autoBid.MaxBidAmount && autoBid.UserId != highestBidder)
+                    if (bidStrategy == null)
                     {
-                        var createBidDto = new CreateBidDTO
-                        {
-                            Amount = nextBidAmount,
-                            UserId = autoBid.UserId,
-                            IsAuto = true
-                        };
-
-                        var result = await _auctionService.PlaceBidAsync(auctionId, createBidDto);
-                        if (result.IsSuccess)
-                        {
-                            _log.LogInformation("Auto-bid placed by user {UserId} on auction {AuctionId} for {Amount}", autoBid.UserId, auctionId, nextBidAmount);
-                            break;
-                        }
-                        else
-                        {
-                            _log.LogWarning("Auto-bid failed for user {UserId} on auction {AuctionId}: {Reason}", autoBid.UserId, auctionId, result.Error);
-                        }
+                        _log.LogWarning("No bid strategy found for user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
+                        continue;
                     }
-                    else
+                    if (nextBidAmount > autoBid.MaxBidAmount)
                     {
-                        _log.LogWarning("User {UserId} on auction {AuctionId} is already highest bidder. Skipping auto-bid", autoBid.UserId, auctionId);
+                        _log.LogInformation("Next bid {Amount} exceeds user {UserId}'s max bid", nextBidAmount, autoBid.UserId);
+                        continue;
+                    }
+
+                    switch (bidStrategy.PreferredBidTiming)
+                    {
+                        case PreferredBidTiming.LastMinute:
+                            if (timeLeft.TotalSeconds <= 120)
+                            {
+                                await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
+                                return;
+                            }
+                            break;
+
+                        case PreferredBidTiming.Immediate:
+                            if (await CanPlaceImmediateBid(autoBid, auctionId))
+                            {
+                                await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
+                                return;
+                            }
+                            break;
+
+                        case PreferredBidTiming.SpreadEvenly:
+                            if (await CanPlaceSpreadBid(autoBid, auctionId))
+                            {
+                                await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
+                                return;
+                            }
+                            break;
                     }
                 }
                 catch (Exception ex)
@@ -101,21 +247,16 @@ namespace AutoFiCore.Services
             if (auction == null || auction.Status != AuctionStatus.Active)
                 return Result<CreateAutoBidDTO>.Failure("Auction not found or not active.");
 
-            if (auction.CurrentPrice == 0 && dto.MaxBidAmount < auction.StartingPrice)
-                return Result<CreateAutoBidDTO>.Failure("MaxBidAmount must be greater than starting price.");
-
-            if (dto.MaxBidAmount <= auction.CurrentPrice)
-                return Result<CreateAutoBidDTO>.Failure("MaxBidAmount must be greater than current price.");
-
-            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auction.AuctionId);
             decimal highestBid = await _uow.Bids.GetHighestBidAmountAsync(auction.AuctionId, auction.StartingPrice);
-            var minimumIncrement = BidIncrementCalculator.GetIncrementByStrategy(highestBid, bids.Count, dto.BidStrategyType);
+            int totalBids = (await _uow.Bids.GetBidsByAuctionIdAsync(auction.AuctionId)).Count;
+            var minIncrement = BidIncrementCalculator.GetIncrementByStrategy(highestBid, totalBids, dto.BidStrategyType);
 
-            if (dto.MaxBidAmount < (auction.StartingPrice + minimumIncrement))
+            if (dto.MaxBidAmount < auction.StartingPrice + minIncrement)
                 return Result<CreateAutoBidDTO>.Failure(
-                    $"MaxBidAmount must be at least {(auction.StartingPrice + minimumIncrement):C} based on the selected strategy.");
+                    $"MaxBidAmount must be at least {(auction.StartingPrice + minIncrement):C} based on the selected strategy.");
 
             var existingAutoBid = await _uow.AutoBid.GetAutoBidWithStrategyAsync(dto.UserId, dto.AuctionId);
+            var now = DateTime.UtcNow;
 
             if (existingAutoBid != null)
             {
@@ -128,14 +269,10 @@ namespace AutoFiCore.Services
 
                 var updateResult = await UpdateAutoBidAsync(dto.AuctionId, dto.UserId, updateDto);
 
-                var existingStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, dto.AuctionId);
-                if (existingStrategy != null)
+                var strategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, dto.AuctionId);
+                if (strategy != null)
                 {
-                    existingStrategy.Type = dto.BidStrategyType;
-                    existingStrategy.PreferredBidTiming = dto.PreferredBidTiming;
-                    existingStrategy.BidDelaySeconds = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.BidDelaySeconds;
-                    existingStrategy.MaxBidsPerMinute = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.MaxBidsPerMinute;
-                    existingStrategy.UpdatedAt = DateTime.UtcNow;
+                    UpdateBidStrategyFromDto(strategy, dto, now);
                 }
 
                 await _uow.SaveChangesAsync();
@@ -145,7 +282,7 @@ namespace AutoFiCore.Services
                     : Result<CreateAutoBidDTO>.Failure(updateResult.Error ?? "Failed to update AutoBid.");
             }
 
-            var ab = new AutoBid
+            var autoBid = new AutoBid
             {
                 UserId = dto.UserId,
                 AuctionId = dto.AuctionId,
@@ -153,27 +290,17 @@ namespace AutoFiCore.Services
                 CurrentBidAmount = 0,
                 BidStrategyType = dto.BidStrategyType,
                 IsActive = dto.IsActive,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                CreatedAt = now,
+                UpdatedAt = now
             };
 
-            var bidStrategy = new BidStrategy
-            {
-                UserId = dto.UserId,
-                AuctionId = dto.AuctionId,
-                Type = dto.BidStrategyType,
-                BidDelaySeconds = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.BidDelaySeconds,
-                MaxBidsPerMinute = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.MaxBidsPerMinute,
-                PreferredBidTiming = dto.PreferredBidTiming,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-            };
+            var strategyToAdd = CreateBidStrategyFromDto(dto, now);
 
-            await _uow.AutoBid.AddAutoBidAsync(ab);
-            await _uow.AutoBid.AddBidStrategyAsync(bidStrategy);
+            await _uow.AutoBid.AddAutoBidAsync(autoBid);
+            await _uow.AutoBid.AddBidStrategyAsync(strategyToAdd);
             await _uow.SaveChangesAsync();
 
-            _log.LogInformation("Auto-bid created for auction {Auction}", ab.AuctionId);
+            _log.LogInformation("Auto-bid created for auction {Auction}", autoBid.AuctionId);
 
             return Result<CreateAutoBidDTO>.Success(dto);
         }
