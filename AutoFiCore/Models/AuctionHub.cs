@@ -6,11 +6,6 @@ namespace AutoFiCore.Hubs
 {
     public class AuctionHub : Hub
     {
-        public async Task NotifyNewBid(int auctionId)
-        {
-            await Clients.Group($"auction-{auctionId}")
-                .SendAsync("ReceiveNewBid", auctionId);
-        }
         public override async Task OnConnectedAsync()
         {
             var httpContext = Context.GetHttpContext();

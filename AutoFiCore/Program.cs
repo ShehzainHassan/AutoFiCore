@@ -240,6 +240,9 @@ builder.Services.AddHostedService<AuctionScheduler>();
 // Register auction scheduler service
 builder.Services.AddScoped<IAuctionSchedulerService, AuctionScheduler>();
 
+// Register auction notifier service
+builder.Services.AddScoped<IAuctionNotifier, AuctionNotifier>();
+
 // Add services to the container.
 builder.Services.AddControllers();
 
@@ -331,8 +334,6 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
     }
 });
 
-app.MapHub<AuctionHub>("/hubs/auction");
-
 
 StartupValidator.ValidateEnvironment(builder.Configuration, app.Environment);
 
@@ -350,6 +351,7 @@ if (app.Environment.IsDevelopment())
     logger.LogInformation("OpenAPI Swagger UI available at: /swagger");
 }
 
+app.UseRouting();
 // Use CORS middleware
 app.UseCors(MyAllowSpecificOrigins);
 
@@ -359,11 +361,9 @@ app.UseRequestExecutionTimeLogging();
 // app.UseHttpsRedirection();
 
 app.UseAuthentication();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
+app.MapHub<AuctionHub>("/hubs/auction");
 await app.RunAsync();
 
 // Helper method to convert Railway DATABASE_URL to Npgsql connection string
