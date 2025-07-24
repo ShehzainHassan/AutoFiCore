@@ -35,6 +35,8 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
         {
             try
             {
+                _logger.LogInformation("Running Auction Scheduler... at {Time}", DateTime.UtcNow);
+
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 var nowUtc = DateTime.UtcNow;
@@ -59,7 +61,7 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
                 foreach (var auction in toActivateDirectly)
                 {
                     auction.Status = AuctionStatus.Active;
-                    auction.StartUtc = nowUtc;
+                    auction.ScheduledStartTime = nowUtc;
                     _logger.LogInformation("Auction {AuctionId} moved to Active at {Time}", auction.AuctionId, nowUtc);
                     // TODO: Send SignalR auction start event
                 }
@@ -127,8 +129,8 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
             return Result<CreateAuctionDTO>.Failure(string.Join("; ", errors));
 
         var now = DateTime.UtcNow;
-        var isFutureStart = dto.StartUtc > now;
-        DateTime previewTime = dto.PreviewStartTime ?? dto.StartUtc;
+        var isFutureStart = dto.ScheduledStartTime > now;
+        DateTime previewTime = dto.PreviewStartTime ?? dto.ScheduledStartTime;
         dto.PreviewStartTime = previewTime;
         bool hasPreviewStarted = previewTime <= now;
 
@@ -141,7 +143,7 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
         DateTime? reserveMetAt = reserveMet ? now : null;
 
         auction.VehicleId = dto.VehicleId;
-        auction.StartUtc = dto.StartUtc;
+        auction.ScheduledStartTime = dto.ScheduledStartTime;
         auction.EndUtc = dto.EndUtc;
         auction.PreviewStartTime = previewTime;
         auction.StartingPrice = dto.StartingPrice;

@@ -63,7 +63,7 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         return await _dbContext.Auctions
             .Include(a => a.Vehicle)
             .Include(a => a.Bids.OrderByDescending(b => b.CreatedUtc))
-                .ThenInclude(b => b.User)              
+                .ThenInclude(b => b.User)
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.AuctionId == id);
     }
@@ -89,13 +89,17 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .AsNoTracking()
             .ToListAsync();
     }
-    public async Task<Bid?> GetHighestBidAsync(int auctionId)
+    public async Task<decimal> GetHighestBidAmountAsync(int auctionId, decimal startingPrice)
     {
-        return await _dbContext.Bids
+        var highestBid = await _dbContext.Bids
             .Where(b => b.AuctionId == auctionId)
             .OrderByDescending(b => b.Amount)
+            .Select(b => (decimal?)b.Amount)
             .FirstOrDefaultAsync();
+
+        return highestBid ?? startingPrice;
     }
+
     public async Task<int?> GetHighestBidderIdAsync(int auctionId)
     {
         var highestBid = await _dbContext.Bids

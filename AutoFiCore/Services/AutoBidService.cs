@@ -63,7 +63,7 @@ namespace AutoFiCore.Services
 
                  
                     _log.LogInformation("Processing auto-bids for auction {AuctionId} with bid {BidAmount}", auctionId, newBidAmount);
-
+                   
                     if (nextBidAmount <= autoBid.MaxBidAmount && autoBid.UserId != highestBidder)
                     {
                         var createBidDto = new CreateBidDTO
@@ -106,6 +106,14 @@ namespace AutoFiCore.Services
 
             if (dto.MaxBidAmount <= auction.CurrentPrice)
                 return Result<CreateAutoBidDTO>.Failure("MaxBidAmount must be greater than current price.");
+
+            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auction.AuctionId);
+            decimal highestBid = await _uow.Bids.GetHighestBidAmountAsync(auction.AuctionId, auction.StartingPrice);
+            var minimumIncrement = BidIncrementCalculator.GetIncrementByStrategy(highestBid, bids.Count, dto.BidStrategyType);
+
+            if (dto.MaxBidAmount < (auction.StartingPrice + minimumIncrement))
+                return Result<CreateAutoBidDTO>.Failure(
+                    $"MaxBidAmount must be at least {(auction.StartingPrice + minimumIncrement):C} based on the selected strategy.");
 
             var existingAutoBid = await _uow.AutoBid.GetAutoBidWithStrategyAsync(dto.UserId, dto.AuctionId);
 
