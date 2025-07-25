@@ -18,6 +18,7 @@ namespace AutoFiCore.Models
         public bool IsAuto { get; set; } = false;
         [Required]
         public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+        public PreferredBidTiming? PreferredBidTiming { get; set; }
     }
 
 }

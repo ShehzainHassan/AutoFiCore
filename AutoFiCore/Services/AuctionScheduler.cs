@@ -1,6 +1,8 @@
 using AutoFiCore.Data;
 using AutoFiCore.Dto;
 using AutoFiCore.Enums;
+using AutoFiCore.Models;
+using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -39,6 +41,8 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
 
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                var _notifier = scope.ServiceProvider.GetRequiredService<IAuctionNotifier>();
+
                 var nowUtc = DateTime.UtcNow;
 
                 // Scheduled -> PreviewMode
@@ -88,7 +92,7 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
                 {
                     auction.Status = AuctionStatus.Ended;
                     _logger.LogInformation("Auction {AuctionId} ended at {Time}", auction.AuctionId, nowUtc);
-                    // TODO: Send SignalR auction end event
+                    await _notifier.AuctionEnded(auction.AuctionId);
                 }
 
                 await dbContext.SaveChangesAsync(stoppingToken);
@@ -101,7 +105,6 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
             await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
         }
     }
-
     public async Task<Result<CreateAuctionDTO>> UpdateScheduledAuctionAsync(int auctionId, CreateAuctionDTO dto)
     {
         using var scope = _scopeFactory.CreateScope();
@@ -158,5 +161,4 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
 
         return Result<CreateAuctionDTO>.Success(dto);
     }
-
 }

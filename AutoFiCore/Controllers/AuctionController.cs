@@ -148,5 +148,17 @@ namespace AutoFiCore.Controllers
             return Ok(highestId.Value);
         }
 
+        [HttpGet("{auctionId}/result")]
+        public async Task<IActionResult> GetAuctionResult(int auctionId)
+        {
+            var result = await _auctionService.ProcessAuctionResultAsync(auctionId);
+            if (!result.IsSuccess)
+                return BadRequest(result.Error);
+
+            return Ok(result.Value);
+        }
+
+
+
     }
 }

@@ -26,6 +26,7 @@ namespace AutoFiCore.Services
         Task<Result<List<BidDTO>>> GetUserBidHistoryAsync(int userId);
         Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId);
         Task<Result<int?>> GetHighestBidderIdAsync(int auctionId);
+        Task<Result<AuctionResultDTO?>> ProcessAuctionResultAsync(int auctionId);
     }
     public class AuctionService : IAuctionService
     {
@@ -126,6 +127,51 @@ namespace AutoFiCore.Services
                 return Result<AuctionDTO?>.Failure("Auction not found.");
 
             return Result<AuctionDTO?>.Success(AuctionMapper.ToDTO(auction));
+        }      
+        private bool ValidateBidAgainstReserve(Auction auction, decimal bidAmount)
+        {
+            return bidAmount >= auction.ReservePrice;
+        }
+        public async Task<Result<AuctionResultDTO?>> ProcessAuctionResultAsync(int auctionId)
+        {
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            if (auction == null)
+                return Result<AuctionResultDTO?>.Failure("Auction not found");
+
+            if (auction.Status != AuctionStatus.Ended)
+                return Result<AuctionResultDTO?>.Failure("Auction is not yet ended");
+
+            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
+
+            if (bids.Count == 0)
+            {
+                return Result<AuctionResultDTO?>.Success(new AuctionResultDTO
+                {
+                    IsSold = false,
+                    IsReserveMet = false,
+                    UserId = null,
+                    UserName = null,
+                    WinningBid = null,
+                    BidCount = 0,
+                });
+            }
+            var highestBid = bids.OrderByDescending(b => b.Amount).First();
+
+            var winningUser = await _uow.Users.GetUserByIdAsync(highestBid.UserId);
+            if (winningUser == null)
+                return Result<AuctionResultDTO?>.Failure("Winning user not found");
+
+            bool reserveMet = ValidateBidAgainstReserve(auction, highestBid.Amount);
+
+            return Result<AuctionResultDTO?>.Success(new AuctionResultDTO
+            {
+                IsSold = reserveMet,
+                IsReserveMet = reserveMet,
+                UserId = reserveMet ? winningUser.Id : null,
+                UserName = reserveMet ? winningUser.Name : null,
+                WinningBid = reserveMet ? highestBid.Amount : null,
+                BidCount = bids.Count
+            });
         }
         public async Task<Result<BidDTO>> PlaceBidAsync(int auctionId, CreateBidDTO dto)
         {
@@ -145,6 +191,16 @@ namespace AutoFiCore.Services
             if (errs.Any())
                 return Result<BidDTO>.Failure(string.Join("; ", errs));
 
+            PreferredBidTiming? timing = null;
+
+            if (dto.IsAuto == true)
+            {
+                var strategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, auctionId);
+                if (strategy != null)
+                {
+                    timing = strategy.PreferredBidTiming;
+                }
+            }
             var bid = new Bid
             {
                 AuctionId = auctionId,
@@ -152,6 +208,7 @@ namespace AutoFiCore.Services
                 Amount = dto.Amount,
                 IsAuto = dto.IsAuto ?? false,
                 CreatedUtc = DateTime.UtcNow,
+                PreferredBidTiming = timing
             };
 
             await _uow.Bids.AddBidAsync(bid);
@@ -165,7 +222,8 @@ namespace AutoFiCore.Services
                 UserId = bid.UserId,
                 Amount = bid.Amount,
                 IsAuto = bid.IsAuto,
-                PlacedAt = bid.CreatedUtc
+                PlacedAt = bid.CreatedUtc,
+               
             };
 
             if (auction.ReservePrice.HasValue && !auction.IsReserveMet && bid.Amount >= auction.ReservePrice.Value)
