@@ -69,7 +69,8 @@ namespace AutoFiCore.Data
                         BidStrategyType = ab.BidStrategyType,
                         BidDelaySeconds = bs.BidDelaySeconds,
                         MaxBidsPerMinute = bs.MaxBidsPerMinute,
-                        PreferredBidTiming = bs.PreferredBidTiming
+                        PreferredBidTiming = bs.PreferredBidTiming,
+                        MaxSpreadBids = bs.MaxSpreadBids,
                     }
                 )
                 .FirstOrDefaultAsync();
