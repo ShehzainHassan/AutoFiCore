@@ -6,6 +6,7 @@ namespace AutoFiCore.Services
     public interface IAuctionNotifier
     {
         Task NotifyNewBid(int auctionId);
+        Task AuctionEnded(int auctionId);
     }
 
     public class AuctionNotifier : IAuctionNotifier
@@ -21,6 +22,11 @@ namespace AutoFiCore.Services
         {
             await _hubContext.Clients.Group($"auction-{auctionId}")
                 .SendAsync("ReceiveNewBid", auctionId);
+        }
+        public async Task AuctionEnded(int auctionId)
+        {
+            await _hubContext.Clients.Group($"auction-{auctionId}")
+                .SendAsync("AuctionEnded", auctionId);
         }
     }
 }

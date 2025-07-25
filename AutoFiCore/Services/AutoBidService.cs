@@ -28,9 +28,7 @@ namespace AutoFiCore.Services
         {
             var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(autoBid.UserId, auctionId);
             if (bidStrategy == null)
-            {
                 return false;
-            }
 
             var now = DateTime.UtcNow;
 
@@ -129,6 +127,21 @@ namespace AutoFiCore.Services
             return false;
 
         }
+        private async Task<bool> CanPlaceLastMinuteBid(AutoBid autoBid, int auctionId)
+        {
+            var userBids = await _uow.Bids.GetBidsByUserIdAsync(autoBid.UserId);
+
+            var lastMinuteBids = userBids
+                .Where(b => b.AuctionId == auctionId && b.IsAuto && b.PreferredBidTiming == PreferredBidTiming.LastMinute)
+                .OrderByDescending(b => b.CreatedUtc)
+                .ToList();
+
+            if (!lastMinuteBids.Any())
+                return true;
+
+            _log.LogInformation("User {UserId} already placed a last-minute bid for auction {AuctionId}.", autoBid.UserId, auctionId);
+            return false;
+        }
         private BidStrategy CreateBidStrategyFromDto(CreateAutoBidDTO dto, DateTime now)
         {
             return new BidStrategy
@@ -211,7 +224,7 @@ namespace AutoFiCore.Services
                     switch (bidStrategy.PreferredBidTiming)
                     {
                         case PreferredBidTiming.LastMinute:
-                            if (timeLeft.TotalSeconds <= 120)
+                            if (timeLeft.TotalSeconds <= 120 && await CanPlaceLastMinuteBid(autoBid, auctionId))
                             {
                                 await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
                                 return;
