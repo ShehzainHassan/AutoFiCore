@@ -111,11 +111,13 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     }
     public async Task UpdateCurrentPriceAsync(int auctionId, decimal newPrice)
     {
-        await _dbContext.Auctions
-            .Where(a => a.AuctionId == auctionId)
-            .ExecuteUpdateAsync(u => u
-                .SetProperty(a => a.CurrentPrice, a => newPrice)
-                .SetProperty(a => a.UpdatedUtc, a => DateTime.UtcNow));
+        var auction = await _dbContext.Auctions.FirstOrDefaultAsync(a => a.AuctionId == auctionId);
+        if (auction != null)
+        {
+            auction.CurrentPrice = newPrice;
+            auction.UpdatedUtc = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
+        }
     }
     public async Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes)
     {

@@ -27,20 +27,26 @@ public static class AuctionQuery
     {
         if (!string.IsNullOrWhiteSpace(filters.SortBy))
         {
-            return filters.SortBy.ToLower() switch
+            switch (filters.SortBy.ToLower())
             {
-                "price" => filters.Descending
-                                    ? source.OrderByDescending(a => a.CurrentPrice)
-                                    : source.OrderBy(a => a.CurrentPrice),
+                case "price":
+                    return filters.Descending
+                        ? source.OrderByDescending(a => a.CurrentPrice)
+                        : source.OrderBy(a => a.CurrentPrice);
 
-                "startutc" => filters.Descending
-                                    ? source.OrderByDescending(a => a.StartUtc)
-                                    : source.OrderBy(a => a.StartUtc),
+                case "endtime":
+                    return filters.Descending
+                        ? source.OrderByDescending(a => a.EndUtc)
+                        : source.OrderBy(a => a.EndUtc); 
 
-                _ => source.OrderBy(a => a.AuctionId)
-            };
+                case "make":
+                    return filters.Descending
+                        ? source.OrderByDescending(a => a.Vehicle.Make)
+                        : source.OrderBy(a => a.Vehicle.Make);
+            }
         }
 
         return source.OrderBy(a => a.AuctionId);
     }
+
 }
