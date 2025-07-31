@@ -31,6 +31,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Watchlist> Watchlists { get; set; } = null!;
     public DbSet<AutoBid> AutoBids { get; set; } = null!;
     public DbSet<BidStrategy> BidStrategies { get; set; } = null!;
+    public DbSet<Notification> Notifications { get; set; }  
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -209,6 +210,19 @@ public class ApplicationDbContext : DbContext
             entity.Property(b => b.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(n => n.Id);
+            entity.Property(n => n.NotificationType).HasConversion<string>().IsRequired();
+            entity.Property(n => n.Priority).HasConversion<string>().IsRequired();
+            entity.Property(n => n.Title).IsRequired().HasMaxLength(255);
+            entity.Property(n => n.Message).IsRequired(false);
+            entity.Property(n => n.IsRead).HasDefaultValue(false);
+            entity.Property(n => n.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(n => n.EmailSentAt).IsRequired(false);
+        });
+
+
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Model).HasDatabaseName("IX_Vehicles_Model");
@@ -324,5 +338,17 @@ public class ApplicationDbContext : DbContext
             .WithMany(u => u.BidStrategies)
             .HasForeignKey(bs => bs.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>().HasOne(n => n.User)
+            .WithMany(u => u.Notifications)
+            .HasForeignKey(n => n.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Notification>().HasOne(n => n.Auction)
+            .WithMany(a => a.Notifications)
+            .HasForeignKey(n => n.AuctionId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
     }
 }
