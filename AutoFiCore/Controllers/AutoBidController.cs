@@ -5,6 +5,7 @@ using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -19,8 +20,8 @@ public class AutoBidController : ControllerBase
         _unitOfWork = unitOfWork;
     }
 
-    [HttpPost]
     [Authorize]
+    [HttpPost]
     public async Task<IActionResult> CreateAutoBid([FromBody] CreateAutoBidDTO dto)
     {
         var result = await _autoBidService.CreateAutoBidAsync(dto);
@@ -31,10 +32,17 @@ public class AutoBidController : ControllerBase
         return Ok(result.Value);
     }
 
-    [HttpPut("update/auction/{auctionId}/user/{userId}")]
     [Authorize]
-    public async Task<IActionResult> UpdateAutoBid(int auctionId, int userId, [FromBody] UpdateAutoBidDTO dto)
+    [HttpPut("update/auction/{auctionId}")]
+    public async Task<IActionResult> UpdateAutoBid(int auctionId, [FromBody] UpdateAutoBidDTO dto)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                        User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+        {
+            return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+        }
         var result = await _autoBidService.UpdateAutoBidAsync(auctionId, userId, dto);
 
         if (!result.IsSuccess)
@@ -43,10 +51,17 @@ public class AutoBidController : ControllerBase
         return Ok(result.Value);
     }
 
-    [HttpDelete("{auctionId}/user/{userId}")]
     [Authorize]
-    public async Task<IActionResult> CancelAutoBid(int userId, int auctionId)
+    [HttpDelete("{auctionId}")]
+    public async Task<IActionResult> CancelAutoBid(int auctionId)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                        User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+        {
+            return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+        }
         var result = await _autoBidService.CancelAutoBidAsync(auctionId, userId);
 
         if (!result.IsSuccess)
@@ -55,9 +70,17 @@ public class AutoBidController : ControllerBase
         return Ok(new { message = "Auto-bid cancelled successfully" });
     }
 
-    [HttpGet("auction/{auctionId}/user/{userId}")]
-    public async Task<ActionResult<bool>> IsAutoBidSet(int auctionId, int userId)
+    [Authorize]
+    [HttpGet("auction/{auctionId}")]
+    public async Task<ActionResult<bool>> IsAutoBidSet(int auctionId)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                        User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+        {
+            return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+        }
         var result = await _autoBidService.IsAutoBidSetAsync(auctionId, userId);
         if (!result.IsSuccess)
             return BadRequest(new { error = result.Error });
@@ -65,9 +88,17 @@ public class AutoBidController : ControllerBase
         return Ok(result.Value);
     }
 
-    [HttpGet("{auctionId}/user/{userId}")]
-    public async Task<IActionResult> GetAutoBidWithStrategy(int userId, int auctionId)
+    [Authorize]
+    [HttpGet("{auctionId}")]
+    public async Task<IActionResult> GetAutoBidWithStrategy(int auctionId)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                        User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+        if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+        {
+            return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+        }
         var result = await _autoBidService.GetAutoBidWithStrategyAsync(userId, auctionId);
 
         if (!result.IsSuccess)

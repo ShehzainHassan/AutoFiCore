@@ -1,9 +1,11 @@
-﻿using AutoFiCore.Models;
+﻿using AutoFiCore.Dto;
+using AutoFiCore.Models;
 using AutoFiCore.Services;
-using Microsoft.AspNetCore.Mvc;
 using AutoFiCore.Utilities;
-using AutoFiCore.Dto;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace AutoFiCore.Controllers
 {
@@ -89,27 +91,43 @@ namespace AutoFiCore.Controllers
             return Ok(removedLike);
         }
 
-        [HttpGet("get-user-liked-vins/{id}")]
-        public async Task<ActionResult<List<string>>> GetUserLikedVins(int id)
+        [Authorize]
+        [HttpGet("get-user-liked-vins")]
+        public async Task<ActionResult<List<string>>> GetUserLikedVins()
         {
-            var user = await _userService.GetUserByIdAsync(id);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                        User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+            }
+            var user = await _userService.GetUserByIdAsync(userId);
             if (user == null)
             {
-                return NotFound($"User with ID {id} not found");
+                return NotFound($"User with ID {userId} not found");
             }
-            var vins = await _userService.GetUserLikedVinsAsync(id);
+            var vins = await _userService.GetUserLikedVinsAsync(userId);
             return Ok(vins);
         }
 
-        [HttpGet("get-user-saved-searches/{id}")]
-        public async Task<ActionResult<List<string>>> GetUserSearches(int id)
+        [Authorize]
+        [HttpGet("get-user-saved-searches")]
+        public async Task<ActionResult<List<string>>> GetUserSearches()
         {
-            var user = await _userService.GetUserByIdAsync(id);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                         User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+            }
+            var user = await _userService.GetUserByIdAsync(userId);
             if (user == null)
             {
-                return NotFound($"User with ID {id} not found");
+                return NotFound($"User with ID {userId} not found");
             }
-            var searches = await _userService.GetUserSavedSearches(id);
+            var searches = await _userService.GetUserSavedSearches(userId);
             return Ok(searches);
         }
 
@@ -136,7 +154,6 @@ namespace AutoFiCore.Controllers
             if (user == null)
                 return NotFound($"User with ID {id} not found");
             return Ok(user);
-
         }
 
         [Authorize]
