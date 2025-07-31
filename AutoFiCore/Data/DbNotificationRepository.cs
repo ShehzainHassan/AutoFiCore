@@ -45,6 +45,7 @@ namespace AutoFiCore.Data
                 .Take(pageSize)
                 .Select(n => new NotificationDTO
                 {
+                    Id = n.Id,
                     AuctionId = n.AuctionId,
                     Title = n.Title,
                     Message = n.Message,
@@ -62,5 +63,42 @@ namespace AutoFiCore.Data
                 PageSize = pageSize
             };
         }
+        public async Task<Result<Notification>> MarkAsReadAsync(int notificationId)
+        {
+            var notification = await _dbContext.Notifications.FirstOrDefaultAsync(n => n.Id == notificationId & !n.IsRead);
+
+            if (notification == null)
+            {
+                return Result<Notification>.Failure("Notification not found"); 
+            }
+
+            notification.IsRead = true;
+            await _dbContext.SaveChangesAsync();
+
+            return Result<Notification>.Success(notification);
+        }
+        public async Task<NotificationDTO?> GetNotificationByIdAsync(int notificationId)
+        {
+            return await _dbContext.Notifications
+                .Where(n => n.Id == notificationId)
+                .Select(n => new NotificationDTO
+                {
+                    Id = n.Id,
+                    AuctionId = n.AuctionId,
+                    Title = n.Title,
+                    Message = n.Message,
+                    NotificationType = n.NotificationType,
+                    IsRead = n.IsRead,
+                    CreatedAt = n.CreatedAt
+                })
+                .FirstOrDefaultAsync();
+        }
+        public async Task<int> GetUnreadNotificationCountAsync(int userId)
+        {
+            return await _dbContext.Notifications
+                .CountAsync(n => n.UserId == userId && !n.IsRead);
+        }
+
+
     }
 }

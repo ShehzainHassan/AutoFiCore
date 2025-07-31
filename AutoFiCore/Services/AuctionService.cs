@@ -195,6 +195,7 @@ namespace AutoFiCore.Services
             if (errs.Any())
                 return Result<BidDTO>.Failure(string.Join("; ", errs));
 
+            var previousHighestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
             PreferredBidTiming? timing = null;
 
             if (dto.IsAuto == true)
@@ -254,6 +255,7 @@ namespace AutoFiCore.Services
             // await _hub.Clients.Group($"auction-{bid.AuctionId}")
             //                 .SendAsync("ReceiveNewBid", bid.AuctionId);
             await _notifier.NotifyNewBid(auctionId);
+            await _auctionLifecycleService.HandleOutbid(auction, previousHighestBidder);
 
             return Result<BidDTO>.Success(bidDto);
         }
