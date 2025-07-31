@@ -29,6 +29,7 @@ public static class AuctionQuery
         {
             switch (filters.SortBy.ToLower())
             {
+               
                 case "price":
                     return filters.Descending
                         ? source.OrderByDescending(a => a.CurrentPrice)

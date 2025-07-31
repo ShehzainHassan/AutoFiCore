@@ -158,6 +158,12 @@ namespace AutoFiCore.Controllers
             return Ok(result.Value);
         }
 
+        [Authorize] 
+        [HttpGet("{id}/checkout")]
+        public IActionResult VerifyCheckoutAccess(int id)
+        {
+            return Ok(new { success = true, message = "User authorized for auction checkout." });
+        }
 
 
     }

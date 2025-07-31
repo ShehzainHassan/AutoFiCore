@@ -11,6 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using Polly;
 using Polly.Retry;
 using QuestPDF.Infrastructure;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 
 WebApplicationBuilder builder;
@@ -193,6 +194,7 @@ else
     builder.Services.AddScoped<IBidRepository, DbAuctionRepository>();
     builder.Services.AddScoped<IWatchlistRepository, DbAuctionRepository>();
     builder.Services.AddScoped<IAutoBidRepository, DbAutoBidRepository>();
+    builder.Services.AddScoped<INotificationRepository, DbNotificationRepository>();
 }
 
 // Register user service
@@ -243,10 +245,14 @@ builder.Services.AddScoped<IAuctionSchedulerService, AuctionScheduler>();
 // Register auction notifier service
 builder.Services.AddScoped<IAuctionNotifier, AuctionNotifier>();
 
+// Register notification service
+builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// Register Auction Lifecylce service
+builder.Services.AddScoped<IAuctionLifecycleService, AuctionLifecycleService>();
+
 // Add services to the container.
 builder.Services.AddControllers();
-
-
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -271,7 +277,8 @@ builder.Services.AddAuthentication("Bearer")
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.Zero,
+            NameClaimType = JwtRegisteredClaimNames.Sub
         };
     });
 
@@ -362,6 +369,7 @@ app.UseRequestExecutionTimeLogging();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<CheckoutAuthorizationMiddleware>();
 app.MapControllers();
 app.MapHub<AuctionHub>("/hubs/auction");
 await app.RunAsync();

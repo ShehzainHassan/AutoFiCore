@@ -33,11 +33,13 @@ namespace AutoFiCore.Services
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AuctionService> _logger;
         private readonly IAuctionNotifier _notifier;
-        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IAuctionNotifier auctionNotifier)
+        private readonly IAuctionLifecycleService _auctionLifecycleService;
+        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IAuctionNotifier auctionNotifier, IAuctionLifecycleService auctionLifecycleService)
         {
             _uow = uow;
             _logger = log;
             _notifier = auctionNotifier;
+            _auctionLifecycleService = auctionLifecycleService;
         }
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
         {
@@ -162,6 +164,8 @@ namespace AutoFiCore.Services
                 return Result<AuctionResultDTO?>.Failure("Winning user not found");
 
             bool reserveMet = ValidateBidAgainstReserve(auction, highestBid.Amount);
+            if (reserveMet)
+                await _auctionLifecycleService.HandleAuctionWonAsync(auction, winningUser.Id);
 
             return Result<AuctionResultDTO?>.Success(new AuctionResultDTO
             {
