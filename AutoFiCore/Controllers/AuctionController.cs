@@ -5,6 +5,8 @@ using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace AutoFiCore.Controllers
 {
@@ -18,7 +20,6 @@ namespace AutoFiCore.Controllers
         {
              _auctionService = auctionService;
         }
-
         //[Authorize(Roles = "Admin")]
         [HttpPost]
         public async Task<IActionResult> CreateAuction([FromBody] CreateAuctionDTO dto)
@@ -49,8 +50,7 @@ namespace AutoFiCore.Controllers
             var auctions = await _auctionService.GetAuctionsAsync(filters);
             return Ok(auctions);
         }
-        
-        
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAuction(int id)
         {
@@ -84,9 +84,18 @@ namespace AutoFiCore.Controllers
             return Ok(result.Value);                             
         }
 
-        [HttpGet("userBids/{id}")]
-        public async Task<IActionResult> GetUserBidHistory([FromRoute(Name = "id")] int userId)
+        [Authorize]
+        [HttpGet("userBids")]
+        public async Task<IActionResult> GetUserBidHistory()
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+            User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+            }
+
             var result = await _auctionService.GetUserBidHistoryAsync(userId);
 
             if (!result.IsSuccess)
@@ -97,8 +106,16 @@ namespace AutoFiCore.Controllers
 
         [Authorize]
         [HttpPost("{id}/watch")]
-        public async Task<IActionResult> AddToWatchlist(int id, [FromQuery] int userId)
+        public async Task<IActionResult> AddToWatchlist(int id)
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                  User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+            }
+
             var result = await _auctionService.AddToWatchListAsync(userId, id);
             if (!result.IsSuccess)
                 return BadRequest(new { error = result.Error });
@@ -109,24 +126,41 @@ namespace AutoFiCore.Controllers
 
         [Authorize]
         [HttpDelete("{id}/watch")]
-        public async Task<IActionResult> RemoveFromWatchlist(int id, [FromQuery] int userId)
+        public async Task<IActionResult> RemoveFromWatchlist(int id)
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+            User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+            }
+
             var result = await _auctionService.RemoveFromWatchListAsync(userId, id);
             if (!result.IsSuccess)
                 return BadRequest(new {error = result.Error});  
             return Ok(result.Value);
         }
 
-        [HttpGet("user/{userId}/watchlist")]
-        public async Task<IActionResult> GetUserWatchlist(int userId)
+        [Authorize]
+        [HttpGet("user/watchlist")]
+        public async Task<IActionResult> GetUserWatchlist()
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                              User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+            }
+
             var watchlists = await _auctionService.GetUserWatchListAsync(userId);
 
             if (!watchlists.IsSuccess)
                 return NotFound(new { error = watchlists.Error });
+
             return Ok(watchlists.Value);
         }
-
 
         [HttpGet("{auctionId}/watchers")]
         public async Task<IActionResult> GetAuctionWatchers(int auctionId)
@@ -164,7 +198,5 @@ namespace AutoFiCore.Controllers
         {
             return Ok(new { success = true, message = "User authorized for auction checkout." });
         }
-
-
     }
 }

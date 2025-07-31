@@ -18,8 +18,16 @@ namespace AutoFiCore.Controllers
             _notificationService = notificationService;
         }
         [HttpGet]
-        public async Task<IActionResult> GetNotifications([FromQuery] int userId, [FromQuery] bool unreadOnly = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetNotifications([FromQuery] bool unreadOnly = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
+                  User.FindFirst(JwtRegisteredClaimNames.Sub);
+
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+            }
+
             var result = await _notificationService.GetUserNotificationsAsync(userId, unreadOnly, page, pageSize);
             return Ok(result);
         }
