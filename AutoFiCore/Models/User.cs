@@ -15,6 +15,8 @@ namespace AutoFiCore.Models
         [StringLength(25)]
         public string Email { get; set; } = string.Empty;
 
+        public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+
         [Required]
         [StringLength(100)]
         public string Password { get; set; } = string.Empty;

@@ -15,6 +15,11 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         _dbContext = db;
         _logger = log;
     }
+    public Task<int> GetAuctionCountAsync(DateTime start, DateTime end) =>
+    _dbContext.Auctions.CountAsync(a => a.CreatedUtc >= start && a.CreatedUtc < end);
+
+    public Task<int> GetBidCountAsync(DateTime start, DateTime end) =>
+    _dbContext.Bids.CountAsync(b => b.CreatedUtc >= start && b.CreatedUtc < end);
 
     public async Task<Auction> AddAuctionAsync(Auction auction)
     {
@@ -176,5 +181,17 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     public void UpdateAuction(Auction auction)
     {
         _dbContext.Auctions.Update(auction);
+    }
+    public Task<int> GetUniqueBiddersCountAsync(int auctionId)
+    {
+        return _dbContext.Bids
+            .Where(b => b.AuctionId == auctionId)
+            .Select(b => b.UserId)
+            .Distinct()
+            .CountAsync();
+    }
+    public Task<int> GetTotalBidsAsync(int auctionId)
+    {
+        return _dbContext.Bids.CountAsync(b => b.AuctionId == auctionId);
     }
 }

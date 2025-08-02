@@ -11,6 +11,10 @@
         IWatchlistRepository Watchlist { get; }
         IAutoBidRepository AutoBid { get; }
         INotificationRepository Notification { get; }
+        IAnalyticsRepository Analytics { get; }
+        IReportRepository Report { get; }   
+        IMetricsRepository Metrics { get; }
+        IPerformanceRepository Performance { get; }
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();
