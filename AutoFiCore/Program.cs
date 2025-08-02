@@ -195,6 +195,10 @@ else
     builder.Services.AddScoped<IWatchlistRepository, DbAuctionRepository>();
     builder.Services.AddScoped<IAutoBidRepository, DbAutoBidRepository>();
     builder.Services.AddScoped<INotificationRepository, DbNotificationRepository>();
+    builder.Services.AddScoped<IAnalyticsRepository, DbAnalyticsRepository>();
+    builder.Services.AddScoped<IMetricsRepository, DbMetricsRepository>();
+    builder.Services.AddScoped<IReportRepository, DbReportRepository>();
+    builder.Services.AddScoped<IPerformanceRepository, DbPerformanceRepository>();  
 }
 
 // Register user service
@@ -236,6 +240,9 @@ builder.Services.AddSignalR();
 // Register auto bid background service
 builder.Services.AddHostedService<AutoBidBackgroundService>();
 
+// Register daily metrics background service
+builder.Services.AddHostedService<DailyMetricsHostedService>();
+
 // Register auction scheduler background service
 builder.Services.AddHostedService<AuctionScheduler>();
 
@@ -250,6 +257,21 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Register Auction Lifecylce service
 builder.Services.AddScoped<IAuctionLifecycleService, AuctionLifecycleService>();
+
+// Register Analytics Service
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+
+// Register Metrics Calculation Service
+builder.Services.AddScoped<IMetricsCalculationService, MetricsCalculationService>();
+
+// Register Reporting Service
+builder.Services.AddScoped<IReportingService, ReportingService>();
+
+// Register System Health Service
+builder.Services.AddScoped<ISystemHealthService, SystemHealthService>();
+
+// Register Dashboard Service
+builder.Services.AddScoped<IDashboardService,  DashboardService>();
 
 // Add services to the container.
 builder.Services.AddControllers();

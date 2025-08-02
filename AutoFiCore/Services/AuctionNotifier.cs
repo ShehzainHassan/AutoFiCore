@@ -7,7 +7,6 @@ namespace AutoFiCore.Services
     {
         Task NotifyNewBid(int auctionId);
         Task AuctionEnded(int auctionId);
-       Task NotifyOutbid(int userId, int auctionId);
     }
 
     public class AuctionNotifier : IAuctionNotifier
@@ -18,12 +17,6 @@ namespace AutoFiCore.Services
         {
             _hubContext = hubContext;
         }
-        public async Task NotifyOutbid(int userId, int auctionId)
-        {
-            await _hubContext.Clients.User(userId.ToString())
-                .SendAsync("Outbid", auctionId);
-        }
-
         public async Task NotifyNewBid(int auctionId)
         {
             await _hubContext.Clients.Group($"auction-{auctionId}")

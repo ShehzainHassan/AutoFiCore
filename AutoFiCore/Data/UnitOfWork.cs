@@ -15,8 +15,11 @@ namespace AutoFiCore.Data
         public INewsLetterRepository NewsLetter { get; }
         public IAutoBidRepository AutoBid { get; }
         public INotificationRepository Notification { get; }
-
-        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository, IAuctionRepository auctions, IBidRepository bids, IWatchlistRepository watchlist, IAutoBidRepository autoBid, INotificationRepository notification)
+        public IAnalyticsRepository Analytics { get; }
+        public IReportRepository Report { get; }
+        public IMetricsRepository Metrics { get; }
+        public IPerformanceRepository Performance { get; }
+        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository, IAuctionRepository auctions, IBidRepository bids, IWatchlistRepository watchlist, IAutoBidRepository autoBid, INotificationRepository notification, IAnalyticsRepository analytics, IReportRepository report, IMetricsRepository metrics, IPerformanceRepository performance)
         {
             _context = context;
             Vehicles = vehicleRepository;
@@ -28,6 +31,10 @@ namespace AutoFiCore.Data
             Watchlist = watchlist;
             AutoBid = autoBid;
             Notification = notification;
+            Analytics = analytics;
+            Report = report;
+            Metrics = metrics;
+            Performance = performance;
         }
         public async Task<int> SaveChangesAsync()
         {

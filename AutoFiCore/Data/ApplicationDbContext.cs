@@ -31,7 +31,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<Watchlist> Watchlists { get; set; } = null!;
     public DbSet<AutoBid> AutoBids { get; set; } = null!;
     public DbSet<BidStrategy> BidStrategies { get; set; } = null!;
-    public DbSet<Notification> Notifications { get; set; }  
+    public DbSet<Notification> Notifications { get; set; }
+    public DbSet<AnalyticsEvent> AnalyticsEvents => Set<AnalyticsEvent>();
+    public DbSet<DailyMetric> DailyMetrics => Set<DailyMetric>();
+    public DbSet<AuctionAnalytics> AuctionAnalytics => Set<AuctionAnalytics>();
+    public DbSet<PerformanceMetric> PerformanceMetrics => Set<PerformanceMetric>();
+    public DbSet<APIPerformanceLog> ApiPerformanceLogs { get; set; }
+    public DbSet<DBQueryLog> DbQueryLogs { get; set; }
+    public DbSet<ErrorLog> ErrorLogs { get; set; }
+
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -86,6 +95,8 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Name).IsRequired().HasMaxLength(40);
             entity.Property(u => u.Email).IsRequired().HasMaxLength(25);
             entity.Property(u => u.Password).IsRequired().HasMaxLength(100);
+            entity.Property(u => u.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
         });
 
         modelBuilder.Entity<UserLikes>(entity =>
@@ -222,7 +233,75 @@ public class ApplicationDbContext : DbContext
             entity.Property(n => n.EmailSentAt).IsRequired(false);
         });
 
+        modelBuilder.Entity<AnalyticsEvent>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.EventType).HasConversion<string>().IsRequired();
+            entity.Property(e => e.Source).HasConversion<string>();
+            entity.Property(e => e.EventData).HasColumnType("text");
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
 
+        modelBuilder.Entity<DailyMetric>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Date).IsRequired();
+            entity.Property(e => e.MetricType).HasConversion<string>().IsRequired();
+            entity.Property(e => e.Value).HasColumnType("decimal(15,2)");
+            entity.Property(e => e.Count);
+            entity.Property(e => e.Category).HasMaxLength(50);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<AuctionAnalytics>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.TotalViews).IsRequired().HasDefaultValue(0);
+            entity.Property(e => e.UniqueBidders).IsRequired().HasDefaultValue(0);
+            entity.Property(e => e.TotalBids).IsRequired().HasDefaultValue(0);
+            entity.Property(e => e.ViewToBidRatio).HasColumnType("decimal(5,2)");
+            entity.Property(e => e.StartPrice).HasColumnType("decimal(15,2)");
+            entity.Property(e => e.FinalPrice).HasColumnType("decimal(15,2)");
+            entity.Property(e => e.Duration);
+            entity.Property(e => e.CompletionStatus);
+            entity.Property(e => e.SuccessRate);
+            entity.Property(e => e.EngagementScore);
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<PerformanceMetric>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.MetricType).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.Endpoint).HasMaxLength(255).IsRequired();
+            entity.Property(e => e.ResponseTime).IsRequired();
+            entity.Property(e => e.StatusCode).IsRequired();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<APIPerformanceLog>(entity =>
+        {
+            entity.Property(e => e.Endpoint).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.ResponseTime).IsRequired();
+            entity.Property(e => e.StatusCode).IsRequired();
+            entity.Property(e => e.Timestamp).IsRequired();
+
+        });
+
+        modelBuilder.Entity<DBQueryLog>(entity =>
+        {
+            entity.Property(e => e.QueryType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Duration).IsRequired();
+            entity.Property(e => e.Timestamp).IsRequired();
+        });
+
+        modelBuilder.Entity<ErrorLog>(entity =>
+        {
+            entity.Property(e => e.ErrorType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.Message).IsRequired();
+            entity.Property(e => e.StackTrace).IsRequired();
+            entity.Property(e => e.Timestamp).IsRequired();
+        });
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Model).HasDatabaseName("IX_Vehicles_Model");
@@ -252,6 +331,31 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<BidStrategy>().HasIndex(b => b.Type).HasDatabaseName("IX_BidStrategy_Type");
         modelBuilder.Entity<BidStrategy>().HasIndex(b => b.PreferredBidTiming).HasDatabaseName("IX_BidStrategy_Timing");
+
+        modelBuilder.Entity<AnalyticsEvent>().HasIndex(e => e.EventType);
+        modelBuilder.Entity<AnalyticsEvent>().HasIndex(e => e.UserId);
+        modelBuilder.Entity<AnalyticsEvent>().HasIndex(e => e.AuctionId);
+        modelBuilder.Entity<AnalyticsEvent>().HasIndex(e => e.CreatedAt);
+
+        modelBuilder.Entity<DailyMetric>().HasIndex(e => new { e.Date, e.MetricType });
+        modelBuilder.Entity<DailyMetric>().HasIndex(e => e.Category);
+
+        modelBuilder.Entity<AuctionAnalytics>().HasIndex(e => e.AuctionId).IsUnique();
+        modelBuilder.Entity<AuctionAnalytics>().HasIndex(e => e.UpdatedAt);
+
+        modelBuilder.Entity<PerformanceMetric>().HasIndex(e => e.MetricType);
+        modelBuilder.Entity<PerformanceMetric>().HasIndex(e => e.CreatedAt);
+        modelBuilder.Entity<PerformanceMetric>().HasIndex(e => e.StatusCode);
+
+        modelBuilder.Entity<APIPerformanceLog>().HasIndex(e => e.Timestamp);
+        modelBuilder.Entity<APIPerformanceLog>().HasIndex(e => e.Endpoint);
+
+        modelBuilder.Entity<DBQueryLog>().HasIndex(e => e.Timestamp);
+        modelBuilder.Entity<DBQueryLog>().HasIndex(e => e.QueryType);
+
+        modelBuilder.Entity<ErrorLog>().HasIndex(e => e.Timestamp);
+        modelBuilder.Entity<ErrorLog>().HasIndex(e => e.ErrorType);
+
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()
@@ -349,6 +453,22 @@ public class ApplicationDbContext : DbContext
             .HasForeignKey(n => n.AuctionId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<AnalyticsEvent>().HasOne(e => e.User)
+            .WithMany()
+            .HasForeignKey(e => e.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<AnalyticsEvent>().HasOne(e => e.Auction)
+            .WithMany()
+            .HasForeignKey(e => e.AuctionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<AuctionAnalytics>()
+            .HasOne(e => e.Auction)
+            .WithOne(a => a.AuctionAnalytics)
+            .HasForeignKey<AuctionAnalytics>(e => e.AuctionId)
+            .OnDelete(DeleteBehavior.Cascade);
 
     }
 }

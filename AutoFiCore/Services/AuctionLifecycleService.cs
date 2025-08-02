@@ -34,7 +34,6 @@ namespace AutoFiCore.Services
                 return;
             string message = $"You got outbid on {auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model} auction!.";
             await _notificationService.CreateNotificationAsync(previousBidderId.Value, NotificationType.Outbid, "Outbid", message, auction.AuctionId);
-            await _notifier.NotifyOutbid(previousBidderId.Value, auction.AuctionId);
         }
         public async Task HandleAuctionWonAsync(Auction auction, int userId)
         {
