@@ -19,5 +19,9 @@ namespace AutoFiCore.Hubs
             }
             await base.OnConnectedAsync();
         }
+        public async Task JoinAuctionGroup(int auctionId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, $"auction-{auctionId}");
+        }
     }
 }

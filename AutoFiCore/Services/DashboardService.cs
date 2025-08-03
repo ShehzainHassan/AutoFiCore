@@ -33,7 +33,6 @@ public class DashboardService : IDashboardService
                 .ContinueWith(r => r.Result.TotalAuctions)
         };
     }
-
     public async Task<AuctionDashboard> GetAuctionDashboardAsync(DateTime start, DateTime end)
     {
         var performance = await _reportService.GetAuctionPerformanceReportAsync(start, end);
@@ -49,8 +48,6 @@ public class DashboardService : IDashboardService
             TopItems = topItems
         };
     }
-
-
     public async Task<UserDashboard> GetUserDashboardAsync(DateTime start, DateTime end)
     {
         var user = await _reportService.GetUserActivityReportAsync(start, end);

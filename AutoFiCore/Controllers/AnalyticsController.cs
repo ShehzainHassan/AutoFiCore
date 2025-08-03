@@ -46,7 +46,6 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
-
         [HttpGet("users")]
         //[Authorize(Roles = "Admin")]
         public async Task<ActionResult<UserActivityReport>> GetUserAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
@@ -68,15 +67,12 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
-
         [HttpPost("event")]
         public async Task<IActionResult> TrackEvent([FromBody] TrackEventRequest request)
         {
             await _analyticsService.TrackEventAsync(request.Type, request.UserId, request.AuctionId, request.Properties ?? new(), "Web");
             return Ok();
         }
-
-
 
         [HttpGet("export")]
         //[Authorize(Roles = "Admin")]

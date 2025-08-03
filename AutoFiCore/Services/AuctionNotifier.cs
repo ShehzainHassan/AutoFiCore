@@ -20,7 +20,7 @@ namespace AutoFiCore.Services
         public async Task NotifyNewBid(int auctionId)
         {
             await _hubContext.Clients.Group($"auction-{auctionId}")
-                .SendAsync("ReceiveNewBid", auctionId);
+                .SendAsync("ReceiveNewBid", new { auctionId });
         }
         public async Task AuctionEnded(int auctionId)
         {
