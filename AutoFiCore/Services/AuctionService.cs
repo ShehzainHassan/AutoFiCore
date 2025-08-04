@@ -32,13 +32,11 @@ namespace AutoFiCore.Services
     {
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AuctionService> _logger;
-        private readonly IAuctionNotifier _notifier;
         private readonly IAuctionLifecycleService _auctionLifecycleService;
-        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IAuctionNotifier auctionNotifier, IAuctionLifecycleService auctionLifecycleService)
+        public AuctionService(IUnitOfWork uow, ILogger<AuctionService> log, IAuctionLifecycleService auctionLifecycleService)
         {
             _uow = uow;
             _logger = log;
-            _notifier = auctionNotifier;
             _auctionLifecycleService = auctionLifecycleService;
         }
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
@@ -251,10 +249,7 @@ namespace AutoFiCore.Services
                 //await _hub.Clients.Group($"auction-{auctionId}")
                 //    .SendAsync("AuctionExtended", auctionId);
             }
-
-            // await _hub.Clients.Group($"auction-{bid.AuctionId}")
-            //                 .SendAsync("ReceiveNewBid", bid.AuctionId);
-            await _notifier.NotifyNewBid(auctionId);
+            await _auctionLifecycleService.HandleNewBid(auctionId);
             await _auctionLifecycleService.HandleOutbid(auction, previousHighestBidder);
 
             return Result<BidDTO>.Success(bidDto);

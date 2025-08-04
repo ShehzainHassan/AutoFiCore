@@ -11,6 +11,7 @@ namespace AutoFiCore.Services
     {
         Task HandleAuctionWonAsync(Auction auction, int userId);
         Task HandleOutbid(Auction auction, int? previousBidderId);
+        Task HandleNewBid(int auctionId);
     }
     public class AuctionLifecycleService:IAuctionLifecycleService
     {
@@ -27,13 +28,17 @@ namespace AutoFiCore.Services
             _unitOfWork = unitOfWork;
             _notifier = notifier;
         }
-
+        public async Task HandleNewBid(int auctionId)
+        {
+            await _notifier.NotifyNewBid(auctionId);
+        }
         public async Task HandleOutbid(Auction auction, int? previousBidderId)
         {
             if (previousBidderId == null)
                 return;
             string message = $"You got outbid on {auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model} auction!.";
             await _notificationService.CreateNotificationAsync(previousBidderId.Value, NotificationType.Outbid, "Outbid", message, auction.AuctionId);
+            await _notifier.NotifyOutbid(previousBidderId.Value, auction.AuctionId);
         }
         public async Task HandleAuctionWonAsync(Auction auction, int userId)
         {

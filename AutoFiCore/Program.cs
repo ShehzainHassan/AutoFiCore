@@ -1,4 +1,4 @@
-using AutoFiCore.BackgroundServices;
+﻿using AutoFiCore.BackgroundServices;
 using AutoFiCore.Data;
 using AutoFiCore.Hubs;
 using AutoFiCore.Middleware;
@@ -302,7 +302,25 @@ builder.Services.AddAuthentication("Bearer")
             ClockSkew = TimeSpan.Zero,
             NameClaimType = JwtRegisteredClaimNames.Sub
         };
+
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    path.StartsWithSegments("/hubs/auction"))
+                {
+                    context.Token = accessToken;
+                }
+
+                return Task.CompletedTask;
+            }
+        };
     });
+
 
 // Configure Railway port binding
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";

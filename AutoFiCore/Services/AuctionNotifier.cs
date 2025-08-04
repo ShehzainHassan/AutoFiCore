@@ -7,12 +7,12 @@ namespace AutoFiCore.Services
     {
         Task NotifyNewBid(int auctionId);
         Task AuctionEnded(int auctionId);
+        Task NotifyOutbid(int userId, int auctionId);
     }
 
     public class AuctionNotifier : IAuctionNotifier
     {
         private readonly IHubContext<AuctionHub> _hubContext;
-
         public AuctionNotifier(IHubContext<AuctionHub> hubContext)
         {
             _hubContext = hubContext;
@@ -22,10 +22,15 @@ namespace AutoFiCore.Services
             await _hubContext.Clients.Group($"auction-{auctionId}")
                 .SendAsync("ReceiveNewBid", new { auctionId });
         }
+        public async Task NotifyOutbid(int userId, int auctionId)
+        {
+            await _hubContext.Clients.User(userId.ToString())
+                .SendAsync("Outbid", new { auctionId });
+        }
         public async Task AuctionEnded(int auctionId)
         {
             await _hubContext.Clients.Group($"auction-{auctionId}")
-                .SendAsync("AuctionEnded", auctionId);
+                .SendAsync("AuctionEnded", new { auctionId });
         }
     }
 }

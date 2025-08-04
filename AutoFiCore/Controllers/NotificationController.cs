@@ -83,7 +83,5 @@ namespace AutoFiCore.Controllers
             var count = await _notificationService.GetUnreadCountAsync(userId);
             return Ok(count);
         }
-
-
     }
 }
