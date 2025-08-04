@@ -92,7 +92,7 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
                 {
                     auction.Status = AuctionStatus.Ended;
                     _logger.LogInformation("Auction {AuctionId} ended at {Time}", auction.AuctionId, nowUtc);
-                    await _notifier.AuctionEnded(auction.AuctionId);
+                    await _notifier.NotifyAuctionEnd(auction);
                 }
 
                 await dbContext.SaveChangesAsync(stoppingToken);

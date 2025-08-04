@@ -12,5 +12,7 @@ namespace AutoFiCore.Data
         Task<int?> GetHighestBidderIdAsync(int auctionId);
         Task<int> GetUniqueBiddersCountAsync(int auctionId);
         Task<int> GetTotalBidsAsync(int auctionId);
+        Task<List<int>> GetUniqueBidderIdsAsync(int auctionId);
+
     }
 }

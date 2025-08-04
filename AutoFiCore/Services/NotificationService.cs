@@ -77,7 +77,5 @@ namespace AutoFiCore.Services
         {
             return await _unitOfWork.Notification.GetUnreadNotificationCountAsync(userId);
         }
-
-
     }
 }

@@ -14,17 +14,20 @@ namespace AutoFiCore.Controllers
     public class AnalyticsController : ControllerBase
     {
         private readonly IAnalyticsService _analyticsService;
+        private readonly IMetricsCalculationService _metricsCalculationService;
         private readonly IDashboardService _dashboardService;
         private readonly IReportingService _reportService;
 
         public AnalyticsController(
             IAnalyticsService analyticsService,
             IDashboardService dashboardService,
-            IReportingService reportService)
+            IReportingService reportService,
+            IMetricsCalculationService metricsCalculationService)
         {
             _analyticsService = analyticsService;
             _dashboardService = dashboardService;
             _reportService = reportService;
+            _metricsCalculationService = metricsCalculationService;
         }
 
         [HttpGet("dashboard")]
@@ -36,6 +39,16 @@ namespace AutoFiCore.Controllers
 
             var dashboard = await _dashboardService.GetExecutiveDashboardAsync(utcStart, utcEnd);
             return Ok(dashboard);
+        }
+
+        [HttpPost("update-auction-analytics")]
+        public async Task<IActionResult> UpdateAuctionAnalytics([FromQuery] int auctionId)
+        {
+            if (auctionId <= 0)
+                return BadRequest(new { error = "Invalid auction ID." });
+
+            await _metricsCalculationService.UpdateAuctionAnalyticsAsync(auctionId);
+            return Ok(new { message = $"Auction analytics updated for auction {auctionId}" });
         }
         [Authorize]
         [HttpPost("auction-view")]
@@ -53,18 +66,10 @@ namespace AutoFiCore.Controllers
             return Ok(new { message = "Auction view tracked" });
         }
 
-        [Authorize]
         [HttpPost("track-bid")]
         public async Task<IActionResult> TrackBidEvent([FromBody] BidTrackingDTO bid)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                      User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
-                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
-            }
-            await _analyticsService.TrackBidEventAsync(bid.AuctionId, userId, bid.Amount);
+            await _analyticsService.TrackBidEventAsync(bid.AuctionId, bid.UserId, bid.Amount);
             return Ok(new { message = "Bid tracked" });
         }
 
@@ -79,7 +84,7 @@ namespace AutoFiCore.Controllers
         public async Task<ActionResult<AuctionPerformanceReport>> GetAuctionAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
-            var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetAuctionPerformanceReportAsync(utcStart, utcEnd);
             return Ok(result);
         }
@@ -89,8 +94,7 @@ namespace AutoFiCore.Controllers
         public async Task<ActionResult<UserActivityReport>> GetUserAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
-            var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
-
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetUserActivityReportAsync(utcStart, utcEnd);
             return Ok(result);
         }
@@ -100,7 +104,7 @@ namespace AutoFiCore.Controllers
         public async Task<ActionResult<RevenueReport>> GetRevenueAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
-            var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetRevenueReportAsync(utcStart, utcEnd);
             return Ok(result);
         }
@@ -117,7 +121,7 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> ExportReport([FromQuery] string reportType, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string format = "csv")
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
-            var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var fileResult = await _reportService.ExportReportAsync(reportType, utcStart, utcEnd, format);
             return File(fileResult.Content, fileResult.ContentType, fileResult.FileName);
         }

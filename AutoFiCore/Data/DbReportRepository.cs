@@ -25,7 +25,6 @@ namespace AutoFiCore.Data
     public class DbReportRepository : IReportRepository
     {
         private readonly ApplicationDbContext _db;
-
         public DbReportRepository(ApplicationDbContext db)
         {
             _db = db;

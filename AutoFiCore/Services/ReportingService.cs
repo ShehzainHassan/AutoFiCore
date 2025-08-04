@@ -14,18 +14,24 @@ public interface IReportingService
 public class ReportingService : IReportingService
 {
     private readonly IUnitOfWork _uow;
-    public ReportingService(IUnitOfWork uow) => _uow = uow;
+    private readonly IPdfService _pdfService;
 
+    public ReportingService(IUnitOfWork uow, IPdfService pdfService)
+    {
+        _uow = uow;
+        _pdfService = pdfService;
+    }
     public async Task<AuctionPerformanceReport> GetAuctionPerformanceReportAsync(DateTime start, DateTime end)
     {
         var total = await _uow.Report.GetTotalAuctionsAsync(start, end);
+        var endedAuctions = await _uow.Auctions.GetEndedAuctions();
         var successful = await _uow.Report.GetSuccessfulAuctionsAsync(start, end);
         var avgPrice = await _uow.Report.GetAverageAuctionPriceAsync(start, end);
 
         return new AuctionPerformanceReport
         {
             TotalAuctions = total,
-            SuccessRate = total == 0 ? 0 : (double)successful / total * 100,
+            SuccessRate = total == 0 ? 0 : (double)successful / endedAuctions.Count * 100,
             AverageFinalPrice = avgPrice
         };
     }
@@ -53,8 +59,9 @@ public class ReportingService : IReportingService
     }
     public async Task<FileResultDTO> ExportReportAsync(string reportType, DateTime startDate, DateTime endDate, string format = "csv")
     {
-        var sb = new StringBuilder();
         string fileName;
+        byte[] content;
+        string contentType;
 
         switch (reportType.ToLower())
         {
@@ -62,36 +69,67 @@ public class ReportingService : IReportingService
                 var auctionReport = await GetAuctionPerformanceReportAsync(startDate, endDate);
                 fileName = $"auction_report_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.{format}";
 
-                sb.AppendLine("StartDate,EndDate,TotalAuctions,SuccessRate,AverageFinalPrice");
-                sb.AppendLine($"{startDate:yyyy-MM-dd},{endDate:yyyy-MM-dd},{auctionReport.TotalAuctions},{auctionReport.SuccessRate},{auctionReport.AverageFinalPrice}");
+                if (format == "pdf")
+                {
+                    content = _pdfService.GenerateAuctionPerformancePdf(startDate, endDate, auctionReport);
+                    contentType = "application/pdf";
+                }
+                else
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("StartDate,EndDate,TotalAuctions,SuccessRate,AverageFinalPrice");
+                    sb.AppendLine($"{startDate:yyyy-MM-dd},{endDate:yyyy-MM-dd},{auctionReport.TotalAuctions},{auctionReport.SuccessRate},{auctionReport.AverageFinalPrice}");
+                    content = Encoding.UTF8.GetBytes(sb.ToString());
+                    contentType = "text/csv";
+                }
                 break;
 
             case "user":
                 var userReport = await GetUserActivityReportAsync(startDate, endDate);
                 fileName = $"user_report_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.{format}";
 
-                sb.AppendLine("StartDate,EndDate,NewRegistrations,EngagementScore");
-                sb.AppendLine($"{startDate:yyyy-MM-dd},{endDate:yyyy-MM-dd},{userReport.NewRegistrations},{userReport.EngagementScore}");
+                if (format == "pdf")
+                {
+                    content = _pdfService.GenerateUserActivityPdf(startDate, endDate, userReport);
+                    contentType = "application/pdf";
+                }
+                else
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("StartDate,EndDate,NewRegistrations,EngagementScore");
+                    sb.AppendLine($"{startDate:yyyy-MM-dd},{endDate:yyyy-MM-dd},{userReport.NewRegistrations},{userReport.EngagementScore}");
+                    content = Encoding.UTF8.GetBytes(sb.ToString());
+                    contentType = "text/csv";
+                }
                 break;
 
             case "revenue":
                 var revenue = await _uow.Report.GetCommissionEarnedAsync(startDate, endDate);
                 fileName = $"revenue_report_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.{format}";
 
-                sb.AppendLine("StartDate,EndDate,CommissionEarned");
-                sb.AppendLine($"{startDate:yyyy-MM-dd},{endDate:yyyy-MM-dd},{revenue}");
+                if (format == "pdf")
+                {
+                    content = _pdfService.GenerateRevenueReportPdf(startDate, endDate, revenue);
+                    contentType = "application/pdf";
+                }
+                else
+                {
+                    var sb = new StringBuilder();
+                    sb.AppendLine("StartDate,EndDate,CommissionEarned");
+                    sb.AppendLine($"{startDate:yyyy-MM-dd},{endDate:yyyy-MM-dd},{revenue}");
+                    content = Encoding.UTF8.GetBytes(sb.ToString());
+                    contentType = "text/csv";
+                }
                 break;
 
             default:
                 throw new ArgumentException("Invalid report type");
         }
 
-        var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-
         return new FileResultDTO
         {
-            Content = bytes,
-            ContentType = "text/csv",
+            Content = content,
+            ContentType = contentType,
             FileName = fileName
         };
     }

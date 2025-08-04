@@ -9,7 +9,9 @@ namespace AutoFiCore.Data
     public interface INotificationRepository
     {
         Task<Notification> CreateNotification(Notification notification);
-        Task<bool> NotificationExistsAsync(int userId, int auctionId, NotificationType type);
+        Task<bool> HasAuctionWonNotificationBeenSentAsync(int userId, int auctionId);
+        Task<bool> HasReservePriceMetNotificationBeenSentAsync(int userId, int auctionId);
+        Task<bool> HasAuctionExtendedNotificationBeenSentAsync(int userId, int auctionId);
         Task<PagedResult<NotificationDTO>> GetUserNotificationsAsync(int userId, bool unreadOnly, int page, int pageSize);
         Task<Result<Notification>> MarkAsReadAsync(int notificationId);
         Task<NotificationDTO?> GetNotificationByIdAsync(int notificationId);

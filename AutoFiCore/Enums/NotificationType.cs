@@ -7,5 +7,7 @@
         PaymentDue,
         AuctionWon,
         AuctionEnd,
+        ReservePriceMet,
+        AuctionExtended,
     }
 }

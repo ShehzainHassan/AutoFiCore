@@ -229,25 +229,30 @@ namespace AutoFiCore.Services
                
             };
 
+            bool reserveJustMet = false;
             if (auction.ReservePrice.HasValue && !auction.IsReserveMet && bid.Amount >= auction.ReservePrice.Value)
             {
                 auction.IsReserveMet = true;
                 auction.ReserveMetAt = DateTime.UtcNow;
                 await _uow.Auctions.UpdateReserveStatusAsync(auctionId);
-                await _uow.SaveChangesAsync();
-
-                //await _hub.Clients.Group($"auction-{auctionId}")
-                //    .SendAsync("ReservePriceMet");
+                reserveJustMet = true;
             }
 
+            await _uow.SaveChangesAsync(); 
+            if (reserveJustMet)
+            {
+                await _auctionLifecycleService.HandleReserveMet(auction);
+            }
+            else if (auction.IsReserveMet)
+            {
+                await _auctionLifecycleService.HandleReserveMet(auction, bid.UserId);
+            }
             var timeRemaining = auction.EndUtc - DateTime.UtcNow;
             if (timeRemaining.TotalMinutes <= auction.TriggerMinutes && auction.ExtensionCount < auction.MaxExtensions)
             {
                 await _uow.Auctions.UpdateAuctionEndTimeAsync(auctionId, auction.ExtensionMinutes);
                 await _uow.SaveChangesAsync();
-
-                //await _hub.Clients.Group($"auction-{auctionId}")
-                //    .SendAsync("AuctionExtended", auctionId);
+                await _auctionLifecycleService.HandleAuctionExtended(auction);
             }
             await _auctionLifecycleService.HandleNewBid(auctionId);
             await _auctionLifecycleService.HandleOutbid(auction, previousHighestBidder);

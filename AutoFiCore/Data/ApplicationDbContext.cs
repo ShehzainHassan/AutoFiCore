@@ -96,7 +96,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(u => u.Email).IsRequired().HasMaxLength(25);
             entity.Property(u => u.Password).IsRequired().HasMaxLength(100);
             entity.Property(u => u.CreatedUtc).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
+            entity.Property(u => u.LastLoggedIn).IsRequired();
         });
 
         modelBuilder.Entity<UserLikes>(entity =>

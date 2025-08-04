@@ -105,7 +105,8 @@ namespace AutoFiCore.Data
             {
                 return null;
             }
-
+            user.LastLoggedIn = DateTime.UtcNow;
+            await _dbContext.SaveChangesAsync();
             string token = tokenProvider.Create(user);
             return new AuthResponse
             {

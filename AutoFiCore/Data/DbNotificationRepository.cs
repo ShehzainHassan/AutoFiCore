@@ -20,12 +20,26 @@ namespace AutoFiCore.Data
             _dbContext.Notifications.Add(notification);
             return Task.FromResult(notification);
         }
-        public async Task<bool> NotificationExistsAsync(int userId, int auctionId, NotificationType type)
+        public async Task<bool> HasAuctionWonNotificationBeenSentAsync(int userId, int auctionId)
         {
             return await _dbContext.Notifications.AnyAsync(n =>
                 n.UserId == userId &&
                 n.AuctionId == auctionId &&
-                n.NotificationType == type);
+                n.NotificationType == NotificationType.AuctionWon);
+        }
+        public async Task<bool> HasReservePriceMetNotificationBeenSentAsync(int userId, int auctionId)
+        {
+            return await _dbContext.Notifications.AnyAsync(n =>
+                n.UserId == userId &&
+                n.AuctionId == auctionId &&
+                n.NotificationType == NotificationType.ReservePriceMet);
+        }
+        public Task<bool> HasAuctionExtendedNotificationBeenSentAsync(int userId, int auctionId)
+        {
+            return _dbContext.Notifications.AnyAsync(n =>
+                n.UserId == userId &&
+                n.AuctionId == auctionId &&
+                n.NotificationType == NotificationType.AuctionExtended);
         }
         public async Task<PagedResult<NotificationDTO>> GetUserNotificationsAsync(int userId, bool unreadOnly, int page, int pageSize)
         {

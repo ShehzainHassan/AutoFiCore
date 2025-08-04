@@ -12,7 +12,9 @@ namespace AutoFiCore.Services
         Task HandleAuctionWonAsync(Auction auction, int userId);
         Task HandleOutbid(Auction auction, int? previousBidderId);
         Task HandleNewBid(int auctionId);
-    }
+        Task HandleReserveMet(Auction auction, int? newBidUserId = null);
+        Task HandleAuctionExtended(Auction auction);
+   }
     public class AuctionLifecycleService:IAuctionLifecycleService
     {
         private readonly INotificationService _notificationService;
@@ -42,7 +44,7 @@ namespace AutoFiCore.Services
         }
         public async Task HandleAuctionWonAsync(Auction auction, int userId)
         {
-            if (await _unitOfWork.Notification.NotificationExistsAsync(userId, auction.AuctionId, NotificationType.AuctionWon))
+            if (await _unitOfWork.Notification.HasAuctionWonNotificationBeenSentAsync(userId, auction.AuctionId))
                 return;
 
             string vehicleInfo = auction.Vehicle != null ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}" : "the vehicle";
@@ -58,6 +60,98 @@ namespace AutoFiCore.Services
                 auction.AuctionId
             );
         }
+        public async Task HandleReserveMet(Auction auction, int? newBidUserId = null)
+        {
+            if (auction == null || auction.ReservePrice <= 0)
+                return;
 
+            string vehicleInfo = auction.Vehicle != null
+                ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}"
+                : "the vehicle";
+
+            string title = "Reserve Price Met for Auction";
+            string message = $"The reserve price has been met for {vehicleInfo}.";
+
+            var uniqueBidderIds = await _unitOfWork.Bids.GetUniqueBidderIdsAsync(auction.AuctionId);
+
+            if (uniqueBidderIds == null || uniqueBidderIds.Count == 0)
+                return;
+
+            foreach (var userId in uniqueBidderIds)
+            {
+                if (newBidUserId.HasValue && userId != newBidUserId.Value)
+                    continue;
+
+                bool alreadyNotified = await _unitOfWork.Notification
+                    .HasReservePriceMetNotificationBeenSentAsync(userId, auction.AuctionId);
+
+                if (!alreadyNotified)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        userId,
+                        NotificationType.ReservePriceMet,
+                        title,
+                        message,
+                        auction.AuctionId
+                    );
+                }
+            }
+
+            if (!newBidUserId.HasValue)
+            {
+                foreach (var userId in uniqueBidderIds)
+                {
+                    bool alreadyNotified = await _unitOfWork.Notification
+                        .HasReservePriceMetNotificationBeenSentAsync(userId, auction.AuctionId);
+
+                    if (!alreadyNotified)
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            userId,
+                            NotificationType.ReservePriceMet,
+                            title,
+                            message,
+                            auction.AuctionId
+                        );
+                    }
+                }
+            }
+            await _notifier.NotifyReserveMet(auction.AuctionId); 
+        }
+        public async Task HandleAuctionExtended(Auction auction)
+        {
+            if (auction == null)
+                return;
+
+            string vehicleInfo = auction.Vehicle != null
+                ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}"
+                : "the vehicle";
+
+            string title = "Auction Extended";
+            string message = $"The auction for {vehicleInfo} has been extended.";
+
+            var uniqueBidderIds = await _unitOfWork.Bids.GetUniqueBidderIdsAsync(auction.AuctionId);
+            if (uniqueBidderIds == null || uniqueBidderIds.Count == 0)
+                return;
+
+            foreach (var userId in uniqueBidderIds)
+            {
+                bool alreadyNotified = await _unitOfWork.Notification
+                    .HasAuctionExtendedNotificationBeenSentAsync(userId, auction.AuctionId);
+
+                if (!alreadyNotified)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        userId,
+                        NotificationType.AuctionExtended,
+                        title,
+                        message,
+                        auction.AuctionId
+                    );
+                }
+            }
+
+            await _notifier.NotifyAuctionExtended(auction.AuctionId, auction.EndUtc);
+        }
     }
 }

@@ -1,13 +1,16 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using AutoFiCore.Hubs;
+using AutoFiCore.Models;
+using Microsoft.AspNetCore.SignalR;
 using System.Threading.Tasks;
-using AutoFiCore.Hubs; 
 namespace AutoFiCore.Services
 {
     public interface IAuctionNotifier
     {
         Task NotifyNewBid(int auctionId);
-        Task AuctionEnded(int auctionId);
+        Task NotifyAuctionEnd(Auction auction);
         Task NotifyOutbid(int userId, int auctionId);
+        Task NotifyReserveMet(int auctionId);
+        Task NotifyAuctionExtended(int auctionId, DateTime newEndTime);
     }
 
     public class AuctionNotifier : IAuctionNotifier
@@ -27,10 +30,35 @@ namespace AutoFiCore.Services
             await _hubContext.Clients.User(userId.ToString())
                 .SendAsync("Outbid", new { auctionId });
         }
-        public async Task AuctionEnded(int auctionId)
+        public async Task NotifyAuctionEnd(Auction auction)
+        {
+
+            await _hubContext.Clients.Group($"auction-{auction.AuctionId}")
+                .SendAsync("AuctionEnded", new
+                {
+                    auctionId = auction.AuctionId,
+                    finalPrice = auction.CurrentPrice,
+                    isReserveMet = auction.IsReserveMet,
+                });
+        }
+        public async Task NotifyReserveMet(int auctionId)
         {
             await _hubContext.Clients.Group($"auction-{auctionId}")
-                .SendAsync("AuctionEnded", new { auctionId });
+                .SendAsync("ReservePriceMet", new
+                {
+                    auctionId
+                });
         }
+
+        public async Task NotifyAuctionExtended(int auctionId, DateTime newEndTime)
+        {
+            await _hubContext.Clients.Group($"auction-{auctionId}")
+                .SendAsync("AuctionExtended", new
+                {
+                    auctionId,
+                    newEndTime
+                });
+        }
+
     }
 }

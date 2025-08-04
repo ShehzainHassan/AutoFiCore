@@ -17,5 +17,7 @@ namespace AutoFiCore.Data
         Task<List<Auction>> GetAuctionsWithActiveAutoBidsAsync();
         Task<Auction?> UpdateReserveStatusAsync(int auctionId);
         Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes);
+        Task<List<Auction>> GetEndedAuctions();
+
     }
 }

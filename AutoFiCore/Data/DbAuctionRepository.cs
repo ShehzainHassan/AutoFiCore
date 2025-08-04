@@ -27,6 +27,14 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         await _dbContext.SaveChangesAsync();
         return auction;
     }
+    public async Task<List<Auction>> GetEndedAuctions()
+    {
+
+        return await _dbContext.Auctions
+            .Where(a => a.Status == AuctionStatus.Ended)
+            .ToListAsync();
+    }
+
     public Task<bool> VehicleHasAuction(int vehicleId)
     {
         return _dbContext.Auctions
@@ -194,4 +202,13 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     {
         return _dbContext.Bids.CountAsync(b => b.AuctionId == auctionId);
     }
+    public Task<List<int>> GetUniqueBidderIdsAsync(int auctionId)
+    {
+        return _dbContext.Bids
+            .Where(b => b.AuctionId == auctionId)
+            .Select(b => b.UserId)
+            .Distinct()
+            .ToListAsync();
+    }
+
 }
