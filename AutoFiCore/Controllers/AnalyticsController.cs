@@ -73,6 +73,13 @@ namespace AutoFiCore.Controllers
             return Ok(new { message = "Bid tracked" });
         }
 
+        [HttpPost("track-payment")]
+        public async Task<IActionResult> TrackPayment([FromBody] BidTrackingDTO bid)
+        {
+            await _analyticsService.TrackPaymentCompleted(bid.AuctionId, bid.UserId, bid.Amount);
+            return Ok(new { message = "Payment tracked" });
+        }
+
         [HttpPost("auction-completion")]
         public async Task<IActionResult> TrackAuctionCompletion([FromBody] AuctionCompletionDTO completion)
         {
@@ -89,6 +96,16 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        [HttpGet("payment-status")]
+        public async Task<IActionResult> IsPaymentCompleted([FromQuery] int auctionId)
+        {
+            bool isCompleted = await _analyticsService.IsAuctionPaymentCompleted(auctionId);
+            return Ok(new
+            {
+                auctionId,
+                paymentCompleted = isCompleted
+            });
+        }
         [HttpGet("users")]
         //[Authorize(Roles = "Admin")]
         public async Task<ActionResult<UserActivityReport>> GetUserAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)

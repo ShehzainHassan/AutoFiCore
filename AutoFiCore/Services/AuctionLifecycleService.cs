@@ -9,11 +9,16 @@ namespace AutoFiCore.Services
 {
     public interface IAuctionLifecycleService
     {
-        Task HandleAuctionWonAsync(Auction auction, int userId);
-        Task HandleOutbid(Auction auction, int? previousBidderId);
         Task HandleNewBid(int auctionId);
+        Task HandleOutbid(Auction auction, int? previousBidderId);
+        Task HandleAuctionWonAsync(Auction auction, int userId);
+        Task HandleAuctionLostAsync(Auction auction, int userId);
+        Task HandleAuctionEndAsync(Auction auction);
         Task HandleReserveMet(Auction auction, int? newBidUserId = null);
         Task HandleAuctionExtended(Auction auction);
+        Task HandleBidderCountUpdate(Auction auction, List<int> previousBidders, List<int> updatedBidders);
+        Task HandleAuctionStatusChangedAsync(Auction auction, AuctionStatus previousStatus);
+        Task HandleAutoBidAsync(int auctionId, int userId, decimal amount);
    }
     public class AuctionLifecycleService:IAuctionLifecycleService
     {
@@ -59,6 +64,77 @@ namespace AutoFiCore.Services
                 message,
                 auction.AuctionId
             );
+            await _notifier.NotifyAuctionWon(userId, auction.AuctionId);
+        }
+        public async Task HandleAuctionLostAsync(Auction auction, int userId)
+        {
+            if (await _unitOfWork.Notification.HasAuctionLostNotificationBeenSentAsync(userId, auction.AuctionId))
+                return;
+
+            string vehicleInfo = auction.Vehicle != null
+                ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}"
+                : "the vehicle";
+
+            string title = $"Auction Lost";
+            string message = $"Unfortunately, you didn't win the auction for {vehicleInfo}. Better luck next time! Keep an eye out for similar listings.";
+
+            await _notificationService.CreateNotificationAsync(
+                userId,
+                NotificationType.AuctionLost,
+                title,
+                message,
+                auction.AuctionId
+            );
+            await _notifier.NotifyAuctionLost(userId, auction.AuctionId);   
+        }
+        public async Task HandleAuctionEndAsync(Auction auction)
+        {
+            if (auction == null || auction.Status != AuctionStatus.Ended)
+                return;
+
+            string vehicleInfo = auction.Vehicle != null
+                ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}"
+                : "the vehicle";
+
+            string endTitle = "Auction Ended";
+            string endMessage = $"The auction for {vehicleInfo} has ended.";
+
+            var uniqueBidderIds = await _unitOfWork.Bids.GetUniqueBidderIdsAsync(auction.AuctionId);
+            if (uniqueBidderIds == null || uniqueBidderIds.Count == 0)
+                return;
+
+            int? winningUserId = await _unitOfWork.Bids.GetHighestBidderIdAsync(auction.AuctionId);
+
+            foreach (var userId in uniqueBidderIds)
+            {
+                bool alreadySentEnd = await _unitOfWork.Notification.HasAuctionEndNotificationBeenSentAsync(userId, auction.AuctionId);
+                if (!alreadySentEnd)
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        userId,
+                        NotificationType.AuctionEnd,
+                        endTitle,
+                        endMessage,
+                        auction.AuctionId
+                    );
+                }
+            }
+
+            if (auction.IsReserveMet && winningUserId.HasValue)
+            {
+                foreach (var userId in uniqueBidderIds)
+                {
+                    if (userId == winningUserId.Value)
+                    {
+                        await HandleAuctionWonAsync(auction, userId);
+                    }
+                    else
+                    {
+                        await HandleAuctionLostAsync(auction, userId);
+                    }
+                }
+            }
+            await _notifier.NotifyAuctionEnd(auction);
         }
         public async Task HandleReserveMet(Auction auction, int? newBidUserId = null)
         {
@@ -152,6 +228,110 @@ namespace AutoFiCore.Services
             }
 
             await _notifier.NotifyAuctionExtended(auction.AuctionId, auction.EndUtc);
+        }
+        public async Task HandleBidderCountUpdate(Auction auction, List<int> previousBidders, List<int> updatedBidders)
+        {
+            var newBidders = updatedBidders.Except(previousBidders).ToList();
+            if (!newBidders.Any())
+                return;
+
+            string vehicleInfo = auction.Vehicle != null
+                ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}"
+                : "an auctioned vehicle";
+
+            foreach (var newBidderId in newBidders)
+            {
+                var newUser = await _unitOfWork.Users.GetUserByIdAsync(newBidderId);
+                if (newUser == null) continue;
+
+                string title = "New Bidder Joined";
+                string message = $"{newUser.Name} has joined the auction for {vehicleInfo}.";
+
+                foreach (var previousBidderId in previousBidders)
+                {
+                    if (previousBidderId == newBidderId) continue;
+
+                    await _notificationService.CreateNotificationAsync(
+                        previousBidderId,
+                        NotificationType.BidderCountUpdate,
+                        title,
+                        message,
+                        auction.AuctionId
+                    );
+                }
+            }
+
+            await _notifier.NotifyBidderCount(auction.AuctionId, updatedBidders.Count);
+        }
+        public async Task HandleAuctionStatusChangedAsync(Auction auction, AuctionStatus previousStatus)
+        {
+            if (auction == null || auction.Status == previousStatus)
+                return;
+
+            if (previousStatus == AuctionStatus.PreviewMode && auction.Status == AuctionStatus.Active)
+            {
+                var watchers = await _unitOfWork.Watchlist.GetAuctionWatchersAsync(auction.AuctionId);
+                if (watchers == null || watchers.Count == 0)
+                    return;
+
+                var userIds = watchers.Select(w => w.UserId).Distinct().ToList();
+
+                string vehicleInfo = auction.Vehicle != null
+                    ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}"
+                    : "the vehicle";
+
+                string title = "Auction is Now Live!";
+                string message = $"The auction for {vehicleInfo} is now live. Place your bids now!";
+                var notificationType = NotificationType.AuctionStart;
+
+                foreach (var userId in userIds)
+                {
+                    bool alreadyNotified = await _unitOfWork.Notification
+                        .HasAuctionStatusChangeNotificationBeenSentAsync(userId, auction.AuctionId, notificationType);
+
+                    if (!alreadyNotified)
+                    {
+                        await _notificationService.CreateNotificationAsync(
+                            userId,
+                            notificationType,
+                            title,
+                            message,
+                            auction.AuctionId
+                        );
+
+                        await _notifier.NotifyAuctionStatusChanged(userId, auction.AuctionId, auction.Status.ToString());
+                    }
+                }
+            }
+        }
+        public async Task HandleAutoBidAsync(int auctionId, int userId, decimal amount)
+        {
+            var auction = await _unitOfWork.Auctions.GetAuctionByIdAsync(auctionId);
+            if (auction == null)
+                return;
+
+            string vehicleInfo = auction.Vehicle != null
+                ? $"{auction.Vehicle.Year} {auction.Vehicle.Make} {auction.Vehicle.Model}"
+                : "a vehicle";
+
+            string title = "AutoBid Executed";
+            string message = $"Your AutoBid has been executed on {vehicleInfo} with a bid of {amount}.";
+
+            bool alreadyNotified = await _unitOfWork.Notification
+                .HasAutoBidNotificationBeenSentAsync(userId, auctionId, message);
+
+            if (!alreadyNotified)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    userId,
+                    NotificationType.AutoBidExecuted,
+                    title,
+                    message,
+                    auctionId
+                );
+            }
+
+            await _notifier.NotifyAutoBidExecuted(userId, auctionId, amount);
         }
     }
 }

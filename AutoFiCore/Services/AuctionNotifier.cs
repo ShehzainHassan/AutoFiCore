@@ -11,8 +11,12 @@ namespace AutoFiCore.Services
         Task NotifyOutbid(int userId, int auctionId);
         Task NotifyReserveMet(int auctionId);
         Task NotifyAuctionExtended(int auctionId, DateTime newEndTime);
+        Task NotifyAuctionWon(int userId, int auctionId);
+        Task NotifyAuctionLost(int userId, int auctionId);
+        Task NotifyBidderCount(int auctionId, int activeBidders);
+        Task NotifyAuctionStatusChanged(int userId, int auctionId, string status);
+        Task NotifyAutoBidExecuted(int userId, int auctionId, decimal amount);
     }
-
     public class AuctionNotifier : IAuctionNotifier
     {
         private readonly IHubContext<AuctionHub> _hubContext;
@@ -32,7 +36,6 @@ namespace AutoFiCore.Services
         }
         public async Task NotifyAuctionEnd(Auction auction)
         {
-
             await _hubContext.Clients.Group($"auction-{auction.AuctionId}")
                 .SendAsync("AuctionEnded", new
                 {
@@ -44,12 +47,8 @@ namespace AutoFiCore.Services
         public async Task NotifyReserveMet(int auctionId)
         {
             await _hubContext.Clients.Group($"auction-{auctionId}")
-                .SendAsync("ReservePriceMet", new
-                {
-                    auctionId
-                });
+                .SendAsync("ReservePriceMet", new { auctionId });
         }
-
         public async Task NotifyAuctionExtended(int auctionId, DateTime newEndTime)
         {
             await _hubContext.Clients.Group($"auction-{auctionId}")
@@ -59,6 +58,48 @@ namespace AutoFiCore.Services
                     newEndTime
                 });
         }
-
+        public async Task NotifyAuctionWon(int userId, int auctionId)
+        {
+            await _hubContext.Clients.User(userId.ToString())
+                .SendAsync("AuctionWon", new
+                {
+                    auctionId
+                });
+        }
+        public async Task NotifyAuctionLost(int userId, int auctionId)
+        {
+            await _hubContext.Clients.User(userId.ToString())
+                .SendAsync("AuctionLost", new
+                {
+                    auctionId
+                });
+        }
+        public async Task NotifyBidderCount(int auctionId, int activeBidders)
+        {
+            await _hubContext.Clients.Group($"auction-{auctionId}")
+                .SendAsync("BidderCountUpdated", new
+                {
+                    auctionId,
+                    activeBidders
+                });
+        }
+        public async Task NotifyAuctionStatusChanged(int userId, int auctionId, string status)
+        {
+            await _hubContext.Clients.User(userId.ToString())
+                .SendAsync("AuctionStatusChanged", new
+                {
+                    auctionId,
+                    newStatus = status
+                });
+        }
+        public async Task NotifyAutoBidExecuted(int userId, int auctionId, decimal amount)
+        {
+            await _hubContext.Clients.User(userId.ToString())
+                .SendAsync("AutoBidExecuted", new
+                {
+                    auctionId,
+                    amount
+                });
+        }
     }
 }

@@ -41,10 +41,9 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
 
                 using var scope = _scopeFactory.CreateScope();
                 var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                var _notifier = scope.ServiceProvider.GetRequiredService<IAuctionNotifier>();
+                var auctionLifecycleService = scope.ServiceProvider.GetRequiredService<IAuctionLifecycleService>();
 
                 var nowUtc = DateTime.UtcNow;
-
                 // Scheduled -> PreviewMode
                 var toPreview = await dbContext.Auctions
                     .Where(a => a.Status == AuctionStatus.Scheduled && a.PreviewStartTime <= nowUtc)
@@ -54,7 +53,6 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
                 {
                     auction.Status = AuctionStatus.PreviewMode;
                     _logger.LogInformation("Auction {AuctionId} moved to PreviewMode at {Time}", auction.AuctionId, nowUtc);
-                    // TODO: Send SignalR preview start event
                 }
 
                 // Scheduled -> Active
@@ -67,7 +65,6 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
                     auction.Status = AuctionStatus.Active;
                     auction.ScheduledStartTime = nowUtc;
                     _logger.LogInformation("Auction {AuctionId} moved to Active at {Time}", auction.AuctionId, nowUtc);
-                    // TODO: Send SignalR auction start event
                 }
 
                 // PreviewMode -> Active
@@ -80,7 +77,7 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
                     auction.Status = AuctionStatus.Active;
                     auction.StartUtc = nowUtc;
                     _logger.LogInformation("Auction {AuctionId} moved from PreviewMode to Active at {Time}", auction.AuctionId, nowUtc);
-                    // TODO: Send SignalR auction start event
+                    await auctionLifecycleService.HandleAuctionStatusChangedAsync(auction, AuctionStatus.PreviewMode);
                 }
 
                 // Active -> Ended
@@ -92,7 +89,7 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
                 {
                     auction.Status = AuctionStatus.Ended;
                     _logger.LogInformation("Auction {AuctionId} ended at {Time}", auction.AuctionId, nowUtc);
-                    await _notifier.NotifyAuctionEnd(auction);
+                    await auctionLifecycleService.HandleAuctionEndAsync(auction);
                 }
 
                 await dbContext.SaveChangesAsync(stoppingToken);

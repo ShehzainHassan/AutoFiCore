@@ -22,7 +22,14 @@ namespace AutoFiCore.Services
         private readonly IUnitOfWork _uow;
         private readonly ILogger<AutoBidService> _log;
         private readonly IAuctionService _auctionService;
-        private static readonly Random _random = new();
+        private readonly IAuctionLifecycleService _auctionLifecycleService;
+        public AutoBidService(IUnitOfWork uow, ILogger<AutoBidService> log, IAuctionService auctionService, IAuctionLifecycleService auctionLifecycleService )
+        {
+            _uow = uow;
+            _log = log;
+            _auctionService = auctionService;
+            _auctionLifecycleService = auctionLifecycleService;
+        }
 
         private async Task<bool> CanPlaceImmediateBid(AutoBid autoBid, int auctionId)
         {
@@ -65,6 +72,7 @@ namespace AutoFiCore.Services
             if (result.IsSuccess)
             {
                 _log.LogInformation("Auto-bid placed by user {UserId} on auction {AuctionId} for {Amount}", autoBid.UserId, auctionId, amount);
+                await _auctionLifecycleService.HandleAutoBidAsync(auctionId, autoBid.UserId, amount); 
             }
             else
             {
@@ -165,12 +173,6 @@ namespace AutoFiCore.Services
             strategy.MaxBidsPerMinute = dto.PreferredBidTiming == PreferredBidTiming.LastMinute ? null : dto.MaxBidsPerMinute;
             strategy.MaxSpreadBids = dto.PreferredBidTiming == PreferredBidTiming.SpreadEvenly ? dto.MaxSpreadBids : null;
             strategy.UpdatedAt = now;
-        }
-        public AutoBidService(IUnitOfWork uow, ILogger<AutoBidService> log, IAuctionService auctionService)
-        {
-            _uow = uow;
-            _log = log;
-            _auctionService = auctionService;
         }
         public async Task ProcessAutoBidTrigger(int auctionId, decimal newBidAmount)
         {

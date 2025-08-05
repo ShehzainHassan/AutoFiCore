@@ -177,6 +177,7 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<BidDTO>> PlaceBidAsync(int auctionId, CreateBidDTO dto)
         {
+            var previousBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
             if (auction == null)
                 return Result<BidDTO>.Failure("Auction not found.");
@@ -238,7 +239,8 @@ namespace AutoFiCore.Services
                 reserveJustMet = true;
             }
 
-            await _uow.SaveChangesAsync(); 
+            await _uow.SaveChangesAsync();
+            var updatedBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
             if (reserveJustMet)
             {
                 await _auctionLifecycleService.HandleReserveMet(auction);
@@ -254,6 +256,7 @@ namespace AutoFiCore.Services
                 await _uow.SaveChangesAsync();
                 await _auctionLifecycleService.HandleAuctionExtended(auction);
             }
+            await _auctionLifecycleService.HandleBidderCountUpdate(auction, previousBidders, updatedBidders);
             await _auctionLifecycleService.HandleNewBid(auctionId);
             await _auctionLifecycleService.HandleOutbid(auction, previousHighestBidder);
 

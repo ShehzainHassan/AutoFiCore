@@ -20,12 +20,49 @@ namespace AutoFiCore.Data
             _dbContext.Notifications.Add(notification);
             return Task.FromResult(notification);
         }
+        public Task<bool> HasAuctionStatusChangeNotificationBeenSentAsync(int userId, int auctionId, NotificationType type)
+        {
+            return _dbContext.Notifications.AnyAsync(n =>
+                n.UserId == userId &&
+                n.AuctionId == auctionId &&
+                n.NotificationType == type);
+        }
+        public async Task<bool> HasAuctionLostNotificationBeenSentAsync(int userId, int auctionId)
+        {
+            return await _dbContext.Notifications.AnyAsync(n =>
+                n.UserId == userId &&
+                n.AuctionId == auctionId &&
+                n.NotificationType == NotificationType.AuctionLost);
+        }
         public async Task<bool> HasAuctionWonNotificationBeenSentAsync(int userId, int auctionId)
         {
             return await _dbContext.Notifications.AnyAsync(n =>
                 n.UserId == userId &&
                 n.AuctionId == auctionId &&
                 n.NotificationType == NotificationType.AuctionWon);
+        }
+        public async Task<bool> HasAuctionEndNotificationBeenSentAsync(int userId, int auctionId)
+        {
+            return await _dbContext.Notifications.AnyAsync(n =>
+                n.UserId == userId &&
+                n.AuctionId == auctionId &&
+                n.NotificationType == NotificationType.AuctionEnd);
+        }
+        public Task<bool> HasBidderCountNotificationBeenSentAsync(int userId, int auctionId)
+        {
+            return _dbContext.Notifications
+                .AnyAsync(n =>
+                    n.UserId == userId &&
+                    n.AuctionId == auctionId &&
+                    n.NotificationType == NotificationType.BidderCountUpdate);
+        }
+        public Task<bool> HasAutoBidNotificationBeenSentAsync(int userId, int auctionId, string message)
+        {
+            return _dbContext.Notifications
+                .AnyAsync(n => n.UserId == userId &&
+                               n.AuctionId == auctionId &&
+                               n.Message == message &&
+                               n.NotificationType == NotificationType.AutoBidExecuted);
         }
         public async Task<bool> HasReservePriceMetNotificationBeenSentAsync(int userId, int auctionId)
         {
@@ -112,7 +149,5 @@ namespace AutoFiCore.Data
             return await _dbContext.Notifications
                 .CountAsync(n => n.UserId == userId && !n.IsRead);
         }
-
-
     }
 }

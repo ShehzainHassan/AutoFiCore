@@ -7,7 +7,10 @@
         PaymentDue,
         AuctionWon,
         AuctionEnd,
+        AuctionLost,
         ReservePriceMet,
         AuctionExtended,
+        BidderCountUpdate,
+        AutoBidExecuted,
     }
 }

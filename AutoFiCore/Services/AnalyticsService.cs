@@ -12,6 +12,8 @@ namespace AutoFiCore.Services
         Task TrackAuctionViewAsync(int auctionId, int? userId, string source);
         Task TrackBidEventAsync(int auctionId, int userId, decimal bidAmount);
         Task TrackAuctionCompletionAsync(int auctionId, bool isSuccessful, decimal finalPrice);
+        Task TrackPaymentCompleted(int auctionId, int? userId, decimal finalPayment);
+        Task<bool> IsAuctionPaymentCompleted(int auctionId);
     }
     public class AnalyticsService : IAnalyticsService
     {
@@ -23,7 +25,6 @@ namespace AutoFiCore.Services
             _uow = uow;
             _logger = logger;
         }
-
         public async Task TrackEventAsync(AnalyticsEventType type, int? userId, int? auctionId, Dictionary<string, object> data, string source)
         {
             if (!Enum.TryParse<AnalyticsSource>(source, out var parsedSource))
@@ -58,6 +59,14 @@ namespace AutoFiCore.Services
                     { "Success", isSuccessful },
                     { "FinalPrice", finalPrice }
                 }, "Web");
+        }
+        public Task TrackPaymentCompleted(int auctionId, int? userId, decimal finalPayment)
+        {
+            return TrackEventAsync(AnalyticsEventType.PaymentCompleted, userId, auctionId, new Dictionary<string, object> { { "AmountPayed", finalPayment } }, "Web");
+        }
+        public async Task<bool> IsAuctionPaymentCompleted(int auctionId)
+        {
+            return await _uow.Analytics.IsPaymentCompletedAsync(auctionId);
         }
     }
 }
