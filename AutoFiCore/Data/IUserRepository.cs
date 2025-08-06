@@ -20,5 +20,6 @@ namespace AutoFiCore.Data
         Task<List<string>> GetUserSavedSearches(int id);
         Task<UserInteractions> AddUserInteraction(UserInteractions userInteractions);
         Task<bool> IsEmailExists(string email);
+        Task<int> GetAllUsersCountAsync();
     }
 }

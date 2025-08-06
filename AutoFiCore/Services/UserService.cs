@@ -19,6 +19,7 @@ namespace AutoFiCore.Services
         Task<UserSavedSearch?> RemoveSavedSearchAsync(UserSavedSearch savedSearch);
         Task<List<string>> GetUserSavedSearches(int id);
         Task<UserInteractions> AddUserInteractionAsync(UserInteractions userInteractions);
+        Task<int> GetAllUsersCountAsync();
     }
 
     public class UserService:IUserService
@@ -95,5 +96,11 @@ namespace AutoFiCore.Services
             await _unitOfWork.SaveChangesAsync();
             return userInteractions;
         }
+
+        public async Task<int> GetAllUsersCountAsync()
+        {
+            return await _unitOfWork.Users.GetAllUsersCountAsync();
+        }
+
     }
 }

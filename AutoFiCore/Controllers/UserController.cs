@@ -49,6 +49,14 @@ namespace AutoFiCore.Controllers
             return Ok(user);
         }
 
+        [HttpGet("all-users-count")]
+        public async Task<ActionResult<UserLikes>> GetUsersCount()
+        {
+            var count = await _userService.GetAllUsersCountAsync();
+            return Ok(count);
+        }
+
+
         [Authorize]
         [HttpPost("add-user-like")]
         public async Task<ActionResult<UserLikes>> AddUserLike([FromBody] UserLikes userLikes)

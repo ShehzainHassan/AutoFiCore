@@ -96,6 +96,23 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        [HttpGet("auctions-report")]
+        public async Task<ActionResult<AuctionAnalyticsTableDTO>> GetAuctionTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        {
+            var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
+            var result = await _reportService.GetAuctionAnalyticsAsync(utcStart, utcEnd);
+            return Ok(result);
+        }
+
+        [HttpGet("user-report")]
+        public async Task<IActionResult> GetUserTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        {
+            var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
+            var result = await _reportService.GetUserAnalyticsAsync(utcStart, utcEnd);
+            return Ok(result);
+        }
         [HttpGet("payment-status")]
         public async Task<IActionResult> IsPaymentCompleted([FromQuery] int auctionId)
         {

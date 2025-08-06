@@ -19,8 +19,11 @@ namespace AutoFiCore.Data
             _dbContext = dbContext;
             _logger = logger;
         }
+        public Task<int> GetAllUsersCountAsync()
+        {
+            return _dbContext.Users.CountAsync();
+        }
         public Task<int> GetUserCountAsync(DateTime start, DateTime end) => _dbContext.Users.CountAsync();
-
         public async Task<bool> IsEmailExists(string email)
         {
             var isExists = await _dbContext.Users.AsNoTracking().AnyAsync(u => u.Email == email);

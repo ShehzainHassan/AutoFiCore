@@ -1,5 +1,6 @@
 ﻿using AutoFiCore.Data;
 using AutoFiCore.Dto;
+using AutoFiCore.Enums;
 using System.Text;
 
 public interface IReportingService
@@ -9,6 +10,8 @@ public interface IReportingService
     Task<RevenueReport> GetRevenueReportAsync(DateTime startDate, DateTime endDate);
     Task<List<CategoryPerformance>> GetPopularCategoriesReportAsync(DateTime startDate, DateTime endDate);
     Task<FileResultDTO> ExportReportAsync(string reportType, DateTime startDate, DateTime endDate, string format = "csv");
+    Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsAsync(DateTime start, DateTime end);
+    Task<List<UserAnalyticsTableDTO>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate);
 }
 
 public class ReportingService : IReportingService
@@ -26,12 +29,16 @@ public class ReportingService : IReportingService
         var total = await _uow.Report.GetTotalAuctionsAsync(start, end);
         var endedAuctions = await _uow.Auctions.GetEndedAuctions();
         var successful = await _uow.Report.GetSuccessfulAuctionsAsync(start, end);
+        var avgViews = await _uow.Report.GetAverageAuctionViewsAsync(start, end);
+        var avgBids = await _uow.Report.GetAverageAuctionBidsAsync(start, end);
         var avgPrice = await _uow.Report.GetAverageAuctionPriceAsync(start, end);
 
         return new AuctionPerformanceReport
         {
             TotalAuctions = total,
             SuccessRate = total == 0 ? 0 : (double)successful / endedAuctions.Count * 100,
+            AverageViews = avgViews,
+            AverageBids = avgBids,
             AverageFinalPrice = avgPrice
         };
     }
@@ -39,8 +46,10 @@ public class ReportingService : IReportingService
     {
         return new UserActivityReport
         {
+            TotalUsers = await _uow.Users.GetAllUsersCountAsync(),
             ActiveUsers = await _uow.Report.GetActiveUserCountAsync(start, end),
             NewRegistrations = await _uow.Report.GetNewUserCountAsync(start, end),
+            RetentionRate = await _uow.Report.GetUserRetentionRateAsync(start, end),
             EngagementScore = await _uow.Report.GetUserEngagementScoreAsync(start, end)
         };
     }
@@ -132,5 +141,13 @@ public class ReportingService : IReportingService
             ContentType = contentType,
             FileName = fileName
         };
+    }
+    public async Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsAsync(DateTime start, DateTime end)
+    {
+        return await _uow.Report.GetAuctionAnalyticsTableAsync(start, end);
+    }
+    public async Task<List<UserAnalyticsTableDTO>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate)
+    {
+        return await _uow.Report.GetUserAnalyticsAsync(startDate, endDate);
     }
 }

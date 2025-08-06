@@ -9,7 +9,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
 {
     private readonly ApplicationDbContext _dbContext;
     private readonly ILogger<DbAuctionRepository> _logger;
-
     public DbAuctionRepository(ApplicationDbContext db, ILogger<DbAuctionRepository> log)
     {
         _dbContext = db;
@@ -17,10 +16,8 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     }
     public Task<int> GetAuctionCountAsync(DateTime start, DateTime end) =>
     _dbContext.Auctions.CountAsync(a => a.CreatedUtc >= start && a.CreatedUtc < end);
-
     public Task<int> GetBidCountAsync(DateTime start, DateTime end) =>
     _dbContext.Bids.CountAsync(b => b.CreatedUtc >= start && b.CreatedUtc < end);
-
     public async Task<Auction> AddAuctionAsync(Auction auction)
     {
         _dbContext.Auctions.Add(auction);
@@ -34,7 +31,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .Where(a => a.Status == AuctionStatus.Ended)
             .ToListAsync();
     }
-
     public Task<bool> VehicleHasAuction(int vehicleId)
     {
         return _dbContext.Auctions
