@@ -3,6 +3,7 @@ using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Polly;
+using System.Globalization;
 
 namespace AutoFiCore.Data
 {
@@ -14,7 +15,7 @@ namespace AutoFiCore.Data
         Task<int> GetActiveUserCountAsync(DateTime start, DateTime end);
         Task<int> GetNewUserCountAsync(DateTime start, DateTime end);
         Task<decimal> GetUserEngagementScoreAsync(DateTime start, DateTime end);
-        Task<int> GetSuccessfulPaymentsCountAsync(DateTime start, DateTime end);
+        Task<decimal> GetSuccessfulPaymentPercentageAsync(DateTime start, DateTime end);
         Task<decimal> GetCommissionEarnedAsync(DateTime start, DateTime end);
         Task<List<CategoryPerformance>> GetPopularCategoriesReportAsync(DateTime start, DateTime end);
         Task<double> GetAverageBidCountAsync(DateTime start, DateTime end);
@@ -26,8 +27,16 @@ namespace AutoFiCore.Data
         Task<int> GetUniqueBiddersCountAsync(int auctionId, DateTime start, DateTime end);
         Task<int> GetTotalBidsCountAsync(int auctionId, DateTime start, DateTime end);
         Task<List<Auction>> GetAuctionsInDateRangeAsync(DateTime start, DateTime end);
-        Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsTableAsync(DateTime start, DateTime end);
+        Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsTableAsync(DateTime start, DateTime end, string? category);
         Task<List<UserAnalyticsTableDTO>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate);
+        Task<List<RevenueTableAnalyticsDTO>> GetRevenueTableAnalyticsAsync(DateTime start, DateTime end);
+        Task<decimal> GetRevenueForRangeAsync(DateTime from, DateTime to);
+        Task<Dictionary<DateTime, decimal>> GetRevenueGroupedByDayAsync(DateTime from, DateTime to);
+        Task<Dictionary<DateTime, decimal>> GetRevenueGroupedByMonthAsync(DateTime? from, DateTime? to);
+        Task<Dictionary<DateTime, decimal>> GetAllTimeRevenueAsync();
+        Task<Dictionary<DateTime, int>> GetUserRegistrationsGroupedByDayAsync(DateTime from, DateTime to);
+        Task<Dictionary<DateTime, int>> GetUserRegistrationsGroupedByMonthAsync(DateTime from, DateTime to);
+        Task<Dictionary<DateTime, int>> GetAllTimeUserRegistrationsAsync();
     }
 
     public class DbReportRepository : IReportRepository
@@ -105,12 +114,23 @@ namespace AutoFiCore.Data
                 .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet && a.EndUtc >= start && a.EndUtc < end)
                 .SumAsync(a => (decimal?)a.CurrentPrice) ?? 0;
 
-            return Math.Round(total * 0.05m, 2);
+            return Math.Round(total * 0.10m, 2);
         }
-        public Task<int> GetSuccessfulPaymentsCountAsync(DateTime start, DateTime end)
+        public async Task<decimal> GetSuccessfulPaymentPercentageAsync(DateTime start, DateTime end)
         {
-            return _db.AnalyticsEvents
-                .CountAsync(e => e.EventType == AnalyticsEventType.PaymentCompleted && e.CreatedAt >= start && e.CreatedAt < end);
+            var successfulPayments = await _db.AnalyticsEvents
+                .CountAsync(e => e.EventType == AnalyticsEventType.PaymentCompleted &&
+                                 e.CreatedAt >= start && e.CreatedAt < end);
+
+            var successfulAuctions = await _db.Auctions
+                .CountAsync(a => a.Status == AuctionStatus.Ended &&
+                                 a.IsReserveMet &&
+                                 a.EndUtc >= start && a.EndUtc < end);
+
+            if (successfulAuctions == 0)
+                return 0;
+
+            return Math.Round((decimal)successfulPayments * 100 / successfulAuctions, 2);
         }
         public async Task<List<CategoryPerformance>> GetPopularCategoriesReportAsync(DateTime start, DateTime end)
         {
@@ -192,12 +212,18 @@ namespace AutoFiCore.Data
         {
             return await _db.Auctions.Include(a => a.Vehicle).Where(a => a.CreatedUtc >= start && a.EndUtc < end).ToListAsync();
         }
-        public async Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsTableAsync(DateTime start, DateTime end)
+        public async Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsTableAsync(DateTime start, DateTime end, string? category)
         {
-            var auctions = await _db.Auctions
+            var auctionsQuery = _db.Auctions
                 .Include(a => a.Vehicle)
-                .Where(a => a.CreatedUtc >= start && a.EndUtc < end)
-                .ToListAsync();
+                .Where(a => a.CreatedUtc >= start && a.EndUtc < end);
+
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                auctionsQuery = auctionsQuery.Where(a => a.Vehicle.FuelType == category);
+            }
+
+            var auctions = await auctionsQuery.ToListAsync();
 
             var result = new List<AuctionAnalyticsTableDTO>();
 
@@ -211,6 +237,7 @@ namespace AutoFiCore.Data
                 {
                     AuctionId = a.AuctionId,
                     VehicleName = $"{a.Vehicle.Year} {a.Vehicle.Make} {a.Vehicle.Model}",
+                    VehicleCategory = a.Vehicle.FuelType!.ToString(),
                     Views = views,
                     Bidders = bidders,
                     Bids = bids,
@@ -264,5 +291,256 @@ namespace AutoFiCore.Data
                 };
             }).ToList();
         }
+        public async Task<List<RevenueTableAnalyticsDTO>> GetRevenueTableAnalyticsAsync(DateTime start, DateTime end)
+        {
+            var auctions = await _db.Auctions
+                .Include(a => a.Vehicle)
+                .Include(a => a.Bids)
+                .Where(a => a.StartUtc >= start && a.StartUtc < end)
+                .ToListAsync();
+
+            var auctionWinners = await _db.Auctions
+                .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet)
+                .Select(a => new
+                {
+                    a.AuctionId,
+                    LastBidUserId = _db.Bids
+                        .Where(b => b.AuctionId == a.AuctionId)
+                        .OrderByDescending(b => b.CreatedUtc)
+                        .Select(b => b.UserId)
+                        .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            var userIds = auctionWinners
+                .Select(w => w.LastBidUserId)
+                .Distinct()
+                .ToList();
+
+            var users = await _db.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => u.Name);
+
+            var revenueList = auctions.Select(auction =>
+            {
+                var isSold = auction.Status == AuctionStatus.Ended && auction.IsReserveMet;
+                var winner = auctionWinners.FirstOrDefault(w => w.AuctionId == auction.AuctionId);
+                var buyerName = (isSold && winner != null && users.ContainsKey(winner.LastBidUserId))
+                    ? users[winner.LastBidUserId]
+                    : "---";
+
+                return new RevenueTableAnalyticsDTO
+                {
+                    ScheduledStartTime = auction.StartUtc,
+                    AuctionId = auction.AuctionId,
+                    Vehicle = $"{auction.Vehicle?.Year} {auction.Vehicle?.Make} {auction.Vehicle?.Model}",
+                    Buyer = isSold ? buyerName : "---",
+                    Revenue = auction.CurrentPrice,
+                    Commission = Math.Round(auction.CurrentPrice * 0.10m, 2)
+                };
+            }).OrderBy(r => r.AuctionId).ToList();
+
+            return revenueList;
+        }
+        public async Task<decimal> GetRevenueForRangeAsync(DateTime from, DateTime to)
+        {
+            from = DateTime.SpecifyKind(from, DateTimeKind.Utc);
+            to = DateTime.SpecifyKind(to, DateTimeKind.Utc);
+
+            return await _db.Auctions
+                .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet &&
+                            a.ScheduledStartTime >= from && a.ScheduledStartTime < to)
+                .SumAsync(a => a.CurrentPrice);
+        }
+        public async Task<Dictionary<DateTime, decimal>> GetRevenueGroupedByDayAsync(DateTime from, DateTime to)
+        {
+            from = DateTime.SpecifyKind(from, DateTimeKind.Utc);
+            to = DateTime.SpecifyKind(to, DateTimeKind.Utc);
+
+            var data = await _db.Auctions
+                .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet && a.ScheduledStartTime >= from && a.ScheduledStartTime < to)
+                .GroupBy(a => a.ScheduledStartTime.Date)
+                .Select(g => new
+                {
+                    Date = g.Key,
+                    Revenue = g.Sum(a => a.CurrentPrice)
+                })
+                .ToListAsync();
+
+            var result = new Dictionary<DateTime, decimal>();
+            for (DateTime date = from.Date; date < to.Date; date = date.AddDays(1))
+            {
+                result[date] = 0;
+            }
+
+            foreach (var item in data)
+            {
+                result[item.Date] = item.Revenue;
+            }
+
+            return result;
+        }
+        public async Task<Dictionary<DateTime, decimal>> GetRevenueGroupedByMonthAsync(DateTime? from, DateTime? to)
+        {
+            DateTime start = from.HasValue ? DateTime.SpecifyKind(from.Value, DateTimeKind.Utc) : DateTime.MinValue;
+            DateTime end = to.HasValue ? DateTime.SpecifyKind(to.Value, DateTimeKind.Utc) : DateTime.UtcNow;
+
+            var data = await _db.Auctions
+                .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet && a.ScheduledStartTime >= start && a.ScheduledStartTime < end)
+                .GroupBy(a => new { a.ScheduledStartTime.Year, a.ScheduledStartTime.Month })
+                .Select(g => new
+                {
+                    Month = new DateTime(g.Key.Year, g.Key.Month, 1),
+                    Revenue = g.Sum(a => a.CurrentPrice)
+                })
+                .ToListAsync();
+
+            var result = new Dictionary<DateTime, decimal>();
+            var temp = new DateTime(start.Year, start.Month, 1);
+            var endMonth = new DateTime(end.Year, end.Month, 1);
+
+            while (temp < endMonth)
+            {
+                result[temp] = 0;
+                temp = temp.AddMonths(1);
+            }
+
+            foreach (var item in data)
+            {
+                result[item.Month] = item.Revenue;
+            }
+
+            return result;
+        }
+        public async Task<Dictionary<DateTime, decimal>> GetAllTimeRevenueAsync()
+        {
+            var oldestAuction = await _db.Auctions
+                .OrderBy(a => a.ScheduledStartTime)
+                .Select(a => a.ScheduledStartTime)
+                .FirstOrDefaultAsync();
+
+            if (oldestAuction == default)
+            {
+                return new Dictionary<DateTime, decimal>();
+            }
+
+            var oldestMonth = DateTime.SpecifyKind(new DateTime(oldestAuction.Year, oldestAuction.Month, 1), DateTimeKind.Utc);
+            var currentMonth = DateTime.SpecifyKind(new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1), DateTimeKind.Utc);
+            var fromMonth = oldestMonth;
+
+            if (oldestMonth == currentMonth)
+            {
+                fromMonth = currentMonth.AddMonths(-1);
+            }
+
+            fromMonth = DateTime.SpecifyKind(fromMonth, DateTimeKind.Utc);
+
+            var result = new Dictionary<DateTime, decimal>();
+
+            var temp = fromMonth;
+            while (temp <= currentMonth)
+            {
+                result[temp] = 0;
+                temp = DateTime.SpecifyKind(temp.AddMonths(1), DateTimeKind.Utc);
+            }
+
+            var toMonthExclusive = DateTime.SpecifyKind(currentMonth.AddMonths(1), DateTimeKind.Utc);
+
+            var groupedRevenue = await _db.Auctions
+                .Where(a =>
+                    a.Status == AuctionStatus.Ended &&
+                    a.IsReserveMet &&
+                    a.ScheduledStartTime >= fromMonth &&
+                    a.ScheduledStartTime < toMonthExclusive)
+                .GroupBy(a => new { a.ScheduledStartTime.Year, a.ScheduledStartTime.Month })
+                .Select(g => new
+                {
+                    Month = new DateTime(g.Key.Year, g.Key.Month, 1),
+                    Revenue = g.Sum(a => a.CurrentPrice)
+                })
+                .ToListAsync();
+
+            foreach (var item in groupedRevenue)
+            {
+                var monthKey = DateTime.SpecifyKind(item.Month, DateTimeKind.Utc);
+                result[monthKey] = item.Revenue;
+            }
+
+            return result;
+        }
+        public async Task<Dictionary<DateTime, int>> GetUserRegistrationsGroupedByDayAsync(DateTime from, DateTime to)
+        {
+            from = DateTime.SpecifyKind(from.Date, DateTimeKind.Utc);
+            to = DateTime.SpecifyKind(to.Date.AddDays(1), DateTimeKind.Utc); 
+
+            var allDays = Enumerable.Range(0, (to - from).Days)
+                .Select(offset => from.AddDays(offset))
+                .ToDictionary(date => date, _ => 0);
+
+            var registrations = await _db.Users
+                .Where(u => u.CreatedUtc >= from && u.CreatedUtc < to)
+                .GroupBy(u => u.CreatedUtc.Date)
+                .Select(g => new { Date = g.Key, Count = g.Count() })
+                .ToListAsync();
+
+            foreach (var item in registrations)
+            {
+                var date = DateTime.SpecifyKind(item.Date, DateTimeKind.Utc);
+                allDays[date] = item.Count;
+            }
+
+            return allDays;
+        }
+        public async Task<Dictionary<DateTime, int>> GetUserRegistrationsGroupedByMonthAsync(DateTime from, DateTime to)
+        {
+            from = DateTime.SpecifyKind(new DateTime(from.Year, from.Month, 1), DateTimeKind.Utc);
+            to = DateTime.SpecifyKind(new DateTime(to.Year, to.Month, 1).AddMonths(1), DateTimeKind.Utc);
+
+            var months = new Dictionary<DateTime, int>();
+            var cursor = from;
+            while (cursor < to)
+            {
+                months[cursor] = 0;
+                cursor = cursor.AddMonths(1);
+            }
+
+            var registrations = await _db.Users
+                .Where(u => u.CreatedUtc >= from && u.CreatedUtc < to)
+                .GroupBy(u => new { u.CreatedUtc.Year, u.CreatedUtc.Month })
+                .Select(g => new
+                {
+                    Month = new DateTime(g.Key.Year, g.Key.Month, 1),
+                    Count = g.Count()
+                })
+                .ToListAsync();
+
+            foreach (var item in registrations)
+            {
+                var month = DateTime.SpecifyKind(item.Month, DateTimeKind.Utc);
+                months[month] = item.Count;
+            }
+
+            return months;
+        }
+        public async Task<Dictionary<DateTime, int>> GetAllTimeUserRegistrationsAsync()
+        {
+            var oldestUser = await _db.Users
+                .OrderBy(u => u.CreatedUtc)
+                .Select(u => u.CreatedUtc)
+                .FirstOrDefaultAsync();
+
+            if (oldestUser == default)
+                return new Dictionary<DateTime, int>();
+
+            var oldestMonth = DateTime.SpecifyKind(new DateTime(oldestUser.Year, oldestUser.Month, 1), DateTimeKind.Utc);
+            var currentMonth = DateTime.SpecifyKind(new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1), DateTimeKind.Utc);
+            var fromMonth = oldestMonth;
+
+            if (oldestMonth == currentMonth)
+                fromMonth = currentMonth.AddMonths(-1);
+
+            return await GetUserRegistrationsGroupedByMonthAsync(fromMonth, currentMonth);
+        }
+
     }
 }

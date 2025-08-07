@@ -21,6 +21,7 @@ public interface IVehicleService
     Task<List<VehicleModelJSON>> GetAllCarFeaturesAsync();
     VehicleModelJSON? GetCarFeature(List<VehicleModelJSON>? carFeatures, string make, string model);
     Task<List<string>> GetAllVehiclesMakesAsync();
+    Task<List<string>> GetAllVehiclesCategoriesAsync();
     Task<Vehicle?> GetVehicleByIdAsync(int id);
     Task<Vehicle?> GetVehicleByVinAsync(string vin);
     Task<Vehicle?> CreateVehicleAsync(Vehicle vehicle);
@@ -70,6 +71,10 @@ public class VehicleService : IVehicleService
     public async Task<List<string>> GetAllVehiclesMakesAsync()
     {
         return await _repository.GetAllVehicleMakes();
+    }
+    public async Task<List<string>> GetAllVehiclesCategoriesAsync()
+    {
+        return await _repository.GetAllVehicleCategories();
     }
     public async Task<VehicleListResult> GetVehiclesByMakeAsync(int pageView, int offset, string make)
     {

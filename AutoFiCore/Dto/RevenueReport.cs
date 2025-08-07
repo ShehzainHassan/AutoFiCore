@@ -4,6 +4,7 @@
     {
         public decimal TotalRevenue { get; set; }
         public decimal CommissionEarned { get; set; }
-        public int SuccessfulPayments { get; set; }
+        public decimal AverageSalePrice { get; set; }
+        public decimal SuccessfulPaymentsPercentage { get; set; }
     }
 }

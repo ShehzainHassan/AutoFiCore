@@ -76,6 +76,12 @@ namespace AutoFiCore.Controllers
         [HttpPost("track-payment")]
         public async Task<IActionResult> TrackPayment([FromBody] BidTrackingDTO bid)
         {
+            var alreadyCompleted = await _analyticsService.IsAuctionPaymentCompleted(bid.AuctionId);
+            if (alreadyCompleted)
+            {
+                return BadRequest(new { message = "Payment has already been tracked for this auction." });
+            }
+
             await _analyticsService.TrackPaymentCompleted(bid.AuctionId, bid.UserId, bid.Amount);
             return Ok(new { message = "Payment tracked" });
         }
@@ -97,11 +103,11 @@ namespace AutoFiCore.Controllers
         }
 
         [HttpGet("auctions-report")]
-        public async Task<ActionResult<AuctionAnalyticsTableDTO>> GetAuctionTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetAuctionTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string? category)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
-            var result = await _reportService.GetAuctionAnalyticsAsync(utcStart, utcEnd);
+            var result = await _reportService.GetAuctionAnalyticsAsync(utcStart, utcEnd, category);
             return Ok(result);
         }
 
@@ -111,6 +117,15 @@ namespace AutoFiCore.Controllers
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetUserAnalyticsAsync(utcStart, utcEnd);
+            return Ok(result);
+        }
+
+        [HttpGet("revenue-report")]
+        public async Task<IActionResult> GetRevenueTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        {
+            var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
+            var result = await _reportService.GetRevenueTableAnalyticsAsync(utcStart, utcEnd);
             return Ok(result);
         }
         [HttpGet("payment-status")]
@@ -148,6 +163,21 @@ namespace AutoFiCore.Controllers
         {
             await _analyticsService.TrackEventAsync(request.Type, request.UserId, request.AuctionId, request.Properties ?? new(), "Web");
             return Ok();
+        }
+
+
+        [HttpGet("revenue-summary")]
+        public async Task<IActionResult> GetRevenueSummary([FromQuery] SummaryPeriod period)
+        {
+            var summary = await _reportService.GetRevenueSummaryAsync(period);
+            return Ok(summary);
+        }
+
+        [HttpGet("user-summary")]
+        public async Task<IActionResult> GetUserSummary([FromQuery] SummaryPeriod period)
+        {
+            var summary = await _reportService.GetUserRegistrationSummaryAsync(period);
+            return Ok(summary);
         }
 
         [HttpGet("export")]

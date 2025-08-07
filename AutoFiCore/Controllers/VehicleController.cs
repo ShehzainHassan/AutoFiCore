@@ -179,6 +179,13 @@ public class VehicleController : ControllerBase
         return Ok(makes);
     }
 
+    [HttpGet("get-categories")]
+    public async Task<ActionResult<List<string>>> GetAllCategories()
+    {
+        var categories = await _vehicleService.GetAllVehiclesCategoriesAsync();
+        return Ok(categories);
+    }
+
     [HttpGet("{id}")]
     public async Task<ActionResult<Vehicle>> GetVehicleById(int id)
 {

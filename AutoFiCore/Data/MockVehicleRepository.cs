@@ -168,7 +168,18 @@ public class MockVehicleRepository : IVehicleRepository
 
         return await Task.FromResult(makes);
     }
-    
+    public async Task<List<string>> GetAllVehicleCategories()
+    {
+        LoadVehiclesFromFile();
+        var categories = _vehicles
+            .Select(v => v.FuelType!)
+            .Distinct()
+            .OrderBy(m => m)
+            .ToList();
+
+        return await Task.FromResult(categories);
+    }
+
     public async Task<VehicleListResult> GetVehiclesByModelAsync(int pageView, int offset, string model)
     {
         var query = _vehicles.AsQueryable();

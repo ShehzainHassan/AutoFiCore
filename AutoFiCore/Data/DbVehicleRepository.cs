@@ -84,6 +84,17 @@ public class DbVehicleRepository : IVehicleRepository
 
         return await Task.FromResult(makes);
     }
+    public async Task<List<string>> GetAllVehicleCategories()
+    {
+        var fuelTypes = await _dbContext.Vehicles
+            .Where(v => v.FuelType != null)        
+            .Select(v => v.FuelType!)
+            .Distinct()
+            .OrderBy(f => f)
+            .ToListAsync();
+        return fuelTypes;
+    }
+
     public async Task<VehicleListResult> GetVehiclesByMakeAsync(int pageView, int offset, string make)
     {
         var query = _dbContext.Vehicles.AsNoTracking().Where(v => v.Make == make).OrderBy(v => v.Id);

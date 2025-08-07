@@ -10,8 +10,11 @@ public interface IReportingService
     Task<RevenueReport> GetRevenueReportAsync(DateTime startDate, DateTime endDate);
     Task<List<CategoryPerformance>> GetPopularCategoriesReportAsync(DateTime startDate, DateTime endDate);
     Task<FileResultDTO> ExportReportAsync(string reportType, DateTime startDate, DateTime endDate, string format = "csv");
-    Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsAsync(DateTime start, DateTime end);
+    Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsAsync(DateTime start, DateTime end, string? category);
     Task<List<UserAnalyticsTableDTO>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate);
+    Task<List<RevenueTableAnalyticsDTO>> GetRevenueTableAnalyticsAsync(DateTime start, DateTime end);
+    Task<SummaryWithChange<decimal>> GetRevenueSummaryAsync(SummaryPeriod period);
+    Task<SummaryWithChange<int>> GetUserRegistrationSummaryAsync(SummaryPeriod period);
 }
 
 public class ReportingService : IReportingService
@@ -59,7 +62,8 @@ public class ReportingService : IReportingService
         {
             TotalRevenue = await _uow.Metrics.GetRevenueTotalAsync(start, end),
             CommissionEarned = await _uow.Report.GetCommissionEarnedAsync(start, end),
-            SuccessfulPayments = await _uow.Report.GetSuccessfulPaymentsCountAsync(start, end)
+            AverageSalePrice = await _uow.Report.GetAverageAuctionPriceAsync(start, end),
+            SuccessfulPaymentsPercentage = await _uow.Report.GetSuccessfulPaymentPercentageAsync(start, end)
         };
     }
     public Task<List<CategoryPerformance>> GetPopularCategoriesReportAsync(DateTime start, DateTime end)
@@ -142,12 +146,298 @@ public class ReportingService : IReportingService
             FileName = fileName
         };
     }
-    public async Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsAsync(DateTime start, DateTime end)
-    {
-        return await _uow.Report.GetAuctionAnalyticsTableAsync(start, end);
+    public async Task<List<AuctionAnalyticsTableDTO>> GetAuctionAnalyticsAsync(DateTime start, DateTime end, string? category)
+    {  
+        return await _uow.Report.GetAuctionAnalyticsTableAsync(start, end, category);
     }
     public async Task<List<UserAnalyticsTableDTO>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate)
     {
         return await _uow.Report.GetUserAnalyticsAsync(startDate, endDate);
+    }
+    public async Task<List<RevenueTableAnalyticsDTO>> GetRevenueTableAnalyticsAsync(DateTime start, DateTime end)
+    {
+        return await _uow.Report.GetRevenueTableAnalyticsAsync(start, end);
+    }
+    public async Task<SummaryWithChange<decimal>> GetRevenueSummaryAsync(SummaryPeriod period)
+    {
+        var now = DateTime.UtcNow.Date;
+        var results = new Dictionary<string, decimal>();
+        decimal currentTotal = 0, previousTotal = 0;
+
+        switch (period)
+        {
+            case SummaryPeriod.Last7Days:
+            {
+                var currentFrom = now.AddDays(-7);
+                var currentTo = now;
+                var previousFrom = currentFrom.AddDays(-7);
+                var previousTo = currentFrom;
+
+                var currentData = await _uow.Report.GetRevenueGroupedByDayAsync(currentFrom, currentTo);
+                var previousData = await _uow.Report.GetRevenueGroupedByDayAsync(previousFrom, previousTo);
+
+                for (var date = currentFrom; date < currentTo; date = date.AddDays(1))
+                {
+                    var key = date.ToString("yyyy-MM-dd");
+                    decimal val = currentData.TryGetValue(date, out var v) ? v : 0m;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.Last2Weeks:
+            {
+                var currentFrom = now.AddDays(-14);
+                var currentTo = now;
+                var previousFrom = currentFrom.AddDays(-14);
+                var previousTo = currentFrom;
+
+                var currentData = await _uow.Report.GetRevenueGroupedByDayAsync(currentFrom, currentTo);
+                var previousData = await _uow.Report.GetRevenueGroupedByDayAsync(previousFrom, previousTo);
+
+                for (var date = currentFrom; date < currentTo; date = date.AddDays(1))
+                {
+                    var key = date.ToString("yyyy-MM-dd");
+                    decimal val = currentData.TryGetValue(date, out var v) ? v : 0m;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.LastMonth:
+            {
+                var currentStart = new DateTime(now.Year, now.Month, 1).AddMonths(-1);
+                var currentEnd = currentStart.AddMonths(1);
+                var previousStart = currentStart.AddMonths(-1);
+                var previousEnd = currentStart;
+
+                var currentData = await _uow.Report.GetRevenueGroupedByDayAsync(currentStart, currentEnd);
+                var previousData = await _uow.Report.GetRevenueGroupedByDayAsync(previousStart, previousEnd);
+
+                for (var date = currentStart; date < currentEnd; date = date.AddDays(1))
+                {
+                    var key = date.ToString("yyyy-MM-dd");
+                    decimal val = currentData.TryGetValue(date, out var v) ? v : 0m;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.LastQuarter:
+            {
+                var start = new DateTime(now.Year, now.Month, 1).AddMonths(-3);
+                var end = new DateTime(now.Year, now.Month, 1);
+                var dbData = await _uow.Report.GetRevenueGroupedByMonthAsync(start, end);
+
+                for (var m = 0; m < 3; m++)
+                {
+                    var date = start.AddMonths(m);
+                    var key = date.ToString("MMMM");
+                    results[key] = dbData.TryGetValue(date, out var val) ? val : 0;
+                }
+
+                break;
+            }
+            case SummaryPeriod.Last12Months:
+            {
+                int months = period == SummaryPeriod.LastQuarter ? 3 : 12;
+                var currentStart = new DateTime(now.Year, now.Month, 1).AddMonths(-months);
+                var currentEnd = new DateTime(now.Year, now.Month, 1);
+                var previousStart = currentStart.AddMonths(-months);
+                var previousEnd = currentStart;
+
+                var currentData = await _uow.Report.GetRevenueGroupedByMonthAsync(currentStart, currentEnd);
+                var previousData = await _uow.Report.GetRevenueGroupedByMonthAsync(previousStart, previousEnd);
+
+                for (int i = 0; i < months; i++)
+                {
+                    var date = currentStart.AddMonths(i);
+                    var key = date.ToString("MMMM");
+                    decimal val = currentData.TryGetValue(date, out var v) ? v : 0m;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.AllTime:
+            {
+                var allData = await _uow.Report.GetAllTimeRevenueAsync();
+
+                foreach (var revenue in allData.OrderBy(x => x.Key))
+                {
+                    var key = revenue.Key.ToString("MMMM");
+                    results[key] = revenue.Value;
+                }
+
+                currentTotal = results.Sum(x => x.Value);
+                break;
+            }
+
+            default:
+                throw new ArgumentException("Invalid period", nameof(period));
+        }
+
+        double percentChange = (previousTotal > 0)
+            ? ((double)(currentTotal - previousTotal) / (double)previousTotal) * 100
+            : (currentTotal > 0 ? 100 : 0);
+
+        return new SummaryWithChange<decimal>
+        {
+            Data = results,
+            PercentageChange = Math.Round(percentChange, 2)
+        };
+    }
+    public async Task<SummaryWithChange<int>> GetUserRegistrationSummaryAsync(SummaryPeriod period)
+    {
+        var today = DateTime.UtcNow.Date;
+        var results = new Dictionary<string, int>();
+        int currentTotal = 0, previousTotal = 0;
+
+        switch (period)
+        {
+            case SummaryPeriod.Last7Days:
+            {
+                var currentFrom = today.AddDays(-7);
+                var currentTo = today;
+                var previousFrom = currentFrom.AddDays(-7);
+                var previousTo = currentFrom;
+
+                var currentData = await _uow.Report.GetUserRegistrationsGroupedByDayAsync(currentFrom, currentTo);
+                var previousData = await _uow.Report.GetUserRegistrationsGroupedByDayAsync(previousFrom, previousTo);
+
+                for (var date = currentFrom; date < currentTo; date = date.AddDays(1))
+                {
+                    var key = date.ToString("yyyy-MM-dd");
+                    int val = currentData.TryGetValue(date, out var v) ? v : 0;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.Last2Weeks:
+            {
+                var currentFrom = today.AddDays(-14);
+                var currentTo = today;
+                var previousFrom = currentFrom.AddDays(-14);
+                var previousTo = currentFrom;
+
+                var currentData = await _uow.Report.GetUserRegistrationsGroupedByDayAsync(currentFrom, currentTo);
+                var previousData = await _uow.Report.GetUserRegistrationsGroupedByDayAsync(previousFrom, previousTo);
+
+                for (var date = currentFrom; date < currentTo; date = date.AddDays(1))
+                {
+                    var key = date.ToString("yyyy-MM-dd");
+                    int val = currentData.TryGetValue(date, out var v) ? v : 0;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.LastMonth:
+            {
+                var start = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
+                var end = start.AddMonths(1);
+                var prevStart = start.AddMonths(-1);
+                var prevEnd = start;
+
+                var currentData = await _uow.Report.GetUserRegistrationsGroupedByDayAsync(start, end);
+                var previousData = await _uow.Report.GetUserRegistrationsGroupedByDayAsync(prevStart, prevEnd);
+
+                for (var date = start; date < end; date = date.AddDays(1))
+                {
+                    var key = date.ToString("yyyy-MM-dd");
+                    int val = currentData.TryGetValue(date, out var v) ? v : 0;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.LastQuarter:
+            {
+                var start = new DateTime(today.Year, today.Month, 1).AddMonths(-3);
+                var end = new DateTime(today.Year, today.Month, 1);
+                var dbData = await _uow.Report.GetUserRegistrationsGroupedByMonthAsync(start, end);
+
+                for (var m = 0; m < 3; m++)
+                {
+                    var date = start.AddMonths(m);
+                    var key = date.ToString("MMMM");
+                    results[key] = dbData.TryGetValue(date, out var val) ? val : 0;
+                }
+
+                break;
+            }
+            case SummaryPeriod.Last12Months:
+            {
+                int months = period == SummaryPeriod.LastQuarter ? 3 : 12;
+                var start = new DateTime(today.Year, today.Month, 1).AddMonths(-months);
+                var end = new DateTime(today.Year, today.Month, 1);
+                var prevStart = start.AddMonths(-months);
+                var prevEnd = start;
+
+                var currentData = await _uow.Report.GetUserRegistrationsGroupedByMonthAsync(start, end);
+                var previousData = await _uow.Report.GetUserRegistrationsGroupedByMonthAsync(prevStart, prevEnd);
+
+                for (int i = 0; i < months; i++)
+                {
+                    var date = start.AddMonths(i);
+                    var key = date.ToString("MMMM");
+                    int val = currentData.TryGetValue(date, out var v) ? v : 0;
+                    results[key] = val;
+                    currentTotal += val;
+                }
+
+                previousTotal = previousData.Sum(x => x.Value);
+                break;
+            }
+
+            case SummaryPeriod.AllTime:
+            {
+                var allData = await _uow.Report.GetAllTimeUserRegistrationsAsync();
+
+                foreach (var user in allData.OrderBy(x => x.Key))
+                {
+                    var key = user.Key.ToString("MMMM");
+                    results[key] = user.Value;
+                }
+
+                currentTotal = results.Sum(x => x.Value);
+                break;
+            }
+
+            default:
+                throw new ArgumentException("Invalid period", nameof(period));
+        }
+
+        double percentChange = (previousTotal > 0)
+            ? ((double)(currentTotal - previousTotal) / previousTotal) * 100
+            : (currentTotal > 0 ? 100 : 0);
+
+        return new SummaryWithChange<int>
+        {
+            Data = results,
+            PercentageChange = Math.Round(percentChange, 2)
+        };
     }
 }

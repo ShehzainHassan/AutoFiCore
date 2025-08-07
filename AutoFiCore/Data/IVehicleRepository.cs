@@ -13,6 +13,7 @@ public interface IVehicleRepository
     VehicleModelJSON? GetCarFeature(List<VehicleModelJSON> carFeatures, string make, string model);
     Task<List<VehicleModelJSON>> GetAllCarFeaturesAsync();
     Task<List<string>> GetAllVehicleMakes();
+    Task<List<string>> GetAllVehicleCategories();
     Task<Vehicle?> GetVehicleByIdAsync(int id);
     Task<Vehicle?> GetVehicleByVinAsync(string Vin);
     Task<Vehicle> AddVehicleAsync(Vehicle vehicle);

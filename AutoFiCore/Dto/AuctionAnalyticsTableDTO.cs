@@ -4,6 +4,7 @@
     {
         public int AuctionId { get; set; }
         public string VehicleName { get; set; } = string.Empty;
+        public string VehicleCategory { get; set; } = string.Empty;
         public int Views { get; set; }
         public int Bidders { get; set; }
         public int Bids { get; set; }
