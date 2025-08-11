@@ -1,5 +1,5 @@
 ﻿public class ErrorStat
 {
-    public string ErrorType { get; set; } = string.Empty;
+    public int ErrorCode { get; set; }
     public int Count { get; set; }
 }

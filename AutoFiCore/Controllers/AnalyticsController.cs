@@ -17,17 +17,20 @@ namespace AutoFiCore.Controllers
         private readonly IMetricsCalculationService _metricsCalculationService;
         private readonly IDashboardService _dashboardService;
         private readonly IReportingService _reportService;
+        private readonly ISystemHealthService _systemHealthService;
 
         public AnalyticsController(
             IAnalyticsService analyticsService,
             IDashboardService dashboardService,
             IReportingService reportService,
-            IMetricsCalculationService metricsCalculationService)
+            IMetricsCalculationService metricsCalculationService,
+            ISystemHealthService systemHealthService)
         {
             _analyticsService = analyticsService;
             _dashboardService = dashboardService;
             _reportService = reportService;
             _metricsCalculationService = metricsCalculationService;
+            _systemHealthService = systemHealthService;
         }
 
         [HttpGet("dashboard")]
@@ -201,5 +204,46 @@ namespace AutoFiCore.Controllers
             var result = await _reportService.GetRecentDownloadsAsync(page, pageSize);
             return Ok(result);
         }
+
+        [HttpGet("system")]
+        public async Task<ActionResult<SystemHealthDashboard>> GetSystemHealthDashboard([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        {
+            var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
+            var dashboard = await _systemHealthService.GetSystemHealthDashboardAsync(utcStart, utcEnd);
+            return Ok(dashboard);
+        }
+
+        [HttpGet("error-logs")]
+        public async Task<IActionResult> GetErrorLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            var result = await _systemHealthService.GetErrorLogsPagedAsync(page, pageSize);
+            return Ok(result);
+        }
+
+        [HttpGet("response-times")]
+        public async Task<IActionResult> GetResponseTimePoints([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        {
+            if (startDate == default || endDate == default)
+                return BadRequest("Start date and end date are required.");
+
+            if (endDate < startDate)
+                return BadRequest("End date must be greater than or equal to start date.");
+
+            startDate = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            endDate = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
+
+            var result = await _systemHealthService.GetResponseTimePointsAsync(startDate, endDate);
+
+            return Ok(result);
+        }
+        
+        [HttpGet("oldest-api-log")]
+        public async Task<IActionResult> GetOldestApiLog()
+        {
+            var result = await _systemHealthService.GetOldestApiLogTimestampAsync();
+            return Ok(result);
+        }
+
     }
 }

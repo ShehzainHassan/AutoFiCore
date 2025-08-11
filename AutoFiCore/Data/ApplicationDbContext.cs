@@ -296,10 +296,9 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<ErrorLog>(entity =>
         {
-            entity.Property(e => e.ErrorType).IsRequired().HasMaxLength(100);
+            entity.Property(e => e.ErrorCode).IsRequired();
             entity.Property(e => e.Message).IsRequired();
-            entity.Property(e => e.StackTrace).IsRequired();
-            entity.Property(e => e.Timestamp).IsRequired();
+            entity.Property(e => e.Timestamp).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP"); ;
         });
 
         modelBuilder.Entity<RecentDownloads>(entity =>
@@ -363,8 +362,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<DBQueryLog>().HasIndex(e => e.QueryType);
 
         modelBuilder.Entity<ErrorLog>().HasIndex(e => e.Timestamp);
-        modelBuilder.Entity<ErrorLog>().HasIndex(e => e.ErrorType);
-
+        modelBuilder.Entity<ErrorLog>().HasIndex(e => e.ErrorCode);
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()

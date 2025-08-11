@@ -273,6 +273,9 @@ builder.Services.AddScoped<ISystemHealthService, SystemHealthService>();
 // Register Dashboard Service
 builder.Services.AddScoped<IDashboardService,  DashboardService>();
 
+// Register Performance Tracking Service
+builder.Services.AddScoped<IPerformanceTrackingService, PerformanceTrackingService>();
+
 // Add services to the container.
 builder.Services.AddControllers();
 
@@ -385,6 +388,7 @@ app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.Health
 StartupValidator.ValidateEnvironment(builder.Configuration, app.Environment);
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseMiddleware<ApiPerformanceMiddleware>();
 
 // Initialize database
 await DbInitializer.InitializeAsync(app.Services, app.Environment);

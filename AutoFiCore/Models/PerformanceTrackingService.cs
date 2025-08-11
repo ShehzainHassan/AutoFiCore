@@ -5,7 +5,7 @@ public interface IPerformanceTrackingService
 {
     Task TrackAPIRequestAsync(string endpoint, TimeSpan responseTime, int statusCode);
     Task TrackDatabaseQueryAsync(string queryType, TimeSpan duration);
-    Task TrackErrorEventAsync(string errorType, string message, string stackTrace);
+    Task TrackErrorEventAsync(int errorCode, string message);
     Task<HourlyPerformanceMetrics> CalculateHourlyPerformanceMetricsAsync(DateTime hour);
 }
 
@@ -41,13 +41,12 @@ public class PerformanceTrackingService : IPerformanceTrackingService
         return _uow.Performance.AddQueryLogAsync(log);
     }
 
-    public Task TrackErrorEventAsync(string errorType, string message, string stackTrace)
+    public Task TrackErrorEventAsync(int errorCode, string message)
     {
         var error = new ErrorLog
         {
-            ErrorType = errorType,
+            ErrorCode = errorCode,
             Message = message,
-            StackTrace = stackTrace,
             Timestamp = DateTime.UtcNow
         };
         return _uow.Performance.AddErrorLogAsync(error);

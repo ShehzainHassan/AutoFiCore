@@ -1,11 +1,16 @@
 ﻿using AutoFiCore.Data;
+using AutoFiCore.Dto;
+using AutoFiCore.Utilities;
 
 public interface ISystemHealthService
 {
-    Task<SystemHealthDashboard> GetSystemHealthDashboardAsync();
+    Task<SystemHealthDashboard> GetSystemHealthDashboardAsync(DateTime start, DateTime end);
     Task<PerformanceReport> GetPerformanceReportAsync(DateTime startDate, DateTime endDate);
     Task<ErrorReport> GetErrorReportAsync(DateTime startDate, DateTime endDate);
     Task<List<SlowQueryEntry>> IdentifySlowQueriesAsync(DateTime startDate, DateTime endDate);
+    Task<PagedResult<ErrorLog>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10);
+    Task<List<ResponseTimePoint>> GetResponseTimePointsAsync(DateTime start, DateTime end);
+    Task<DateTime?> GetOldestApiLogTimestampAsync();
 }
 
 public class SystemHealthService : ISystemHealthService
@@ -19,20 +24,18 @@ public class SystemHealthService : ISystemHealthService
         _reportRepo = reportRepo;
     }
 
-    public async Task<SystemHealthDashboard> GetSystemHealthDashboardAsync()
+    public async Task<SystemHealthDashboard> GetSystemHealthDashboardAsync(DateTime start, DateTime end)
     {
-        var now = DateTime.UtcNow;
-        var start = now.AddHours(-1);
-
-        var avgApiTime = await _repo.GetAverageApiResponseTimeAsync(start, now);
-        var totalErrors = await _repo.GetErrorCountAsync(start, now);
-        var activeUsers = await _reportRepo.GetActiveUserCountAsync(start, now);
-
+        var avgApiTime = await _repo.GetAverageApiResponseTimeAsync(start, end);
+        var errorRate = await _repo.GetErrorRatePercentageAsync(start, end);
+        var activeUsers = await _reportRepo.GetActiveUserCountAsync(start, end);
+        var systemUptime = await _repo.GetSystemUptimePercentageAsync(start, end);
         return new SystemHealthDashboard
         {
             AverageApiResponseTime = avgApiTime,
-            TotalErrors = totalErrors,
-            ActiveUserCount = activeUsers
+            ErrorRate = errorRate,
+            ActiveSessions = activeUsers,
+            SystemUptime = systemUptime,
         };
     }
 
@@ -61,5 +64,17 @@ public class SystemHealthService : ISystemHealthService
     public Task<List<SlowQueryEntry>> IdentifySlowQueriesAsync(DateTime start, DateTime end)
     {
         return _repo.GetSlowQueriesAsync(start, end, TimeSpan.FromMilliseconds(500));
+    }
+    public async Task<PagedResult<ErrorLog>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10)
+    {
+       return await _repo.GetErrorLogsPagedAsync(page, pageSize);
+    }
+    public async Task<List<ResponseTimePoint>> GetResponseTimePointsAsync(DateTime start, DateTime end)
+    {
+        return await _repo.GetResponseTimePointsAsync(start, end);
+    }
+    public async Task<DateTime?> GetOldestApiLogTimestampAsync()
+    {
+        return await _repo.GetOldestApiLogTimestampAsync();
     }
 }
