@@ -37,6 +37,5 @@ namespace AutoFiCore.Data
             return await _dbContext.AnalyticsEvents
                 .AnyAsync(e => e.AuctionId == auctionId && e.EventType == AnalyticsEventType.PaymentCompleted);
         }
-
     }
 }

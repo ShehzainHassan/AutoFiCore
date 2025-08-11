@@ -12,18 +12,18 @@ namespace AutoFiCore.Data
         Task<AuctionAnalytics?> GetAuctionAnalyticsAsync(int auctionId);
         Task SaveAuctionAnalyticsAsync(AuctionAnalytics analytics);
         Task<decimal> CalculateUserEngagementAsync(int userId, DateTime start, DateTime end);
+        Task<int> GetUserCountAsync(DateTime start, DateTime end);
+        Task<int> GetAuctionCountAsync(DateTime start, DateTime end);
     }
 
 
     public class DbMetricsRepository : IMetricsRepository
     {
         private readonly ApplicationDbContext _db;
-
         public DbMetricsRepository(ApplicationDbContext db)
         {
             _db = db;
         }
-
         public async Task<decimal> GetRevenueTotalAsync(DateTime start, DateTime end)
         {
             var total = await _db.Auctions
@@ -54,7 +54,6 @@ namespace AutoFiCore.Data
                 .Where(e => e.AuctionId == auctionId && e.EventType == AnalyticsEventType.AuctionView)
                 .CountAsync();
         }
-
         public async Task<decimal> CalculateUserEngagementAsync(int userId, DateTime start, DateTime end)
         {
             var views = await _db.AnalyticsEvents
@@ -74,8 +73,7 @@ namespace AutoFiCore.Data
 
             return engagementScore;
         }
-
-
+        public Task<int> GetUserCountAsync(DateTime start, DateTime end) => _db.Users.CountAsync(u => u.CreatedUtc >= start && u.CreatedUtc < end);
+        public Task<int> GetAuctionCountAsync(DateTime start, DateTime end) => _db.Auctions.CountAsync(a => a.CreatedUtc >= start && a.CreatedUtc < end);
     }
-
 }

@@ -39,8 +39,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<APIPerformanceLog> ApiPerformanceLogs { get; set; }
     public DbSet<DBQueryLog> DbQueryLogs { get; set; }
     public DbSet<ErrorLog> ErrorLogs { get; set; }
-
-
+    public DbSet<RecentDownloads> RecentDownloads { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -302,6 +301,16 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.StackTrace).IsRequired();
             entity.Property(e => e.Timestamp).IsRequired();
         });
+
+        modelBuilder.Entity<RecentDownloads>(entity =>
+        {
+            entity.HasKey(rd => rd.Id);
+            entity.Property(rd => rd.ReportType).IsRequired().HasConversion<string>();
+            entity.Property(rd => rd.DateRange).IsRequired();
+            entity.Property(rd => rd.Format).HasDefaultValue("CSV");
+            entity.Property(rd => rd.DownloadedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Model).HasDatabaseName("IX_Vehicles_Model");

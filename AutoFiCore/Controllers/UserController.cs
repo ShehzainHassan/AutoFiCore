@@ -56,6 +56,13 @@ namespace AutoFiCore.Controllers
             return Ok(count);
         }
 
+        [HttpGet("oldest-user")]
+        public async Task<ActionResult> GetOldestCreatedUsre()
+        {
+            var date = await _userService.GetOldestUserCreatedDateAsync();
+            return Ok(date);
+        }
+
 
         [Authorize]
         [HttpPost("add-user-like")]

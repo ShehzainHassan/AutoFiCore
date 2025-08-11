@@ -27,6 +27,7 @@ namespace AutoFiCore.Services
         Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId);
         Task<Result<int?>> GetHighestBidderIdAsync(int auctionId);
         Task<Result<AuctionResultDTO?>> ProcessAuctionResultAsync(int auctionId);
+        Task<DateTime?> GetOldestAuctionDateAsync();
     }
     public class AuctionService : IAuctionService
     {
@@ -366,6 +367,10 @@ namespace AutoFiCore.Services
 
             var highestBidderId = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
             return Result<int?>.Success(highestBidderId);
+        }
+        public async Task<DateTime?> GetOldestAuctionDateAsync()
+        {
+            return await _uow.Auctions.GetOldestAuctionDateAsync();
         }
 
     }

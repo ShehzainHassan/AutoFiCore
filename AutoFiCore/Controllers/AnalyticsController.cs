@@ -36,7 +36,6 @@ namespace AutoFiCore.Controllers
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
-
             var dashboard = await _dashboardService.GetExecutiveDashboardAsync(utcStart, utcEnd);
             return Ok(dashboard);
         }
@@ -92,6 +91,7 @@ namespace AutoFiCore.Controllers
             await _analyticsService.TrackAuctionCompletionAsync(completion.AuctionId, completion.IsSuccessful, completion.FinalPrice);
             return Ok(new { message = "Auction completion tracked" });
         }
+
         [HttpGet("auctions")]
         //[Authorize(Roles = "Admin")]
         public async Task<ActionResult<AuctionPerformanceReport>> GetAuctionAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
@@ -128,6 +128,7 @@ namespace AutoFiCore.Controllers
             var result = await _reportService.GetRevenueTableAnalyticsAsync(utcStart, utcEnd);
             return Ok(result);
         }
+
         [HttpGet("payment-status")]
         public async Task<IActionResult> IsPaymentCompleted([FromQuery] int auctionId)
         {
@@ -138,6 +139,7 @@ namespace AutoFiCore.Controllers
                 paymentCompleted = isCompleted
             });
         }
+
         [HttpGet("users")]
         //[Authorize(Roles = "Admin")]
         public async Task<ActionResult<UserActivityReport>> GetUserAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
@@ -165,29 +167,39 @@ namespace AutoFiCore.Controllers
             return Ok();
         }
 
-
         [HttpGet("revenue-summary")]
-        public async Task<IActionResult> GetRevenueSummary([FromQuery] SummaryPeriod period)
+        public async Task<IActionResult> GetRevenueSummary([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string type)
         {
-            var summary = await _reportService.GetRevenueSummaryAsync(period);
+            var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
+            var summary = await _reportService.GetSummaryAsync("Revenue", utcStart, utcEnd);
             return Ok(summary);
         }
 
         [HttpGet("user-summary")]
-        public async Task<IActionResult> GetUserSummary([FromQuery] SummaryPeriod period)
+        public async Task<IActionResult> GetUserSummary([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string type)
         {
-            var summary = await _reportService.GetUserRegistrationSummaryAsync(period);
+            var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
+            var summary = await _reportService.GetSummaryAsync("Users", utcStart, utcEnd);
             return Ok(summary);
         }
 
         [HttpGet("export")]
         //[Authorize(Roles = "Admin")]
-        public async Task<IActionResult> ExportReport([FromQuery] string reportType, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string format = "csv")
+        public async Task<IActionResult> ExportReport([FromQuery] ReportType reportType, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string format = "CSV")
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var fileResult = await _reportService.ExportReportAsync(reportType, utcStart, utcEnd, format);
             return File(fileResult.Content, fileResult.ContentType, fileResult.FileName);
+        }
+
+        [HttpGet("recent-downloads")]
+        public async Task<IActionResult> GetRecentDownloads([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        {
+            var result = await _reportService.GetRecentDownloadsAsync(page, pageSize);
+            return Ok(result);
         }
     }
 }

@@ -8,7 +8,6 @@ namespace AutoFiCore.Data
 {
     public interface IUserRepository
     {
-        Task<int> GetUserCountAsync(DateTime start, DateTime end);
         Task<User> AddUserAsync(User user);
         Task<AuthResponse?> LoginUserAsync(string email, string password, TokenProvider tokenProvider);
         Task<UserLikes> AddUserLikeAsync(UserLikes userlikes);
@@ -21,5 +20,6 @@ namespace AutoFiCore.Data
         Task<UserInteractions> AddUserInteraction(UserInteractions userInteractions);
         Task<bool> IsEmailExists(string email);
         Task<int> GetAllUsersCountAsync();
+        Task<DateTime?> GetOldestUserCreatedDateAsync();
     }
 }

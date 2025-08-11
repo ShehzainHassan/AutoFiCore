@@ -6,7 +6,6 @@ namespace AutoFiCore.Data
 {
     public interface IAuctionRepository
     {
-        Task<int> GetAuctionCountAsync(DateTime start, DateTime end);
         Task<Auction> AddAuctionAsync(Auction auction);
         Task<bool> VehicleHasAuction(int vehicleId);
         void UpdateAuction(Auction auction);
@@ -18,6 +17,7 @@ namespace AutoFiCore.Data
         Task<Auction?> UpdateReserveStatusAsync(int auctionId);
         Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes);
         Task<List<Auction>> GetEndedAuctions();
+        Task<DateTime?> GetOldestAuctionDateAsync();
 
     }
 }

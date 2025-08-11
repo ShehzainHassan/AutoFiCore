@@ -8,6 +8,7 @@ public interface IPdfService
     byte[] GenerateAuctionPerformancePdf(DateTime startDate, DateTime endDate, AuctionPerformanceReport report);
     byte[] GenerateUserActivityPdf(DateTime startDate, DateTime endDate, UserActivityReport report);
     byte[] GenerateRevenueReportPdf(DateTime startDate, DateTime endDate, decimal revenue);
+    byte[] GenerateDashboardSummaryPdf(DateTime startDate, DateTime endDate, ExecutiveDashboard report);
 }
 
 
@@ -30,6 +31,26 @@ public class PdfService : IPdfService
                         col.Item().Text($"Total Cost: {loan.TotalCost}");
                         col.Item().Text($"Interest Rate: {loan.InterestRate}%");
                         col.Item().Text($"Term: {loan.LoanTermMonths} months");
+                    });
+            });
+        }).GeneratePdf();
+    }
+    public byte[] GenerateDashboardSummaryPdf(DateTime startDate, DateTime endDate, ExecutiveDashboard report)
+    {
+        return Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Margin(50);
+                page.Content()
+                    .Column(col =>
+                    {
+                        col.Item().PaddingBottom(10).Text("Dashboard Summary Report").FontSize(20).Bold().Underline();
+                        col.Item().Text($"Start Date: {startDate:yyyy-MM-dd}");
+                        col.Item().Text($"End Date: {endDate:yyyy-MM-dd}");
+                        col.Item().Text($"Total Revenue: {report.TotalRevenue:C}");
+                        col.Item().Text($"New Users: {report.NewUsers}");
+                        col.Item().Text($"Active Auctions: {report.ActiveAuctions}");
                     });
             });
         }).GeneratePdf();

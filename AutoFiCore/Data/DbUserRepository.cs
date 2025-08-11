@@ -23,7 +23,6 @@ namespace AutoFiCore.Data
         {
             return _dbContext.Users.CountAsync();
         }
-        public Task<int> GetUserCountAsync(DateTime start, DateTime end) => _dbContext.Users.CountAsync();
         public async Task<bool> IsEmailExists(string email)
         {
             var isExists = await _dbContext.Users.AsNoTracking().AnyAsync(u => u.Email == email);
@@ -118,6 +117,13 @@ namespace AutoFiCore.Data
                 UserName = user.Name,
                 UserEmail = user.Email
             };           
+        }
+        public async Task<DateTime?> GetOldestUserCreatedDateAsync()
+        {
+            return await _dbContext.Users
+                .OrderBy(u => u.CreatedUtc)
+                .Select(u => (DateTime?)u.CreatedUtc)
+                .FirstOrDefaultAsync();
         }
     }
 }

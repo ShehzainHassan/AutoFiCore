@@ -31,9 +31,9 @@ public class MetricsCalculationService : IMetricsCalculationService
         var start = date.Date;
         var end = start.AddDays(1);
 
-        var auctionCount = await _unitOfWork.Auctions.GetAuctionCountAsync(start, end);
+        var auctionCount = await _unitOfWork.Metrics.GetAuctionCountAsync(start, end);
         var bidCount = await _unitOfWork.Bids.GetBidCountAsync(start, end);
-        var userCount = await _unitOfWork.Users.GetUserCountAsync(start, end);
+        var userCount = await _unitOfWork.Metrics.GetUserCountAsync(start, end);
         var revenueTotal = await _repo.GetRevenueTotalAsync(start, end);
 
         var metrics = new List<DailyMetric>
@@ -46,7 +46,6 @@ public class MetricsCalculationService : IMetricsCalculationService
 
         await _repo.SaveDailyMetricsAsync(metrics);
     }
-
     public async Task UpdateAuctionAnalyticsAsync(int auctionId)
     {
         var views = await _repo.GetAuctionViewsAsync(auctionId);
@@ -71,7 +70,6 @@ public class MetricsCalculationService : IMetricsCalculationService
 
         await _repo.SaveAuctionAnalyticsAsync(analytics);
     }
-
     public Task<decimal> CalculateUserEngagementAsync(int userId, DateTime start, DateTime end)
     {
         return _repo.CalculateUserEngagementAsync(userId, start, end);
@@ -80,5 +78,4 @@ public class MetricsCalculationService : IMetricsCalculationService
     {
         return _repo.GetRevenueTotalAsync(start, end);
     }
-
 }

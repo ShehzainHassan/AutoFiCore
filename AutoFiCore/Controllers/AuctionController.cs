@@ -61,6 +61,13 @@ namespace AutoFiCore.Controllers
             return Ok(result.Value);
         }
 
+        [HttpGet("oldest-auction")]
+        public async Task<IActionResult> GetOldestAuctionDate()
+        {
+            var result = await _auctionService.GetOldestAuctionDateAsync();
+            return Ok(result);
+        }
+
         [Authorize]
         [HttpPost("{id}/bids")]
         public async Task<IActionResult> PlaceBid([FromRoute(Name = "id")] int auctionId, [FromBody] CreateBidDTO dto)

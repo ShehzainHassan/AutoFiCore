@@ -20,6 +20,7 @@ namespace AutoFiCore.Services
         Task<List<string>> GetUserSavedSearches(int id);
         Task<UserInteractions> AddUserInteractionAsync(UserInteractions userInteractions);
         Task<int> GetAllUsersCountAsync();
+        Task<DateTime?> GetOldestUserCreatedDateAsync();
     }
 
     public class UserService:IUserService
@@ -100,6 +101,11 @@ namespace AutoFiCore.Services
         public async Task<int> GetAllUsersCountAsync()
         {
             return await _unitOfWork.Users.GetAllUsersCountAsync();
+        }
+        public async Task<DateTime?> GetOldestUserCreatedDateAsync()
+        {
+            return await _unitOfWork.Users.GetOldestUserCreatedDateAsync();
+
         }
 
     }

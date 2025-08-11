@@ -14,6 +14,7 @@ namespace AutoFiCore.Services
         Task TrackAuctionCompletionAsync(int auctionId, bool isSuccessful, decimal finalPrice);
         Task TrackPaymentCompleted(int auctionId, int? userId, decimal finalPayment);
         Task<bool> IsAuctionPaymentCompleted(int auctionId);
+      
     }
     public class AnalyticsService : IAnalyticsService
     {
@@ -68,5 +69,6 @@ namespace AutoFiCore.Services
         {
             return await _uow.Analytics.IsPaymentCompletedAsync(auctionId);
         }
+       
     }
 }
