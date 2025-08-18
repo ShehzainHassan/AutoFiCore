@@ -8,6 +8,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore.Storage.Json;
 namespace AutoFiCore.Controllers;
 
+using Utilities;
 using AutoFiCore.Dto;
 using AutoFiCore.DTOs;
 using Newtonsoft.Json;
@@ -32,32 +33,15 @@ public class VehicleController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Vehicle>>> GetAllVehiclesByStatus([FromQuery] int pageView, [FromQuery] int offset, [FromQuery] string? status = null)
+    public async Task<ActionResult<IEnumerable<Vehicle>>> GetAllVehiclesByStatus([FromQuery] PaginationParams paginationParams, [FromQuery] string? status = null)
     {
-       
-        var validationError = Validator.ValidatePagination(pageView, offset);
-        if (validationError != null)
-            return BadRequest(validationError);
-
-
-        var vehicles = await _vehicleService.GetAllVehiclesByStatusAsync(pageView, offset, status);
+        var vehicles = await _vehicleService.GetAllVehiclesByStatusAsync(paginationParams.PageView, paginationParams.Offset, status);
         return Ok(vehicles);
     }
     [HttpGet("features")]
     public async Task<ActionResult<NormalizedCarFeatureDto>> GetCarFeatures([FromQuery] string make, [FromQuery] string model)
     {
-        make = make.Trim();
-        var makeValidator = Validator.ValidateMakeOrModel(make);
-        if (makeValidator != null)
-            return BadRequest(makeValidator);
-
-        model = model.Trim();
-        var modelValidator = Validator.ValidateMakeOrModel(model);
-        if (modelValidator != null)
-            return BadRequest(modelValidator);
-
         var carFeatures = await _vehicleService.GetAllCarFeaturesAsync();
-
         if (carFeatures == null || carFeatures.Count == 0)
             return NotFound("No car features found.");
 
@@ -73,27 +57,16 @@ public class VehicleController : ControllerBase
     [HttpGet("get-colors")]
     public async Task<ActionResult<List<string>>> GetAllCarColors()
     {
-       
+
         var result = await _vehicleService.GetDistinctColorsAsync();
         return Ok(result);
     }
 
     [HttpGet("by-make")]
-    public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByMake([FromQuery] int pageView, [FromQuery] int offset, [FromQuery] string make)
+    public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByMake([FromQuery] PaginationParams paginationParams, [FromQuery] string make)
     {
-       
-        make = make.Trim();
-        var makeValidator = Validator.ValidateMakeOrModel(make);
-        if (makeValidator != null)
-            return BadRequest(makeValidator);
-
-        var paginationValidator = Validator.ValidatePagination(pageView, offset);
-        if (paginationValidator != null)
-            return BadRequest(paginationValidator);
-
-        var vehicles = await _vehicleService.GetVehiclesByMakeAsync(pageView, offset, make);
+        var vehicles = await _vehicleService.GetVehiclesByMakeAsync(paginationParams.PageView, paginationParams.Offset, make);
         return Ok(vehicles);
-       
     }
 
     [HttpGet("get-vehicle-options")]
@@ -106,11 +79,8 @@ public class VehicleController : ControllerBase
     [HttpGet("colors-count")]
     public async Task<ActionResult<Dictionary<string, int>>> GetColorsCount([FromQuery] VehicleFilterDto filters)
     {
-        var validationErrors = Validator.ValidateFilters(filters);
-        if (validationErrors.Any())
-            return BadRequest(string.Join(" ", validationErrors));
         filters = NormalizeInput.NormalizeFilters(filters);
-          
+
         var count = await _vehicleService.GetAvailableColorsCountAsync(filters);
         return Ok(count);
     }
@@ -118,9 +88,6 @@ public class VehicleController : ControllerBase
     [HttpGet("gearbox-count")]
     public async Task<ActionResult<Dictionary<string, int>>> GetGearboxCount([FromQuery] VehicleFilterDto filters)
     {
-        var validationErrors = Validator.ValidateFilters(filters);
-        if (validationErrors.Any())
-            return BadRequest(string.Join(" ", validationErrors));
         filters = NormalizeInput.NormalizeFilters(filters);
 
         var count = await _vehicleService.GetGearboxCountsAsync(filters);
@@ -129,9 +96,6 @@ public class VehicleController : ControllerBase
     [HttpGet("total-vehicle-count")]
     public async Task<ActionResult<int>> GetTotalVehicleCount([FromQuery] VehicleFilterDto filters)
     {
-        var validationErrors = Validator.ValidateFilters(filters);
-        if (validationErrors.Any())
-            return BadRequest(string.Join(" ", validationErrors));
         filters = NormalizeInput.NormalizeFilters(filters);
 
         var count = await _vehicleService.GetTotalCountAsync(filters);
@@ -139,41 +103,22 @@ public class VehicleController : ControllerBase
     }
 
     [HttpGet("search-vehicles")]
-    public async Task<ActionResult<IEnumerable<Vehicle>>> SearchVehicles([FromQuery] VehicleFilterDto filters, [FromQuery] int pageView, [FromQuery] int offset, [FromQuery] string? sortOrder = null)
+    public async Task<ActionResult<IEnumerable<Vehicle>>> SearchVehicles([FromQuery] VehicleFilterDto filters, [FromQuery] PaginationParams paginationParams, [FromQuery] string? sortOrder = null)
     {
-        var validationErrors = Validator.ValidateFilters(filters);
-        if (validationErrors.Any())
-            return BadRequest(string.Join(" ", validationErrors));
-
-        var paginationValidator = Validator.ValidatePagination(pageView, offset);
-        if (paginationValidator != null)
-            return BadRequest(paginationValidator);
-
         filters = NormalizeInput.NormalizeFilters(filters);
-
-        var vehicles = await _vehicleService.SearchVehiclesAsync(filters, pageView, offset, sortOrder);
+        var vehicles = await _vehicleService.SearchVehiclesAsync(filters, paginationParams.PageView, paginationParams.Offset, sortOrder);
         return Ok(vehicles);
     }
 
     [HttpGet("by-model")]
-    public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByModel([FromQuery] int pageView, [FromQuery] int offset, [FromQuery] string model)
+    public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByModel([FromQuery] PaginationParams paginationParams, [FromQuery] string model)
     {
-        model = model.Trim();
-        var paginationValidator = Validator.ValidatePagination(pageView, offset);
-
-        if (paginationValidator != null)
-            return BadRequest(paginationValidator);
-
-        var modelValidator = Validator.ValidateMakeOrModel(model);
-        if (modelValidator != null)
-            return BadRequest(modelValidator);
-
-        var vehicles = await _vehicleService.GetVehiclesByModelAsync(pageView, offset, model);
+        var vehicles = await _vehicleService.GetVehiclesByModelAsync(paginationParams.PageView, paginationParams.Offset, model);
         return Ok(vehicles);
     }
 
     [HttpGet("get-makes")]
-    public async Task<ActionResult<List<string>>> GetAllMakes() 
+    public async Task<ActionResult<List<string>>> GetAllMakes()
     {
         var makes = await _vehicleService.GetAllVehiclesMakesAsync();
         return Ok(makes);
@@ -188,7 +133,7 @@ public class VehicleController : ControllerBase
 
     [HttpGet("{id}")]
     public async Task<ActionResult<Vehicle>> GetVehicleById(int id)
-{
+    {
         var vehicle = await _vehicleService.GetVehicleByIdAsync(id);
         if (vehicle == null)
         {
@@ -199,7 +144,7 @@ public class VehicleController : ControllerBase
 
     [HttpGet("vin/{vin}")]
     public async Task<ActionResult<Vehicle>> GetVehicleByVin(string vin)
-{
+    {
         var vehicle = await _vehicleService.GetVehicleByVinAsync(vin);
         if (vehicle == null)
         {

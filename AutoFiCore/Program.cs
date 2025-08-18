@@ -5,6 +5,9 @@ using AutoFiCore.Middleware;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
 using AutoFiCore.Utilities;
+using AutoFiCore.Validator;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
@@ -13,6 +16,7 @@ using Polly.Retry;
 using QuestPDF.Infrastructure;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+
 
 WebApplicationBuilder builder;
 try
@@ -51,6 +55,13 @@ QuestPDF.Settings.License = LicenseType.Community;
 
 builder.Services.AddMemoryCache();
 
+
+builder.Configuration
+    .SetBasePath(Directory.GetCurrentDirectory())
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
+    .AddEnvironmentVariables();
+
 // Configure logging
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -88,10 +99,17 @@ builder.Services.AddSingleton(apiSettings);
 
 // Configure database settings only if not using mock API
 DatabaseSettings databaseSettings = new DatabaseSettings();
+JwtSettings jwtSettings = new JwtSettings
+{
+    Secret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT Secret key is not configured."),
+    Issuer = builder.Configuration["Jwt:Issuer"] ?? "AutoFiCore",
+    Audience = builder.Configuration["Jwt:Audience"] ?? "AutoFiCoreClient",
+    ExpirationInMinutes = int.Parse(builder.Configuration["Jwt:ExpirationInMinutes"] ?? "60")
+};
 if (!apiSettings.UseMockApi)
 {
-    databaseSettings = builder.Configuration.GetSection("DatabaseSettings").Get<DatabaseSettings>()
-        ?? throw new InvalidOperationException("Database settings are not configured properly.");
+    databaseSettings = builder.Configuration.GetSection("DatabaseSettings").Get<DatabaseSettings>() ?? throw new InvalidOperationException("Database settings are not configured properly.");
+    jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
 
     // Override with environment variables if available (for Railway deployment)
     if (string.IsNullOrEmpty(databaseSettings.ConnectionString))
@@ -122,7 +140,7 @@ if (!apiSettings.UseMockApi)
     // Add health checks with proper error handling
     builder.Services.AddHealthChecks()
         .AddNpgSql(databaseSettings.ConnectionString, name: "database", timeout: TimeSpan.FromSeconds(10))
-        .AddCheck<VehicleServiceHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
+        .AddCheck<DatabaseHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
 
     // Log connection string info for debugging (without sensitive data)
     Console.WriteLine($"Database connection configured - Host: {GetHostFromConnectionString(databaseSettings.ConnectionString)}");
@@ -131,7 +149,7 @@ else
 {
     // Mock API mode - add basic health checks without database
     builder.Services.AddHealthChecks()
-        .AddCheck<VehicleServiceHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
+        .AddCheck<DatabaseHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
 
     Console.WriteLine("Using Mock API - database connection not required");
 }
@@ -198,7 +216,7 @@ else
     builder.Services.AddScoped<IAnalyticsRepository, DbAnalyticsRepository>();
     builder.Services.AddScoped<IMetricsRepository, DbMetricsRepository>();
     builder.Services.AddScoped<IReportRepository, DbReportRepository>();
-    builder.Services.AddScoped<IPerformanceRepository, DbPerformanceRepository>();  
+    builder.Services.AddScoped<IPerformanceRepository, DbPerformanceRepository>();
 }
 
 // Register user service
@@ -219,8 +237,8 @@ builder.Services.AddScoped<IPdfService, PdfService>();
 // Register vehicle service
 builder.Services.AddScoped<IVehicleService, VehicleService>();
 
-// Register vehicle health check service
-builder.Services.AddScoped<VehicleServiceHealthCheck>();
+// Register database health check service
+builder.Services.AddScoped<DatabaseHealthCheck>();
 
 // Register contact info service
 builder.Services.AddScoped<IContactInfoService, ContactInfoService>();
@@ -271,13 +289,41 @@ builder.Services.AddScoped<IReportingService, ReportingService>();
 builder.Services.AddScoped<ISystemHealthService, SystemHealthService>();
 
 // Register Dashboard Service
-builder.Services.AddScoped<IDashboardService,  DashboardService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Register Performance Tracking Service
 builder.Services.AddScoped<IPerformanceTrackingService, PerformanceTrackingService>();
 
 // Add services to the container.
 builder.Services.AddControllers();
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Version = "v1",
+        Title = "AutoFi API",
+        Description = "Comprehensive API documentation for AutoFi service",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "AUTO-FI",
+            Email = "boxcars.autofi@gmail.com",
+            Url = new Uri("https://boxcars.live/")
+        }
+    });
+
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    options.IncludeXmlComments(xmlPath);
+});
+
+// Register all validators
+builder.Services.AddValidatorsFromAssemblyContaining<PaginationParamsValidator>();
+builder.Services.AddValidatorsFromAssemblyContaining<AuctionQueryParamsValidator>();
+
+// Enable automatic FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -342,6 +388,17 @@ else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PORT")))
 }
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "AutoFi API V1");
+        c.RoutePrefix = string.Empty;
+    });
+}
+
 
 // Configure health check endpoints with detailed logging
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions

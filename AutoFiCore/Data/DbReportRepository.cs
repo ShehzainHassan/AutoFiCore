@@ -19,7 +19,6 @@ namespace AutoFiCore.Data
         Task<decimal> GetSuccessfulPaymentPercentageAsync(DateTime start, DateTime end);
         Task<decimal> GetCommissionEarnedAsync(DateTime start, DateTime end);
         Task<List<CategoryPerformance>> GetPopularCategoriesReportAsync(DateTime start, DateTime end);
-        Task<double> GetAverageBidCountAsync(DateTime start, DateTime end);
         Task<List<string>> GetTopAuctionItemsAsync(DateTime start, DateTime end);
         Task<double> GetUserRetentionRateAsync(DateTime start, DateTime end);
         Task<decimal> GetAverageAuctionViewsAsync(DateTime start, DateTime end);
@@ -135,10 +134,10 @@ namespace AutoFiCore.Data
                 .Where(a => a.CreatedUtc >= start && a.CreatedUtc < end && a.Vehicle != null)
                 .Include(a => a.Vehicle)
                 .GroupBy(a => a.Vehicle!.FuelType)
-                .Where(g => g.Key != null) 
+                .Where(g => g.Key != null)
                 .Select(g => new CategoryPerformance
                 {
-                    CategoryName = g.Key!.ToString(), 
+                    CategoryName = g.Key!.ToString(),
                     AuctionCount = g.Count(),
                     AveragePrice = g.Average(a => a.CurrentPrice),
                     SuccessRate = g.Count(a => a.Status == AuctionStatus.Ended && a.IsReserveMet) * 100.0 / g.Count()
@@ -146,21 +145,13 @@ namespace AutoFiCore.Data
                 .OrderByDescending(c => c.AuctionCount)
                 .ToListAsync();
         }
-        public async Task<double> GetAverageBidCountAsync(DateTime start, DateTime end)
-        {
-            return await _db.Auctions
-                .Where(a => a.Status == AuctionStatus.Ended && a.EndUtc >= start && a.EndUtc < end)
-                .Select(a => a.Bids.Count)
-                .DefaultIfEmpty(0)
-                .AverageAsync();
-        }
         public async Task<List<string>> GetTopAuctionItemsAsync(DateTime start, DateTime end)
         {
             return await _db.Auctions
                 .Where(a => a.Status == AuctionStatus.Ended && a.EndUtc >= start && a.EndUtc < end && a.Vehicle != null)
                 .Include(a => a.Vehicle)
                 .OrderByDescending(a => a.Bids.Count)
-                .Take(5) 
+                .Take(5)
                 .Select(a => a.Vehicle.Make + " " + a.Vehicle.Model + " " + a.Vehicle.Year)
                 .ToListAsync();
         }

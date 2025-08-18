@@ -7,8 +7,6 @@ using System.Text;
 
 public interface IReportingService
 {
-    Task<AuctionPerformanceReport> GetAuctionPerformanceReportAsync(DateTime startDate, DateTime endDate);
-    Task<UserActivityReport> GetUserActivityReportAsync(DateTime startDate, DateTime endDate);
     Task<RevenueReport> GetRevenueReportAsync(DateTime startDate, DateTime endDate);
     Task<List<CategoryPerformance>> GetPopularCategoriesReportAsync(DateTime startDate, DateTime endDate);
     Task<FileResultDTO> ExportReportAsync(ReportType reportType, DateTime startDate, DateTime endDate, string format = "csv");
@@ -30,35 +28,6 @@ public class ReportingService : IReportingService
         _uow = uow;
         _pdfService = pdfService;
         _dashboardService = dashboardService;
-    }
-    public async Task<AuctionPerformanceReport> GetAuctionPerformanceReportAsync(DateTime start, DateTime end)
-    {
-        var total = await _uow.Report.GetTotalAuctionsAsync(start, end);
-        var endedAuctions = await _uow.Auctions.GetEndedAuctions();
-        var successful = await _uow.Report.GetSuccessfulAuctionsAsync(start, end);
-        var avgViews = await _uow.Report.GetAverageAuctionViewsAsync(start, end);
-        var avgBids = await _uow.Report.GetAverageAuctionBidsAsync(start, end);
-        var avgPrice = await _uow.Report.GetAverageAuctionPriceAsync(start, end);
-
-        return new AuctionPerformanceReport
-        {
-            TotalAuctions = total,
-            SuccessRate = total == 0 ? 0 : (double)successful / endedAuctions.Count * 100,
-            AverageViews = avgViews,
-            AverageBids = avgBids,
-            AverageFinalPrice = avgPrice
-        };
-    }
-    public async Task<UserActivityReport> GetUserActivityReportAsync(DateTime start, DateTime end)
-    {
-        return new UserActivityReport
-        {
-            TotalUsers = await _uow.Users.GetAllUsersCountAsync(),
-            ActiveUsers = await _uow.Report.GetActiveUserCountAsync(start, end),
-            NewRegistrations = await _uow.Report.GetNewUserCountAsync(start, end),
-            RetentionRate = await _uow.Report.GetUserRetentionRateAsync(start, end),
-            EngagementScore = await _uow.Report.GetUserEngagementScoreAsync(start, end)
-        };
     }
     public async Task<RevenueReport> GetRevenueReportAsync(DateTime start, DateTime end)
     {
@@ -86,7 +55,7 @@ public class ReportingService : IReportingService
                 return await _dashboardService.ExportDashboardReportAsync(startDate, endDate, format);
 
             case ReportType.AuctionReport:
-                var auctionReport = await GetAuctionPerformanceReportAsync(startDate, endDate);
+                var auctionReport = await _dashboardService.GetAuctionDashboardAsync(startDate, endDate);
                 fileName = $"auction_report_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.{format}";
 
                 if (format.Equals("PDF", StringComparison.OrdinalIgnoreCase))
@@ -112,7 +81,7 @@ public class ReportingService : IReportingService
                 return new FileResultDTO { Content = content, ContentType = contentType, FileName = fileName };
 
             case ReportType.UserReport:
-                var userReport = await GetUserActivityReportAsync(startDate, endDate);
+                var userReport = await _dashboardService.GetUserDashboardAsync(startDate, endDate);
                 fileName = $"user_report_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.{format}";
 
                 if (format.Equals("PDF", StringComparison.OrdinalIgnoreCase))

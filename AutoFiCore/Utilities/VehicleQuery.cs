@@ -10,7 +10,6 @@ namespace AutoFiCore.Utilities
 {
     public class VehicleQuery
     {
-
         public static IQueryable<Vehicle> ApplyFilters(IQueryable<Vehicle> query, 
             string? make,
             string? model, 
@@ -105,7 +104,5 @@ namespace AutoFiCore.Utilities
                  .ToDictionaryAsync(c => c.Color, c => c.Count);
             return selectedColorsCounts;
         }
-
-
     }
 }

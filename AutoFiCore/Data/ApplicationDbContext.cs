@@ -11,7 +11,6 @@ public class ApplicationDbContext : DbContext
         : base(options)
     {
     }
-
     public DbSet<Vehicle> Vehicles { get; set; } = null!;
     public DbSet<ContactInfo> ContactInfos { get; set; } = null!;
     public DbSet<UserSavedSearch> UserSavedSearches { get; set; } = null!;

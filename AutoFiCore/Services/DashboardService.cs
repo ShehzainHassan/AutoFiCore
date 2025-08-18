@@ -8,8 +8,8 @@ public interface IDashboardService
 {
     Task<ExecutiveDashboard> GetExecutiveDashboardAsync(DateTime startDate, DateTime endDate);
     Task<FileResultDTO> ExportDashboardReportAsync(DateTime startDate, DateTime endDate, string format = "csv");
-    //Task<AuctionDashboard> GetAuctionDashboardAsync(DateTime startDate, DateTime endDate);
-    //Task<UserDashboard> GetUserDashboardAsync(DateTime startDate, DateTime endDate);
+    Task<AuctionPerformanceReport> GetAuctionDashboardAsync(DateTime start, DateTime end);
+    Task<UserActivityReport> GetUserDashboardAsync(DateTime start, DateTime end);
 }
 
 public class DashboardService : IDashboardService
@@ -73,30 +73,34 @@ public class DashboardService : IDashboardService
             FileName = fileName
         };
     }
-    //public async Task<AuctionDashboard> GetAuctionDashboardAsync(DateTime start, DateTime end)
-    //{
-    //    var performance = await _reportService.GetAuctionPerformanceReportAsync(start, end);
+    public async Task<AuctionPerformanceReport> GetAuctionDashboardAsync(DateTime start, DateTime end)
+    {
+        var total = await _unitOfWork.Report.GetTotalAuctionsAsync(start, end);
+        var endedAuctions = await _unitOfWork.Auctions.GetEndedAuctions();
+        var successful = await _unitOfWork.Report.GetSuccessfulAuctionsAsync(start, end);
+        var avgViews = await _unitOfWork.Report.GetAverageAuctionViewsAsync(start, end);
+        var avgBids = await _unitOfWork.Report.GetAverageAuctionBidsAsync(start, end);
+        var avgPrice = await _unitOfWork.Report.GetAverageAuctionPriceAsync(start, end);
+        var topItems = await _unitOfWork.Report.GetTopAuctionItemsAsync(start, end);
 
-    //    var averageBidCount = await _unitOfWork.Report.GetAverageBidCountAsync(start, end);
-
-    //    var topItems = await _unitOfWork.Report.GetTopAuctionItemsAsync(start, end);
-
-    //    return new AuctionDashboard
-    //    {
-    //        CompletionRate = performance.SuccessRate,
-    //        AverageBidCount = Math.Round(averageBidCount, 2),
-    //        TopItems = topItems
-    //    };
-    //}
-    //public async Task<UserDashboard> GetUserDashboardAsync(DateTime start, DateTime end)
-    //{
-    //    var user = await _reportService.GetUserActivityReportAsync(start, end);
-    //    var retentionRate = await _unitOfWork.Report.GetUserRetentionRateAsync(start, end);
-    //    return new UserDashboard
-    //    {
-    //        Registrations = user.NewRegistrations,
-    //        Engagement = user.EngagementScore,
-    //        RetentionRate = retentionRate,
-    //    };
-    //}
+        return new AuctionPerformanceReport
+        {
+            TotalAuctions = total,
+            SuccessRate = total == 0 ? 0 : (double)successful / endedAuctions.Count * 100,
+            AverageViews = avgViews,
+            AverageBids = avgBids,
+            AverageFinalPrice = avgPrice,
+        };
+    }
+    public async Task<UserActivityReport> GetUserDashboardAsync(DateTime start, DateTime end)
+    {
+        return new UserActivityReport
+        {
+            TotalUsers = await _unitOfWork.Users.GetAllUsersCountAsync(),
+            ActiveUsers = await _unitOfWork.Report.GetActiveUserCountAsync(start, end),
+            NewRegistrations = await _unitOfWork.Report.GetNewUserCountAsync(start, end),
+            RetentionRate = await _unitOfWork.Report.GetUserRetentionRateAsync(start, end),
+            EngagementScore = await _unitOfWork.Report.GetUserEngagementScoreAsync(start, end)
+        };
+    }
 }

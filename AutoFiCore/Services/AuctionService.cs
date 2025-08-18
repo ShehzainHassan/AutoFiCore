@@ -42,10 +42,6 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
         {
-            var errors = Validator.ValidateAuctionDto(dto);
-            if (errors.Any())
-                return Result<AuctionDTO>.Failure(string.Join("; ", errors));
-
             var vehicle = await _uow.Vehicles.GetVehicleByIdAsync(dto.VehicleId);
             if (vehicle == null)
                 return Result<AuctionDTO>.Failure($"Vehicle {dto.VehicleId} not found");
@@ -128,7 +124,7 @@ namespace AutoFiCore.Services
                 return Result<AuctionDTO?>.Failure("Auction not found.");
 
             return Result<AuctionDTO?>.Success(AuctionMapper.ToDTO(auction));
-        }      
+        }
         private bool ValidateBidAgainstReserve(Auction auction, decimal bidAmount)
         {
             return bidAmount >= auction.ReservePrice;
@@ -178,7 +174,6 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<BidDTO>> PlaceBidAsync(int auctionId, CreateBidDTO dto)
         {
-            var previousBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
             if (auction == null)
                 return Result<BidDTO>.Failure("Auction not found.");
@@ -191,21 +186,33 @@ namespace AutoFiCore.Services
                 return Result<BidDTO>.Failure("Auction has ended.");
 
             var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
-            var errs = Validator.ValidateBidAmount(dto.Amount, auction.StartingPrice, auction.CurrentPrice, bids.Count);
-            if (errs.Any())
-                return Result<BidDTO>.Failure(string.Join("; ", errs));
-
+            var previousBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
             var previousHighestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
-            PreferredBidTiming? timing = null;
 
+            var bidValidationDto = new BidValidationDTO
+            {
+                Amount = dto.Amount,
+                StartingPrice = auction.StartingPrice,
+                CurrentPrice = auction.CurrentPrice,
+                BidCount = bids.Count
+            };
+
+            var validator = new BidValidator();
+            var validationResult = validator.Validate(bidValidationDto);
+            if (!validationResult.IsValid)
+            {
+                var errors = string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage));
+                return Result<BidDTO>.Failure(errors);
+            }
+
+            PreferredBidTiming? timing = null;
             if (dto.IsAuto == true)
             {
                 var strategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, auctionId);
                 if (strategy != null)
-                {
                     timing = strategy.PreferredBidTiming;
-                }
             }
+
             var bid = new Bid
             {
                 AuctionId = auctionId,
@@ -220,17 +227,6 @@ namespace AutoFiCore.Services
             await _uow.Auctions.UpdateCurrentPriceAsync(auctionId, dto.Amount);
             await _uow.SaveChangesAsync();
 
-            var bidDto = new BidDTO
-            {
-                BidId = bid.BidId,
-                AuctionId = bid.AuctionId,
-                UserId = bid.UserId,
-                Amount = bid.Amount,
-                IsAuto = bid.IsAuto,
-                PlacedAt = bid.CreatedUtc,
-               
-            };
-
             bool reserveJustMet = false;
             if (auction.ReservePrice.HasValue && !auction.IsReserveMet && bid.Amount >= auction.ReservePrice.Value)
             {
@@ -241,15 +237,14 @@ namespace AutoFiCore.Services
             }
 
             await _uow.SaveChangesAsync();
+
             var updatedBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
+
             if (reserveJustMet)
-            {
                 await _auctionLifecycleService.HandleReserveMet(auction);
-            }
             else if (auction.IsReserveMet)
-            {
                 await _auctionLifecycleService.HandleReserveMet(auction, bid.UserId);
-            }
+
             var timeRemaining = auction.EndUtc - DateTime.UtcNow;
             if (timeRemaining.TotalMinutes <= auction.TriggerMinutes && auction.ExtensionCount < auction.MaxExtensions)
             {
@@ -257,9 +252,20 @@ namespace AutoFiCore.Services
                 await _uow.SaveChangesAsync();
                 await _auctionLifecycleService.HandleAuctionExtended(auction);
             }
+
             await _auctionLifecycleService.HandleBidderCountUpdate(auction, previousBidders, updatedBidders);
             await _auctionLifecycleService.HandleNewBid(auctionId);
             await _auctionLifecycleService.HandleOutbid(auction, previousHighestBidder);
+
+            var bidDto = new BidDTO
+            {
+                BidId = bid.BidId,
+                AuctionId = bid.AuctionId,
+                UserId = bid.UserId,
+                Amount = bid.Amount,
+                IsAuto = bid.IsAuto,
+                PlacedAt = bid.CreatedUtc,
+            };
 
             return Result<BidDTO>.Success(bidDto);
         }

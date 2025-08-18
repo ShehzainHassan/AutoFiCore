@@ -101,7 +101,7 @@ namespace AutoFiCore.Controllers
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
-            var result = await _reportService.GetAuctionPerformanceReportAsync(utcStart, utcEnd);
+            var result = await _dashboardService.GetAuctionDashboardAsync(utcStart, utcEnd);
             return Ok(result);
         }
 
@@ -149,7 +149,7 @@ namespace AutoFiCore.Controllers
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
-            var result = await _reportService.GetUserActivityReportAsync(utcStart, utcEnd);
+            var result = await _dashboardService.GetUserDashboardAsync(utcStart, utcEnd);
             return Ok(result);
         }
 
@@ -244,6 +244,5 @@ namespace AutoFiCore.Controllers
             var result = await _systemHealthService.GetOldestApiLogTimestampAsync();
             return Ok(result);
         }
-
     }
 }

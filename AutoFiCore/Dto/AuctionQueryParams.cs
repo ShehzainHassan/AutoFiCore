@@ -1,16 +1,24 @@
-﻿using System.Text.Json.Serialization;
-using AutoFiCore.Enums;
+﻿using AutoFiCore.Enums;
+using System.Text.Json.Serialization;
 
-namespace AutoFiCore.Dto
+public class AuctionQueryParams
 {
-    public class AuctionQueryParams
-    {
-        [JsonConverter(typeof(JsonStringEnumConverter))]
-        public AuctionStatus? Status { get; set; }
-        public string? Make { get; set; }
-        public decimal? MinPrice { get; set; }
-        public decimal? MaxPrice { get; set; }
-        public string? SortBy { get; set; }
-        public bool Descending { get; set; } = false;
-    }
+    /// <summary>Status of the auction (Active, Ended, Scheduled, PreviewMode, Cancelled).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public AuctionStatus? Status { get; set; }
+
+    /// <summary>Filter auctions by vehicle make.</summary>
+    public string? Make { get; set; }
+
+    /// <summary>Filter auctions with a minimum price.</summary>
+    public decimal? MinPrice { get; set; }
+
+    /// <summary>Filter auctions with a maximum price.</summary>
+    public decimal? MaxPrice { get; set; }
+
+    /// <summary>Sort auctions by a specific field (e.g., price, endtime, make).</summary>
+    public string? SortBy { get; set; }
+
+    /// <summary>If true, results will be sorted in descending order.</summary>
+    public bool Descending { get; set; } = false;
 }

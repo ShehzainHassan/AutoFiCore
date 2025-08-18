@@ -9,7 +9,7 @@ namespace AutoFiCore.Services
     {
         Task<Result<Newsletter>> SubscribeToNewsLetterAsync(Newsletter newsletter);
     }
-    public class NewsLetterService:INewsLetterService
+    public class NewsLetterService : INewsLetterService
     {
         private readonly INewsLetterRepository _repository;
         private readonly ILogger<NewsLetterService> _logger;
@@ -23,10 +23,6 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<Newsletter>> SubscribeToNewsLetterAsync(Newsletter newsletter)
         {
-            var errors = Utilities.Validator.ValidateNewsLetter(newsletter.Email);
-            if (errors.Any())
-                return Result<Newsletter>.Failure(errors);
-
             var isAlreadySubcribed = await _repository.IsAlreadySubscribed(newsletter.Email);
             if (isAlreadySubcribed)
                 return Result<Newsletter>.Failure("Email is already subscribed");

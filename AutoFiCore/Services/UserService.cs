@@ -23,7 +23,7 @@ namespace AutoFiCore.Services
         Task<DateTime?> GetOldestUserCreatedDateAsync();
     }
 
-    public class UserService:IUserService
+    public class UserService : IUserService
     {
         private readonly IUserRepository _repository;
         private readonly ILogger<UserService> _logger;
@@ -39,10 +39,6 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<User>> AddUserAsync(User user)
         {
-            var errors = Utilities.Validator.ValidateUserInfo(user);
-            if (errors.Any())
-                return Result<User>.Failure(errors);
-            
             var existingUser = await _repository.IsEmailExists(user.Email);
             if (existingUser)
                 return Result<User>.Failure("User already exists");
@@ -83,7 +79,7 @@ namespace AutoFiCore.Services
             await _unitOfWork.SaveChangesAsync();
             return search;
         }
-        public async Task<List<string>> GetUserLikedVinsAsync (int id)
+        public async Task<List<string>> GetUserLikedVinsAsync(int id)
         {
             return await _repository.GetUserLikesVehicles(id);
         }

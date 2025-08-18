@@ -124,10 +124,6 @@ public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
         if (DateTime.UtcNow >= auction.PreviewStartTime)
             return Result<CreateAuctionDTO>.Failure("Cannot update auction after PreviewStartTime");
 
-        var errors = Validator.ValidateAuctionDto(dto);
-        if (errors.Any())
-            return Result<CreateAuctionDTO>.Failure(string.Join("; ", errors));
-
         var now = DateTime.UtcNow;
         var isFutureStart = dto.ScheduledStartTime > now;
         DateTime previewTime = dto.PreviewStartTime ?? dto.ScheduledStartTime;

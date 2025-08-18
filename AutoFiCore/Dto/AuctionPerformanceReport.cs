@@ -8,6 +8,7 @@
         public decimal AverageBids { get; set; }
         public decimal AverageFinalPrice { get; set; }
 
+
     }
 }
 

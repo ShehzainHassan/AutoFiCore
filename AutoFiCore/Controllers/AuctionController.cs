@@ -44,12 +44,24 @@ namespace AutoFiCore.Controllers
             return Ok(result.Value);
         }
 
+        /// <summary>
+        /// Retrieves all auctions with optional filters for status, make, and price range.
+        /// </summary>
+        /// <param name="filters">Optional filters for querying auctions.</param>
+        /// <remarks>
+        /// Example query:
+        /// GET /api/auctions?status=Active&make=Toyota&minPrice=10000&maxPrice=50000&sortBy=price&descending=true
+        /// </remarks>
+        /// <returns>Returns a list of auctions matching the specified filters.</returns>
+        /// <response code="200">Returns the list of auctions</response>
+        /// <response code="400">If the request parameters are invalid</response>
         [HttpGet]
         public async Task<IActionResult> GetAuctions([FromQuery] AuctionQueryParams filters)
         {
             var auctions = await _auctionService.GetAuctionsAsync(filters);
             return Ok(auctions);
         }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAuction(int id)
