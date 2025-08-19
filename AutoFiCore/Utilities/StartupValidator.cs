@@ -1,7 +1,15 @@
 ﻿namespace AutoFiCore.Utilities
 {
+    /// <summary>
+    /// Provides startup-time validation for environment configuration, secrets, and performance settings.
+    /// </summary>
     public static class StartupValidator
     {
+        /// <summary>
+        /// Validates critical environment settings when running in production.
+        /// </summary>
+        /// <param name="config">The application configuration.</param>
+        /// <param name="env">The hosting environment.</param>
         public static void ValidateEnvironment(IConfiguration config, IWebHostEnvironment env)
         {
             if (env.IsProduction())
@@ -12,6 +20,10 @@
             }
         }
 
+        /// <summary>
+        /// Ensures required environment variables are present in production.
+        /// </summary>
+        /// <param name="config">The application configuration.</param>
         private static void ValidateProductionSecrets(IConfiguration config)
         {
             var requiredEnvVars = new[] { "DATABASE_URL", "JWT_SECRET" };
@@ -26,10 +38,13 @@
             }
         }
 
+        /// <summary>
+        /// Validates the security configuration, including JWT secret length.
+        /// </summary>
+        /// <param name="config">The application configuration.</param>
         private static void ValidateSecuritySettings(IConfiguration config)
         {
             var jwtSecret = config["Jwt:Secret"];
-            // Check environment variable if config value is empty (for Railway deployment)
             if (string.IsNullOrEmpty(jwtSecret))
             {
                 jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
@@ -41,6 +56,10 @@
             }
         }
 
+        /// <summary>
+        /// Validates database performance-related settings such as retry count and timeouts.
+        /// </summary>
+        /// <param name="config">The application configuration.</param>
         private static void ValidatePerformanceSettings(IConfiguration config)
         {
             int maxRetryCount = config.GetValue<int>("DatabaseSettings:MaxRetryCount");

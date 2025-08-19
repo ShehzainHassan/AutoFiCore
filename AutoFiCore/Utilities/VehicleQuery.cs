@@ -8,8 +8,28 @@ using static Microsoft.EntityFrameworkCore.DbLoggerCategory;
 
 namespace AutoFiCore.Utilities
 {
+    /// <summary>
+    /// Provides utility methods for querying and filtering <see cref="Vehicle"/> entities.
+    /// </summary>
+
     public class VehicleQuery
     {
+        /// <summary>
+        /// Applies filtering criteria to the vehicle query based on provided parameters.
+        /// </summary>
+        /// <param name="query">The initial vehicle query.</param>
+        /// <param name="make">Filter by vehicle make.</param>
+        /// <param name="model">Filter by vehicle model.</param>
+        /// <param name="startPrice">Minimum price filter.</param>
+        /// <param name="endPrice">Maximum price filter.</param>
+        /// <param name="mileage">Maximum mileage filter.</param>
+        /// <param name="startYear">Minimum manufacturing year filter.</param>
+        /// <param name="endYear">Maximum manufacturing year filter.</param>
+        /// <param name="gearbox">Comma-separated list of gearbox types to filter.</param>
+        /// <param name="selectedColors">Comma-separated list of colors to filter.</param>
+        /// <param name="status">Filter by vehicle status.</param>
+        /// <returns>The filtered <see cref="IQueryable{Vehicle}"/>.</returns>
+
         public static IQueryable<Vehicle> ApplyFilters(IQueryable<Vehicle> query, 
             string? make,
             string? model, 
@@ -63,6 +83,13 @@ namespace AutoFiCore.Utilities
             return query;
         }
 
+        /// <summary>
+        /// Applies sorting to the vehicle query based on the specified sort order.
+        /// </summary>
+        /// <param name="query">The vehicle query to sort.</param>
+        /// <param name="sortOrder">The sort order string (e.g., "price_asc", "year_desc").</param>
+        /// <returns>The sorted <see cref="IQueryable{Vehicle}"/>.</returns>
+
         public static IQueryable<Vehicle> ApplySorting(IQueryable<Vehicle> query, string? sortOrder)
         {
             return sortOrder switch
@@ -79,11 +106,24 @@ namespace AutoFiCore.Utilities
             };
         }
 
+        /// <summary>
+        /// Retrieves a paginated list of vehicles from the query.
+        /// </summary>
+        /// <param name="query">The vehicle query.</param>
+        /// <param name="offset">The number of records to skip.</param>
+        /// <param name="pageView">The number of records to take.</param>
+        /// <returns>A task that resolves to a list of vehicles.</returns>
+
         public static Task<List<Vehicle>> GetPaginatedVehiclesAsync(IQueryable<Vehicle> query, int offset, int pageView)
         {
             return query.Skip(offset).Take(pageView).ToListAsync();
         }
 
+        /// <summary>
+        /// Retrieves a dictionary of gearbox types and their respective counts.
+        /// </summary>
+        /// <param name="query">The vehicle query.</param>
+        /// <returns>A task that resolves to a dictionary of gearbox counts.</returns>
         public static async Task<Dictionary<string, int>> GetGearboxCountsAsync(IQueryable<Vehicle> query)
         {
             var gearboxCounts = await query
@@ -95,6 +135,12 @@ namespace AutoFiCore.Utilities
 
             return gearboxCounts;
         }
+
+        /// <summary>
+        /// Retrieves a dictionary of selected colors and their respective counts.
+        /// </summary>
+        /// <param name="query">The vehicle query.</param>
+        /// <returns>A task that resolves to a dictionary of color counts.</returns>
         public static async Task<Dictionary<string, int>> GetSelectedColorCounts(IQueryable<Vehicle> query)
         {
             var selectedColorsCounts = await query

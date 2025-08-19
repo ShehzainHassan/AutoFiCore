@@ -4,35 +4,33 @@ using AutoFiCore.Models;
 
 namespace AutoFiCore.Utilities
 {
+    /// <summary>
+    /// Provides utility methods for normalizing vehicle-related input and transforming raw data into DTOs.
+    /// </summary>
     public class NormalizeInput
     {
-        public static string? NormalizeMakeModel(string? input)
-        {
-            if (string.IsNullOrWhiteSpace(input))
-                return null;
-
-            input = input.Trim();
-
-            if (input.Equals("Any_Makes", StringComparison.OrdinalIgnoreCase) ||
-                input.Equals("Any_Models", StringComparison.OrdinalIgnoreCase))
-            {
-                return null;
-            }
-
-            return input;
-        }
+        /// <summary>
+        /// Normalizes the vehicle status input by trimming and converting to uppercase.
+        /// Returns null if input is null, whitespace, or "Any".
+        /// </summary>
+        /// <param name="input">The raw status input.</param>
+        /// <returns>The normalized status string or null.</returns>
         public static string? NormalizeStatus(string? input)
         {
             if (string.IsNullOrWhiteSpace(input))
                 return null;
             if (input.Equals("Any", StringComparison.OrdinalIgnoreCase))
-            {
                 return null;
-            }
-            input = input.Trim().ToUpper();
-            return input;
+
+            return input.Trim().ToUpper();
         }
 
+        /// <summary>
+        /// Normalizes gearbox or color input by trimming whitespace.
+        /// Returns null if input is null, whitespace, or "Any".
+        /// </summary>
+        /// <param name="input">The raw gearbox or color input.</param>
+        /// <returns>The normalized string or null.</returns>
         public static string? NormalizeGearboxColors(string? input)
         {
             if (string.IsNullOrWhiteSpace(input) ||
@@ -43,6 +41,12 @@ namespace AutoFiCore.Utilities
 
             return input.Trim();
         }
+
+        /// <summary>
+        /// Converts a raw <see cref="VehicleModelJSON"/> object into a structured <see cref="NormalizedCarFeatureDto"/>.
+        /// </summary>
+        /// <param name="vehicle">The raw vehicle model input.</param>
+        /// <returns>A normalized DTO containing vehicle features.</returns>
         public static NormalizedCarFeatureDto NormalizeCarFeatures(VehicleModelJSON vehicle)
         {
             return new NormalizedCarFeatureDto
@@ -95,10 +99,14 @@ namespace AutoFiCore.Utilities
                 }
             };
         }
+
+        /// <summary>
+        /// Normalizes filter values in a <see cref="VehicleFilterDto"/> by applying standard input sanitization.
+        /// </summary>
+        /// <param name="filters">The raw filter DTO.</param>
+        /// <returns>The normalized filter DTO.</returns>
         public static VehicleFilterDto NormalizeFilters(VehicleFilterDto filters)
         {
-            filters.Make = NormalizeMakeModel(filters.Make);
-            filters.Model = NormalizeMakeModel(filters.Model);
             filters.Gearbox = NormalizeGearboxColors(filters.Gearbox);
             filters.SelectedColors = NormalizeGearboxColors(filters.SelectedColors);
             filters.Status = NormalizeStatus(filters.Status);

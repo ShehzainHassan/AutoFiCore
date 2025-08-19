@@ -1,8 +1,15 @@
 ﻿using AutoFiCore.Dto;
 using FluentValidation;
 
+/// <summary>
+/// Provides validation rules for the <see cref="AuctionQueryParams"/> DTO used in auction filtering.
+/// </summary>
 public class AuctionQueryParamsValidator : AbstractValidator<AuctionQueryParams>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AuctionQueryParamsValidator"/> class
+    /// and defines validation rules for minimum and maximum price constraints.
+    /// </summary>
     public AuctionQueryParamsValidator()
     {
         RuleFor(x => x.MinPrice)

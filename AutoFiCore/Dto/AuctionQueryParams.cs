@@ -1,9 +1,13 @@
 ﻿using AutoFiCore.Enums;
+
 using System.Text.Json.Serialization;
 
+/// <summary>
+/// Represents query parameters for filtering and sorting auctions.
+/// </summary>
 public class AuctionQueryParams
 {
-    /// <summary>Status of the auction (Active, Ended, Scheduled, PreviewMode, Cancelled).</summary>
+    /// <summary>Status of the auction (Scheduled, PreviewMode, Active, Ended, Cancelled).</summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AuctionStatus? Status { get; set; }
 

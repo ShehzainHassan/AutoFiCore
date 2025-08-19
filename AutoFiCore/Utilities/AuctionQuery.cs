@@ -4,8 +4,17 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AutoFiCore.Queries;
 
+/// <summary>
+/// Provides query extensions for filtering and sorting <see cref="Auction"/> entities.
+/// </summary>
 public static class AuctionQuery
 {
+    /// <summary>
+    /// Applies filtering criteria to an <see cref="IQueryable{Auction}"/> based on the provided <see cref="AuctionQueryParams"/>.
+    /// </summary>
+    /// <param name="source">The source queryable of auctions.</param>
+    /// <param name="filters">The filtering parameters.</param>
+    /// <returns>A filtered <see cref="IQueryable{Auction}"/>.</returns>
     public static IQueryable<Auction> ApplyFilters(IQueryable<Auction> source, AuctionQueryParams filters)
     {
         if (filters.Status.HasValue)
@@ -23,13 +32,18 @@ public static class AuctionQuery
         return source;
     }
 
+    /// <summary>
+    /// Applies sorting to an <see cref="IQueryable{Auction}"/> based on the provided <see cref="AuctionQueryParams"/>.
+    /// </summary>
+    /// <param name="source">The source queryable of auctions.</param>
+    /// <param name="filters">The sorting parameters.</param>
+    /// <returns>A sorted <see cref="IQueryable{Auction}"/>.</returns>
     public static IQueryable<Auction> ApplySorting(IQueryable<Auction> source, AuctionQueryParams filters)
     {
         if (!string.IsNullOrWhiteSpace(filters.SortBy))
         {
             switch (filters.SortBy.ToLower())
             {
-               
                 case "price":
                     return filters.Descending
                         ? source.OrderByDescending(a => a.CurrentPrice)
@@ -38,7 +52,7 @@ public static class AuctionQuery
                 case "endtime":
                     return filters.Descending
                         ? source.OrderByDescending(a => a.EndUtc)
-                        : source.OrderBy(a => a.EndUtc); 
+                        : source.OrderBy(a => a.EndUtc);
 
                 case "make":
                     return filters.Descending
@@ -49,5 +63,4 @@ public static class AuctionQuery
 
         return source.OrderBy(a => a.AuctionId);
     }
-
 }

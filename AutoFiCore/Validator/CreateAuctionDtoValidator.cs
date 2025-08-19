@@ -1,8 +1,15 @@
 ﻿using AutoFiCore.Dto;
 using FluentValidation;
 
+/// <summary>
+/// Provides validation rules for the <see cref="CreateAuctionDTO"/> used when creating a new auction.
+/// </summary>
 public class CreateAuctionDtoValidator : AbstractValidator<CreateAuctionDTO>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CreateAuctionDtoValidator"/> class
+    /// and defines validation rules for auction creation parameters.
+    /// </summary>
     public CreateAuctionDtoValidator()
     {
         RuleFor(x => x.VehicleId)

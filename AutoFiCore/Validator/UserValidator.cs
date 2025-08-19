@@ -1,8 +1,15 @@
 ﻿using AutoFiCore.Models;
 using FluentValidation;
 
+/// <summary>
+/// Provides validation rules for the <see cref="User"/> model.
+/// </summary>
 public class UserValidator : AbstractValidator<User>
 {
+    /// <summary>
+    /// Initializes a new instance of the <see cref="UserValidator"/> class
+    /// and defines validation rules for user properties.
+    /// </summary>
     public UserValidator()
     {
         RuleFor(x => x.Email)

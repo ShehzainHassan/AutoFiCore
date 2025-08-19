@@ -3,8 +3,16 @@ using AutoFiCore.Models;
 
 namespace AutoFiCore.Mappers
 {
+    /// <summary>
+    /// Provides mapping logic between <see cref="Auction"/> domain models and <see cref="AuctionDTO"/> data transfer objects.
+    /// </summary>
     public static class AuctionMapper
     {
+        /// <summary>
+        /// Converts an <see cref="Auction"/> entity into an <see cref="AuctionDTO"/>, including nested vehicle and bid data.
+        /// </summary>
+        /// <param name="auction">The auction domain model to convert.</param>
+        /// <returns>A DTO representation of the auction.</returns>
         public static AuctionDTO ToDTO(Auction auction)
         {
             return new AuctionDTO
@@ -46,6 +54,5 @@ namespace AutoFiCore.Mappers
                     }).ToList()
             };
         }
-
     }
 }
