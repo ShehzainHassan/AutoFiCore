@@ -9,6 +9,9 @@ using System.IdentityModel.Tokens.Jwt;
 
 namespace AutoFiCore.Controllers
 {
+    /// <summary>
+    /// Provides endpoints for tracking and retrieving auction-related analytics, metrics, and reports.
+    /// </summary>
     [ApiController]
     [Route("api/[controller]")]
     public class AnalyticsController : ControllerBase
@@ -19,12 +22,16 @@ namespace AutoFiCore.Controllers
         private readonly IReportingService _reportService;
         private readonly ISystemHealthService _systemHealthService;
 
-        public AnalyticsController(
-            IAnalyticsService analyticsService,
-            IDashboardService dashboardService,
-            IReportingService reportService,
-            IMetricsCalculationService metricsCalculationService,
-            ISystemHealthService systemHealthService)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AnalyticsController"/> class.
+        /// </summary>
+        /// <param name="analyticsService">Service for tracking analytics events.</param>
+        /// <param name="dashboardService">Service for generating executive dashboards.</param>
+        /// <param name="reportService">Service for generating detailed reports.</param>
+        /// <param name="metricsCalculationService">Service for calculating metrics.</param>
+        /// <param name="systemHealthService">Service for monitoring system health.</param>
+
+        public AnalyticsController(IAnalyticsService analyticsService, IDashboardService dashboardService, IReportingService reportService, IMetricsCalculationService metricsCalculationService, ISystemHealthService systemHealthService)
         {
             _analyticsService = analyticsService;
             _dashboardService = dashboardService;
@@ -33,6 +40,12 @@ namespace AutoFiCore.Controllers
             _systemHealthService = systemHealthService;
         }
 
+        /// <summary>
+        /// Retrieves executive dashboard metrics for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>Executive dashboard data.</returns>
         [HttpGet("dashboard")]
         //[Authorize(Roles = "Admin", "Manager")]
         public async Task<ActionResult<ExecutiveDashboard>> GetDashboard([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
@@ -43,6 +56,11 @@ namespace AutoFiCore.Controllers
             return Ok(dashboard);
         }
 
+        /// <summary>
+        /// Updates analytics for a specific auction.
+        /// </summary>
+        /// <param name="auctionId">The ID of the auction to update.</param>
+        /// <returns>Status message.</returns>
         [HttpPost("update-auction-analytics")]
         public async Task<IActionResult> UpdateAuctionAnalytics([FromQuery] int auctionId)
         {
@@ -52,6 +70,13 @@ namespace AutoFiCore.Controllers
             await _metricsCalculationService.UpdateAuctionAnalyticsAsync(auctionId);
             return Ok(new { message = $"Auction analytics updated for auction {auctionId}" });
         }
+
+        /// <summary>
+        /// Tracks a user's view of an auction.
+        /// </summary>
+        /// <param name="auctionId">The ID of the auction viewed.</param>
+        /// <param name="source">The source of the view (e.g., Web, Mobile).</param>
+        /// <returns>Status message.</returns>
         [Authorize]
         [HttpPost("auction-view")]
         public async Task<IActionResult> TrackAuctionView([FromQuery] int auctionId, [FromQuery] string source = "Web")
@@ -68,6 +93,11 @@ namespace AutoFiCore.Controllers
             return Ok(new { message = "Auction view tracked" });
         }
 
+        /// <summary>
+        /// Tracks a bid event for analytics purposes.
+        /// </summary>
+        /// <param name="bid">Bid tracking data.</param>
+        /// <returns>Status message.</returns>
         [HttpPost("track-bid")]
         public async Task<IActionResult> TrackBidEvent([FromBody] BidTrackingDTO bid)
         {
@@ -75,6 +105,11 @@ namespace AutoFiCore.Controllers
             return Ok(new { message = "Bid tracked" });
         }
 
+        /// <summary>
+        /// Tracks payment completion for an auction.
+        /// </summary>
+        /// <param name="bid">Bid tracking data.</param>
+        /// <returns>Status message or error if already completed.</returns>
         [HttpPost("track-payment")]
         public async Task<IActionResult> TrackPayment([FromBody] BidTrackingDTO bid)
         {
@@ -88,6 +123,11 @@ namespace AutoFiCore.Controllers
             return Ok(new { message = "Payment tracked" });
         }
 
+        /// <summary>
+        /// Tracks the completion status of an auction.
+        /// </summary>
+        /// <param name="completion">Auction completion data.</param>
+        /// <returns>Status message.</returns>
         [HttpPost("auction-completion")]
         public async Task<IActionResult> TrackAuctionCompletion([FromBody] AuctionCompletionDTO completion)
         {
@@ -95,6 +135,12 @@ namespace AutoFiCore.Controllers
             return Ok(new { message = "Auction completion tracked" });
         }
 
+        /// <summary>
+        /// Retrieves auction performance metrics for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>Auction performance report.</returns>
         [HttpGet("auctions")]
         //[Authorize(Roles = "Admin")]
         public async Task<ActionResult<AuctionPerformanceReport>> GetAuctionAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
@@ -105,6 +151,13 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieves tabular auction analytics for the specified date range and optional category.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <param name="category">Optional category filter.</param>
+        /// <returns>Tabular auction analytics.</returns>
         [HttpGet("auctions-report")]
         public async Task<IActionResult> GetAuctionTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string? category)
         {
@@ -114,6 +167,12 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieves user engagement analytics for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>User analytics report.</returns>
         [HttpGet("user-report")]
         public async Task<IActionResult> GetUserTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
@@ -123,6 +182,12 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieves revenue analytics for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>Revenue analytics report.</returns>
         [HttpGet("revenue-report")]
         public async Task<IActionResult> GetRevenueTableAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
@@ -132,6 +197,11 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Checks whether payment has been completed for a specific auction.
+        /// </summary>
+        /// <param name="auctionId">The ID of the auction.</param>
+        /// <returns>Payment status.</returns>
         [HttpGet("payment-status")]
         public async Task<IActionResult> IsPaymentCompleted([FromQuery] int auctionId)
         {
@@ -143,6 +213,12 @@ namespace AutoFiCore.Controllers
             });
         }
 
+        /// <summary>
+        /// Retrieves user activity analytics for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>User activity report.</returns>
         [HttpGet("users")]
         //[Authorize(Roles = "Admin")]
         public async Task<ActionResult<UserActivityReport>> GetUserAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
@@ -153,6 +229,12 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieves revenue analytics for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>Revenue report.</returns>
         [HttpGet("revenue")]
         //[Authorize(Roles = "Admin")]
         public async Task<ActionResult<RevenueReport>> GetRevenueAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
@@ -163,6 +245,11 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Tracks a custom event related to user or auction activity.
+        /// </summary>
+        /// <param name="request">Event tracking request payload.</param>
+        /// <returns>Status message.</returns>
         [HttpPost("event")]
         public async Task<IActionResult> TrackEvent([FromBody] TrackEventRequest request)
         {
@@ -170,6 +257,13 @@ namespace AutoFiCore.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Retrieves a summarized view of revenue analytics.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <param name="type">Type of summary (e.g., Revenue or Users).</param>
+        /// <returns>Revenue summary data.</returns>
         [HttpGet("revenue-summary")]
         public async Task<IActionResult> GetRevenueSummary([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string type)
         {
@@ -179,6 +273,13 @@ namespace AutoFiCore.Controllers
             return Ok(summary);
         }
 
+        /// <summary>
+        /// Retrieves a summarized view of user analytics.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <param name="type">Type of summary (e.g., Revenue or Users).</param>
+        /// <returns>User summary data.</returns>
         [HttpGet("user-summary")]
         public async Task<IActionResult> GetUserSummary([FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string type)
         {
@@ -188,6 +289,14 @@ namespace AutoFiCore.Controllers
             return Ok(summary);
         }
 
+        /// <summary>
+        /// Exports a report in the specified format for the given date range.
+        /// </summary>
+        /// <param name="reportType">Type of report to export.</param>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <param name="format">Export format (e.g., CSV, PDF).</param>
+        /// <returns>File download response.</returns>
         [HttpGet("export")]
         //[Authorize(Roles = "Admin")]
         public async Task<IActionResult> ExportReport([FromQuery] ReportType reportType, [FromQuery] DateTime startDate, [FromQuery] DateTime endDate, [FromQuery] string format = "CSV")
@@ -198,6 +307,12 @@ namespace AutoFiCore.Controllers
             return File(fileResult.Content, fileResult.ContentType, fileResult.FileName);
         }
 
+        /// <summary>
+        /// Retrieves a paginated list of recently downloaded reports.
+        /// </summary>
+        /// <param name="page">Page number.</param>
+        /// <param name="pageSize">Number of items per page.</param>
+        /// <returns>List of recent downloads.</returns>
         [HttpGet("recent-downloads")]
         public async Task<IActionResult> GetRecentDownloads([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
@@ -205,6 +320,12 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieves system health dashboard metrics for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>System health dashboard.</returns>
         [HttpGet("system")]
         public async Task<ActionResult<SystemHealthDashboard>> GetSystemHealthDashboard([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
@@ -214,6 +335,12 @@ namespace AutoFiCore.Controllers
             return Ok(dashboard);
         }
 
+        /// <summary>
+        /// Retrieves a paginated list of system error logs.
+        /// </summary>
+        /// <param name="page">Page number.</param>
+        /// <param name="pageSize">Number of logs per page.</param>
+        /// <returns>Error log entries.</returns>
         [HttpGet("error-logs")]
         public async Task<IActionResult> GetErrorLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
@@ -221,6 +348,12 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+        /// <summary>
+        /// Retrieves response time data points for the specified date range.
+        /// </summary>
+        /// <param name="startDate">Start date (UTC).</param>
+        /// <param name="endDate">End date (UTC).</param>
+        /// <returns>Response time metrics.</returns>
         [HttpGet("response-times")]
         public async Task<IActionResult> GetResponseTimePoints([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
@@ -237,7 +370,11 @@ namespace AutoFiCore.Controllers
 
             return Ok(result);
         }
-        
+
+        /// <summary>
+        /// Retrieves the timestamp of the oldest API log entry.
+        /// </summary>
+        /// <returns>Oldest API log timestamp.</returns>
         [HttpGet("oldest-api-log")]
         public async Task<IActionResult> GetOldestApiLog()
         {

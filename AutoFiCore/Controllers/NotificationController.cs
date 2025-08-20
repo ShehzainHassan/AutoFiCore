@@ -6,16 +6,32 @@ using System.IdentityModel.Tokens.Jwt;
 
 namespace AutoFiCore.Controllers
 {
+    /// <summary>
+    /// Provides endpoints for notifications management.
+    /// </summary>
+
     [ApiController]
     [Route("api/[controller]")]
     public class NotificationController : ControllerBase
     {
         private readonly INotificationService _notificationService;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="NotificationController"/> class with the specified notification service.
+        /// </summary>
+        /// <param name="notificationService">The service used to handle notification-related operations.</param>
         public NotificationController(INotificationService notificationService)
         {
             _notificationService = notificationService;
         }
+
+        /// <summary>
+        /// Retrieves a paginated list of notifications for the authenticated user.
+        /// </summary>
+        /// <param name="unreadOnly">If true, filters to only unread notifications.</param>
+        /// <param name="page">Page number for pagination.</param>
+        /// <param name="pageSize">Number of items per page.</param>
+        /// <returns>List of notifications.</returns>
         [HttpGet]
         public async Task<IActionResult> GetNotifications([FromQuery] bool unreadOnly = false, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
@@ -30,6 +46,10 @@ namespace AutoFiCore.Controllers
             var result = await _notificationService.GetUserNotificationsAsync(userId, unreadOnly, page, pageSize);
             return Ok(result);
         }
+
+        /// <summary>
+        /// Marks a specific notification as read.
+        /// </summary>
 
         [Authorize]
         [HttpPost("{id}/mark-read")]
@@ -57,6 +77,10 @@ namespace AutoFiCore.Controllers
             });
         }
 
+        /// <summary>
+        /// Retrieves a specific notification by its ID.
+        /// </summary>
+
         [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetNotificationById(int id)
@@ -69,6 +93,9 @@ namespace AutoFiCore.Controllers
             return Ok(result.Value);
         }
 
+        /// <summary>
+        /// Returns the count of unread notifications for the authenticated user.
+        /// </summary>
         [Authorize]
         [HttpGet("unread-count")]
         public async Task<ActionResult<int>> GetUnreadNotificationCount()
