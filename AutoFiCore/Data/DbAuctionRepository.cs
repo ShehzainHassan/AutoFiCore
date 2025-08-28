@@ -25,7 +25,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     }
     public async Task<List<Auction>> GetEndedAuctions()
     {
-
         return await _dbContext.Auctions
             .Where(a => a.Status == AuctionStatus.Ended)
             .ToListAsync();
@@ -211,6 +210,14 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .OrderBy(a => a.CreatedUtc)
             .Select(a => a.CreatedUtc)
             .FirstOrDefaultAsync();
+    }
+    public async Task<List<int>> GetUserAuctionIdsWithBidsAsync(int userId)
+    {
+        return await _dbContext.Bids
+            .Where(b => b.UserId == userId)
+            .Select(b => b.AuctionId)
+            .Distinct()
+            .ToListAsync();
     }
 
 

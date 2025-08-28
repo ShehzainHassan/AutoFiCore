@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using AutoFiCore.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AutoFiCore.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250827125134_InitChatFix")]
+    partial class InitChatFix
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -381,6 +384,60 @@ namespace AutoFiCore.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("BidStrategies");
+                });
+
+            modelBuilder.Entity("AutoFiCore.Models.ChatMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ChatSessionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("QueryType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Sender")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.PrimitiveCollection<List<string>>("Sources")
+                        .HasColumnType("jsonb");
+
+                    b.PrimitiveCollection<List<string>>("SuggestedActions")
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("Timestamp")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<string>("UiType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChatSessionId")
+                        .HasDatabaseName("IX_ChatMessages_ChatSessionId");
+
+                    b.HasIndex("Sender")
+                        .HasDatabaseName("IX_ChatMessages_Sender");
+
+                    b.HasIndex("Timestamp")
+                        .HasDatabaseName("IX_ChatMessages_Timestamp");
+
+                    b.ToTable("ChatMessages");
                 });
 
             modelBuilder.Entity("AutoFiCore.Models.ChatSession", b =>
@@ -1079,60 +1136,6 @@ namespace AutoFiCore.Migrations
                     b.ToTable("VehiclePerformances");
                 });
 
-            modelBuilder.Entity("ChatMessage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ChatSessionId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("QueryType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("Sender")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.PrimitiveCollection<List<string>>("Sources")
-                        .HasColumnType("jsonb");
-
-                    b.PrimitiveCollection<List<string>>("SuggestedActions")
-                        .HasColumnType("jsonb");
-
-                    b.Property<DateTime>("Timestamp")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
-
-                    b.Property<string>("UiType")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChatSessionId")
-                        .HasDatabaseName("IX_ChatMessages_ChatSessionId");
-
-                    b.HasIndex("Sender")
-                        .HasDatabaseName("IX_ChatMessages_Sender");
-
-                    b.HasIndex("Timestamp")
-                        .HasDatabaseName("IX_ChatMessages_Timestamp");
-
-                    b.ToTable("ChatMessages");
-                });
-
             modelBuilder.Entity("DBQueryLog", b =>
                 {
                     b.Property<int>("Id")
@@ -1331,6 +1334,17 @@ namespace AutoFiCore.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("AutoFiCore.Models.ChatMessage", b =>
+                {
+                    b.HasOne("AutoFiCore.Models.ChatSession", "ChatSession")
+                        .WithMany("Messages")
+                        .HasForeignKey("ChatSessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChatSession");
+                });
+
             modelBuilder.Entity("AutoFiCore.Models.Drivetrain", b =>
                 {
                     b.HasOne("AutoFiCore.Models.Vehicle", "Vehicle")
@@ -1421,17 +1435,6 @@ namespace AutoFiCore.Migrations
                         .IsRequired();
 
                     b.Navigation("Vehicle");
-                });
-
-            modelBuilder.Entity("ChatMessage", b =>
-                {
-                    b.HasOne("AutoFiCore.Models.ChatSession", "ChatSession")
-                        .WithMany("Messages")
-                        .HasForeignKey("ChatSessionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ChatSession");
                 });
 
             modelBuilder.Entity("VehicleVehicleOptions", b =>

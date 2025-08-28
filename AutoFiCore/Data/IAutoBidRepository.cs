@@ -1,3 +1,4 @@
+using AutoFiCore.Dto;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Polly;
@@ -14,5 +15,6 @@ namespace AutoFiCore.Data
         Task<CreateAutoBidDTO?> GetAutoBidWithStrategyAsync(int userId, int auctionId);
         Task<List<AutoBid>> GetActiveAutoBidsByAuctionIdAsync(int auctionId);
         Task<BidStrategy> AddBidStrategyAsync(BidStrategy bidStrategy);
+        Task<List<UserAutoBidSettings>> GetUserAutoBidSettingsAsync(int userId);
     }
 }

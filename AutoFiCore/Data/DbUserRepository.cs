@@ -1,4 +1,5 @@
 ﻿using AutoFiCore.Dto;
+using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using BCrypt.Net;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -14,7 +15,7 @@ namespace AutoFiCore.Data
     {
         private readonly ApplicationDbContext _dbContext;
         private readonly ILogger<DbUserRepository> _logger;
-        public DbUserRepository(ApplicationDbContext dbContext, ILogger<DbUserRepository> logger)
+        public DbUserRepository(ApplicationDbContext dbContext,  ILogger<DbUserRepository> logger)
         {
             _dbContext = dbContext;
             _logger = logger;
@@ -125,6 +126,7 @@ namespace AutoFiCore.Data
                 .Select(u => (DateTime?)u.CreatedUtc)
                 .FirstOrDefaultAsync();
         }
+
     }
 }
 

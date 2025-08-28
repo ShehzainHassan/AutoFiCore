@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Enums;
+﻿using AutoFiCore.Dto;
+using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Polly;
@@ -81,5 +82,39 @@ namespace AutoFiCore.Data
                 .Where(ab => ab.AuctionId == auctionId && ab.IsActive)
                 .ToListAsync();
         }
+        public async Task<List<UserAutoBidSettings>> GetUserAutoBidSettingsAsync(int userId)
+        {
+            var autoBids = await _dbContext.AutoBids
+                .Where(ab => ab.UserId == userId)
+                .ToListAsync();
+
+            var strategies = await _dbContext.BidStrategies
+                .Where(bs => bs.UserId == userId)
+                .ToListAsync();
+
+            var result = (from ab in autoBids
+                          join bs in strategies
+                              on new { ab.UserId, ab.AuctionId }
+                              equals new { bs.UserId, bs.AuctionId }
+                              into gj
+                          from bs in gj.DefaultIfEmpty()
+                          select new UserAutoBidSettings
+                          {
+                              Id = ab.Id,
+                              UserId = ab.UserId,
+                              AuctionId = ab.AuctionId,
+                              MaxBidAmount = ab.MaxBidAmount,
+                              BidStrategyType = ab.BidStrategyType,
+                              CreatedAt = ab.CreatedAt,
+                              UpdatedAt = ab.UpdatedAt,
+                              BidDelaySeconds = bs?.BidDelaySeconds,
+                              MaxBidsPerMinute = bs?.MaxBidsPerMinute,
+                              MaxSpreadBids = bs?.MaxSpreadBids,
+                              PreferredBidTiming = bs?.PreferredBidTiming ?? PreferredBidTiming.Immediate
+                          }).ToList();
+
+            return result;
+        }
+
     }
 }

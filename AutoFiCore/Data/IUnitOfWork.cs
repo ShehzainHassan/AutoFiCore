@@ -15,6 +15,7 @@
         IReportRepository Report { get; }   
         IMetricsRepository Metrics { get; }
         IPerformanceRepository Performance { get; }
+        IChatRepository ChatRepository { get; }
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();

@@ -16,8 +16,10 @@ using Polly.Retry;
 using QuestPDF.Infrastructure;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using Npgsql;
 
 
+NpgsqlConnection.GlobalTypeMapper.EnableDynamicJson();
 WebApplicationBuilder builder;
 try
 {
@@ -54,7 +56,11 @@ catch (InvalidDataException ex) when (ex.Message.Contains("appsettings.json"))
 QuestPDF.Settings.License = LicenseType.Community;
 
 builder.Services.AddMemoryCache();
-
+builder.Services.AddHttpClient("FastApi", client =>
+{
+    client.BaseAddress = new Uri("http://localhost:8000/api/ai/");
+    client.Timeout = TimeSpan.FromSeconds(30);
+});
 
 builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
@@ -217,6 +223,7 @@ else
     builder.Services.AddScoped<IMetricsRepository, DbMetricsRepository>();
     builder.Services.AddScoped<IReportRepository, DbReportRepository>();
     builder.Services.AddScoped<IPerformanceRepository, DbPerformanceRepository>();
+    builder.Services.AddScoped<IChatRepository, DbChatRepository>();
 }
 
 // Register user service
@@ -293,6 +300,15 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Register Performance Tracking Service
 builder.Services.AddScoped<IPerformanceTrackingService, PerformanceTrackingService>();
+
+// Register User Context Service
+builder.Services.AddScoped<IUserContextService, UserContextService>();
+
+// Register AI Assistant Service
+builder.Services.AddScoped<IAIAssistantService, AIAssistantService>();
+
+// Register User Context Cache Service
+builder.Services.AddSingleton<IUserContextCache, UserContextCache>();
 
 // Add services to the container.
 builder.Services.AddControllers();

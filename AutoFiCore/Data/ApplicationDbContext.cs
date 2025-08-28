@@ -39,6 +39,9 @@ public class ApplicationDbContext : DbContext
     public DbSet<DBQueryLog> DbQueryLogs { get; set; }
     public DbSet<ErrorLog> ErrorLogs { get; set; }
     public DbSet<RecentDownloads> RecentDownloads { get; set; } = null!;
+    public DbSet<ChatMessage> ChatMessages { get; set; }
+    public DbSet<ChatSession> ChatSessions { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -309,6 +312,29 @@ public class ApplicationDbContext : DbContext
             entity.Property(rd => rd.DownloadedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
+        modelBuilder.Entity<ChatSession>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.UserId).IsRequired();
+            entity.Property(e => e.Title).HasMaxLength(200);
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        });
+
+        modelBuilder.Entity<ChatMessage>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.ChatSessionId).IsRequired();
+            entity.Property(e => e.Sender).IsRequired().HasMaxLength(50);
+            entity.Property(e => e.Message).IsRequired();
+            entity.Property(e => e.Timestamp).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(e => e.UiType).HasMaxLength(100).IsRequired(false);
+            entity.Property(e => e.QueryType).HasMaxLength(100).IsRequired(false);
+            entity.Property(e => e.SuggestedActions).HasColumnType("jsonb").IsRequired(false);
+            entity.Property(e => e.Sources).HasColumnType("jsonb").IsRequired(false);
+        });
+
+
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Model).HasDatabaseName("IX_Vehicles_Model");
@@ -362,6 +388,14 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<ErrorLog>().HasIndex(e => e.Timestamp);
         modelBuilder.Entity<ErrorLog>().HasIndex(e => e.ErrorCode);
+
+        modelBuilder.Entity<ChatSession>().HasIndex(e => e.UserId).HasDatabaseName("IX_ChatSessions_UserId");
+        modelBuilder.Entity<ChatSession>().HasIndex(e => e.CreatedAt).HasDatabaseName("IX_ChatSessions_CreatedAt");
+
+        modelBuilder.Entity<ChatMessage>().HasIndex(e => e.ChatSessionId).HasDatabaseName("IX_ChatMessages_ChatSessionId");
+        modelBuilder.Entity<ChatMessage>().HasIndex(e => e.Timestamp).HasDatabaseName("IX_ChatMessages_Timestamp");
+        modelBuilder.Entity<ChatMessage>().HasIndex(e => e.Sender).HasDatabaseName("IX_ChatMessages_Sender");
+
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()
@@ -475,6 +509,10 @@ public class ApplicationDbContext : DbContext
             .WithOne(a => a.AuctionAnalytics)
             .HasForeignKey<AuctionAnalytics>(e => e.AuctionId)
             .OnDelete(DeleteBehavior.Cascade);
-
+        
+        modelBuilder.Entity<ChatMessage>().HasOne(e => e.ChatSession)
+            .WithMany(s => s.Messages)
+            .HasForeignKey(e => e.ChatSessionId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
