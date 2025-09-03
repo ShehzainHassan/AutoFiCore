@@ -26,6 +26,6 @@ namespace AutoFiCore.Dto
         public List<string> Sources { get; set; }
 
         [JsonPropertyName("session_id")]
-        public string? SessionId { get; set; }
+        public string SessionId { get; set; }
     }
 }

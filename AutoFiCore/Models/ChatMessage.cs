@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Models;
+﻿using AutoFiCore.Enums;
+using AutoFiCore.Models;
 
 public class ChatMessage
 {
@@ -12,4 +13,6 @@ public class ChatMessage
     public string? QueryType { get; set; }
     public List<string>? SuggestedActions { get; set; } = new();
     public List<string>? Sources { get; set; } = new();
+
+    public QueryFeedback Feedback = QueryFeedback.NotVoted;
 }

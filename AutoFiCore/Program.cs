@@ -307,9 +307,6 @@ builder.Services.AddScoped<IUserContextService, UserContextService>();
 // Register AI Assistant Service
 builder.Services.AddScoped<IAIAssistantService, AIAssistantService>();
 
-// Register User Context Cache Service
-builder.Services.AddSingleton<IUserContextCache, UserContextCache>();
-
 // Add services to the container.
 builder.Services.AddControllers();
 

@@ -41,7 +41,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<RecentDownloads> RecentDownloads { get; set; } = null!;
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<ChatSession> ChatSessions { get; set; }
-
+    public DbSet<PopularQueries> PopularQueries { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -318,7 +318,7 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.UserId).IsRequired();
             entity.Property(e => e.Title).HasMaxLength(200);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
-
+            entity.Property(e => e.UpdatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
         modelBuilder.Entity<ChatMessage>(entity =>
@@ -332,8 +332,18 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.QueryType).HasMaxLength(100).IsRequired(false);
             entity.Property(e => e.SuggestedActions).HasColumnType("jsonb").IsRequired(false);
             entity.Property(e => e.Sources).HasColumnType("jsonb").IsRequired(false);
+            entity.Property(e => e.Feedback).HasConversion<string>().HasMaxLength(20).IsRequired();
         });
 
+        modelBuilder.Entity<PopularQueries>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.DisplayText).IsRequired().HasMaxLength(250);
+            entity.Property(p => p.Count).HasDefaultValue(1);
+            entity.Property(p => p.LastAsked).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            entity.Property(q => q.Embedding).HasColumnType("double precision[]");
+
+        });
 
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
@@ -396,6 +406,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<ChatMessage>().HasIndex(e => e.Timestamp).HasDatabaseName("IX_ChatMessages_Timestamp");
         modelBuilder.Entity<ChatMessage>().HasIndex(e => e.Sender).HasDatabaseName("IX_ChatMessages_Sender");
 
+        modelBuilder.Entity<PopularQueries>().HasIndex(e => new { e.Count, e.LastAsked });
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()
