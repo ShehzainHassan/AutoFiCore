@@ -258,12 +258,12 @@ namespace AutoFiCore.Services
                 {
                     ChatSessionId = session.Id,
                     Sender = "AI",
-                    Message = result.Answer,
+                    Message = result.UiBlock,
                     Timestamp = DateTime.UtcNow,
                     UiType = result.UiType,
                     QueryType = result.QueryType,
                     SuggestedActions = result.SuggestedActions,
-                    Sources = result.Sources
+                    Sources = result.Sources,
                 };
                 await uow.ChatRepository.AddMessageAsync(aiMessage);
 
@@ -283,10 +283,8 @@ namespace AutoFiCore.Services
         }
         public async Task<ChatSessionDto?> GetFullChatAsync(int userId, string sessionId)
         {
-            using var scope = _scopeFactory.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
-            var chat = await uow.ChatRepository.GetSessionAsync(sessionId, userId);
+          
+            var chat = await _uow.ChatRepository.GetSessionAsync(sessionId, userId);
             if (chat == null) return null;
 
             return new ChatSessionDto
@@ -306,7 +304,7 @@ namespace AutoFiCore.Services
                         UiType = m.UiType,
                         QueryType = m.QueryType,
                         SuggestedActions = m.SuggestedActions ?? new List<string>(),
-                        Sources = m.Sources ?? new List<string>()
+                        Sources = m.Sources ?? new List<string>(),
                     })
                     .OrderBy(m => m.Id)
                     .ToList()

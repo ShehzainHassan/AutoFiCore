@@ -80,7 +80,6 @@ namespace AutoFiCore.Controllers
             return Ok(context);
         }
 
-
         /// <summary>
         /// Retrieves contextual AI-generated suggestions based on the user's auction and vehicle history.
         /// </summary>

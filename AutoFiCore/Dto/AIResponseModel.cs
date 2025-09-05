@@ -27,5 +27,8 @@ namespace AutoFiCore.Dto
 
         [JsonPropertyName("session_id")]
         public string SessionId { get; set; }
+
+        [JsonPropertyName("ui_block")]
+        public string UiBlock { get; set; }
     }
 }
