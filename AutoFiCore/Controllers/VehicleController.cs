@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage.Json;
 using AutoFiCore.Dto;
 using AutoFiCore.DTOs;
 using Newtonsoft.Json;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace AutoFiCore.Controllers
 {
@@ -85,6 +86,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves all distinct car colors.
         /// </summary>
         /// <returns>Returns a list of car colors.</returns>
+        [DisableRateLimiting]
         [HttpGet("get-colors")]
         public async Task<ActionResult<List<string>>> GetAllCarColors()
         {
@@ -98,6 +100,7 @@ namespace AutoFiCore.Controllers
         /// <param name="paginationParams">Pagination parameters.</param>
         /// <param name="make">Vehicle make to filter by.</param>
         /// <returns>Returns a list of vehicles matching the make.</returns>
+        [DisableRateLimiting]
         [HttpGet("by-make")]
         public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByMake([FromQuery] PaginationParams paginationParams, [FromQuery] string make)
         {
@@ -124,6 +127,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="filters">Filter criteria.</param>
         /// <returns>Returns a dictionary with color counts.</returns>
+        [DisableRateLimiting]
         [HttpGet("colors-count")]
         public async Task<ActionResult<Dictionary<string, int>>> GetColorsCount([FromQuery] VehicleFilterDto filters)
         {
@@ -137,6 +141,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="filters">Filter criteria.</param>
         /// <returns>Returns a dictionary with gearbox type counts.</returns>
+        [DisableRateLimiting]
         [HttpGet("gearbox-count")]
         public async Task<ActionResult<Dictionary<string, int>>> GetGearboxCount([FromQuery] VehicleFilterDto filters)
         {
@@ -150,6 +155,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="filters">Filter criteria.</param>
         /// <returns>Returns the total count of vehicles.</returns>
+        [DisableRateLimiting]
         [HttpGet("total-vehicle-count")]
         public async Task<ActionResult<int>> GetTotalVehicleCount([FromQuery] VehicleFilterDto filters)
         {
@@ -183,6 +189,7 @@ namespace AutoFiCore.Controllers
         /// <param name="paginationParams">Pagination parameters.</param>
         /// <param name="model">Vehicle model.</param>
         /// <returns>Returns a list of vehicles matching the model.</returns>
+        [DisableRateLimiting]
         [HttpGet("by-model")]
         public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByModel([FromQuery] PaginationParams paginationParams, [FromQuery] string model)
         {
@@ -197,6 +204,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves all distinct vehicle makes.
         /// </summary>
         /// <returns>Returns a list of vehicle makes.</returns>
+        [DisableRateLimiting]
         [HttpGet("get-makes")]
         public async Task<ActionResult<List<string>>> GetAllMakes()
         {
@@ -208,6 +216,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves all distinct vehicle categories.
         /// </summary>
         /// <returns>Returns a list of vehicle categories.</returns>
+        [DisableRateLimiting]
         [HttpGet("get-categories")]
         public async Task<ActionResult<List<string>>> GetAllCategories()
         {

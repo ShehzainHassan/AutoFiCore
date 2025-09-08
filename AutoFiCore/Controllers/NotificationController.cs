@@ -1,8 +1,9 @@
 ﻿using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using Microsoft.AspNetCore.RateLimiting;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace AutoFiCore.Controllers
 {
@@ -97,6 +98,7 @@ namespace AutoFiCore.Controllers
         /// Returns the count of unread notifications for the authenticated user.
         /// </summary>
         [Authorize]
+        [DisableRateLimiting]
         [HttpGet("unread-count")]
         public async Task<ActionResult<int>> GetUnreadNotificationCount()
         {

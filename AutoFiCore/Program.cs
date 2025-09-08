@@ -17,7 +17,8 @@ using QuestPDF.Infrastructure;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using Npgsql;
-
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 NpgsqlConnection.GlobalTypeMapper.EnableDynamicJson();
 WebApplicationBuilder builder;
@@ -97,6 +98,29 @@ builder.Services.AddCors(options =>
             .AllowCredentials();
     });
 });
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.User.Identity?.Name
+                         ?? context.Connection.RemoteIpAddress?.ToString()
+                         ?? "anonymous",
+            factory: key => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 15,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", token);
+    };
+});
+
 
 // Configure API settings first to determine if we need database
 var apiSettings = builder.Configuration.GetSection("ApiSettings").Get<ApiSettings>()
@@ -481,11 +505,12 @@ app.UseRequestExecutionTimeLogging();
 
 // app.UseHttpsRedirection();
 
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<CheckoutAuthorizationMiddleware>();
 app.MapControllers();
-app.MapHub<AuctionHub>("/hubs/auction");
+app.MapHub<AuctionHub>("/hubs/auction").DisableRateLimiting();
 await app.RunAsync();
 
 // Helper method to convert Railway DATABASE_URL to Npgsql connection string

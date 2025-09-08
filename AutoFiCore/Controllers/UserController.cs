@@ -4,8 +4,9 @@ using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using Microsoft.AspNetCore.RateLimiting;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace AutoFiCore.Controllers
 {
@@ -56,6 +57,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="loginDTO">The login credentials.</param>
         /// <returns>Returns the authenticated user or unauthorized error.</returns>
+        [DisableRateLimiting]
         [HttpPost("login")]
         public async Task<ActionResult<User>> LoginUser([FromBody] LoginDTO loginDTO)
         {
@@ -138,6 +140,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <returns>Returns a list of vehicle VINs liked by the user.</returns>
         [Authorize]
+        [DisableRateLimiting]
         [HttpGet("get-user-liked-vins")]
         public async Task<ActionResult<List<string>>> GetUserLikedVins()
         {
@@ -160,6 +163,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <returns>Returns a list of saved searches.</returns>
         [Authorize]
+        [DisableRateLimiting]
         [HttpGet("get-user-saved-searches")]
         public async Task<ActionResult<List<string>>> GetUserSearches()
         {

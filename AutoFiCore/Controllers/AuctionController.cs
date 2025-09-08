@@ -5,8 +5,9 @@ using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
+using Microsoft.AspNetCore.RateLimiting;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace AutoFiCore.Controllers
 {
@@ -76,6 +77,7 @@ namespace AutoFiCore.Controllers
         /// <response code="400">If the request parameters are invalid.</response>
 
         [HttpGet]
+        [DisableRateLimiting]
         public async Task<IActionResult> GetAuctions([FromQuery] AuctionQueryParams filters)
         {
             var auctions = await _auctionService.GetAuctionsAsync(filters);
@@ -101,6 +103,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves the date of the oldest auction in the system.
         /// </summary>
         /// <returns>Returns the oldest auction date.</returns>
+        [DisableRateLimiting]
         [HttpGet("oldest-auction")]
         public async Task<IActionResult> GetOldestAuctionDate()
         {
@@ -115,6 +118,7 @@ namespace AutoFiCore.Controllers
         /// <param name="dto">Bid creation data.</param>
         /// <returns>Returns the placed bid or an error.</returns>
         [Authorize]
+        [DisableRateLimiting]
         [HttpPost("{id}/bids")]
         public async Task<IActionResult> PlaceBid([FromRoute(Name = "id")] int auctionId, [FromBody] CreateBidDTO dto)
         {
