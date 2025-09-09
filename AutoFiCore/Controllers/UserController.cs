@@ -15,20 +15,26 @@ namespace AutoFiCore.Controllers
     /// </summary>
     [ApiController]
     [Route("[controller]")]
-    public class UserController : ControllerBase
+    public class UserController : SecureControllerBase
     {
         private readonly IUserService _userService;
         private readonly IVehicleService _vehicleService;
+        private readonly TokenProvider _tokenProvider;
+        private readonly IRefreshTokenService _refreshTokenService;
+        private readonly ILogger<UserController> _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UserController"/> class.
         /// </summary>
         /// <param name="userService">Service for handling user-related operations.</param>
         /// <param name="vehicleService">Service for handling vehicle-related operations.</param>
-        public UserController(IUserService userService, IVehicleService vehicleService)
+        public UserController(IUserService userService, IVehicleService vehicleService, TokenProvider tokenProvider, IRefreshTokenService refreshTokenService, ILogger<UserController> logger)
         {
             _userService = userService;
             _vehicleService = vehicleService;
+            _tokenProvider = tokenProvider;
+            _refreshTokenService = refreshTokenService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -36,6 +42,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="user">The user entity to create.</param>
         /// <returns>Returns the created user or error details.</returns>
+        [AllowAnonymous]
         [HttpPost("add")]
         public async Task<ActionResult> CreateUser([FromBody] User user)
         {
@@ -57,22 +64,40 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="loginDTO">The login credentials.</param>
         /// <returns>Returns the authenticated user or unauthorized error.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpPost("login")]
         public async Task<ActionResult<User>> LoginUser([FromBody] LoginDTO loginDTO)
         {
-            var user = await _userService.LoginUserAsync(loginDTO.Email, loginDTO.Password);
-            if (user == null)
-            {
+            var response = await _userService.LoginUserAsync(loginDTO.Email, loginDTO.Password);
+            if (response == null)
                 return Unauthorized(new { message = "Invalid credentials" });
-            }
-            return Ok(user);
+
+            var refreshToken = await _refreshTokenService.GetLatestTokenForUserAsync(response.UserId);
+            Response.Cookies.Append("refreshToken", refreshToken!.Token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Expires = refreshToken.Expires
+            });
+         
+            return Ok(response);
         }
 
+        [AllowAnonymous]
+        [HttpPost("logout")]
+        public IActionResult Logout()
+        {
+            Response.Cookies.Delete("refreshToken");
+
+            return Ok(new { message = "Logged out successfully" });
+        }
         /// <summary>
         /// Gets the total count of all users.
         /// </summary>
         /// <returns>Returns the count of users.</returns>
+        [AllowAnonymous]
         [HttpGet("all-users-count")]
         public async Task<ActionResult<UserLikes>> GetUsersCount()
         {
@@ -84,6 +109,7 @@ namespace AutoFiCore.Controllers
         /// Gets the creation date of the oldest user in the system.
         /// </summary>
         /// <returns>Returns the date of the oldest user creation.</returns>
+        [AllowAnonymous]
         [HttpGet("oldest-user")]
         public async Task<ActionResult> GetOldestCreatedUsre()
         {
@@ -100,15 +126,17 @@ namespace AutoFiCore.Controllers
         [HttpPost("add-user-like")]
         public async Task<ActionResult<UserLikes>> AddUserLike([FromBody] UserLikes userLikes)
         {
-            var user = await _userService.GetUserByIdAsync(userLikes.userId);
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context. " });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("AddUserLike called. CorrelationId={CorrelationId}, UserId={UserId}, VIN={Vin}", correlationId, userId, userLikes.vehicleVin);
+
             var vehicle = await _vehicleService.GetVehicleByVinAsync(userLikes.vehicleVin);
-
-            if (user == null)
-                return NotFound(new { message = $"User with ID {userLikes.userId} not found." });
-
             if (vehicle == null)
                 return NotFound(new { message = $"Vehicle with VIN {userLikes.vehicleVin} not found." });
 
+            userLikes.userId = userId;
             var addedLike = await _userService.AddUserLikeAsync(userLikes);
             return Ok(addedLike);
         }
@@ -122,15 +150,17 @@ namespace AutoFiCore.Controllers
         [HttpDelete("remove-user-like")]
         public async Task<ActionResult<UserLikes>> RemoveUserLike([FromBody] UserLikes userLikes)
         {
-            var user = await _userService.GetUserByIdAsync(userLikes.userId);
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("RemoveUserLike called. CorrelationId={CorrelationId}, UserId={UserId}, VIN={Vin}", correlationId, userId, userLikes.vehicleVin);
+
             var vehicle = await _vehicleService.GetVehicleByVinAsync(userLikes.vehicleVin);
-
-            if (user == null)
-                return NotFound(new { message = $"User with ID {userLikes.userId} not found." });
-
             if (vehicle == null)
                 return NotFound(new { message = $"Vehicle with VIN {userLikes.vehicleVin} not found." });
 
+            userLikes.userId = userId;
             var removedLike = await _userService.RemoveUserLikeAsync(userLikes);
             return Ok(removedLike);
         }
@@ -144,55 +174,43 @@ namespace AutoFiCore.Controllers
         [HttpGet("get-user-liked-vins")]
         public async Task<ActionResult<List<string>>> GetUserLikedVins()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                        User.FindFirst(JwtRegisteredClaimNames.Sub);
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
 
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
-
-            var user = await _userService.GetUserByIdAsync(userId);
-            if (user == null)
-                return NotFound($"User with ID {userId} not found");
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetUserLikedVins called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var vins = await _userService.GetUserLikedVinsAsync(userId);
             return Ok(vins);
         }
 
-        /// <summary>
-        /// Retrieves all saved searches for the authenticated user.
-        /// </summary>
-        /// <returns>Returns a list of saved searches.</returns>
         [Authorize]
         [DisableRateLimiting]
         [HttpGet("get-user-saved-searches")]
         public async Task<ActionResult<List<string>>> GetUserSearches()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                         User.FindFirst(JwtRegisteredClaimNames.Sub);
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
 
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
-
-            var user = await _userService.GetUserByIdAsync(userId);
-            if (user == null)
-                return NotFound($"User with ID {userId} not found");
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetUserSearches called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var searches = await _userService.GetUserSavedSearches(userId);
             return Ok(searches);
         }
 
-        /// <summary>
-        /// Deletes a saved search for a user.
-        /// </summary>
-        /// <param name="search">The saved search to delete.</param>
-        /// <returns>Returns the deleted search or not found error.</returns>
         [Authorize]
         [HttpDelete("delete-search")]
         public async Task<ActionResult<UserSavedSearch>> DeleteUserSearch([FromBody] UserSavedSearch search)
         {
-            var user = await _userService.GetUserByIdAsync(search.userId);
-            if (user == null)
-                return NotFound($"User with ID {search.userId} not found");
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("DeleteUserSearch called. CorrelationId={CorrelationId}, UserId={UserId}, Search={Search}", correlationId, userId, search.search);
+
+            if (search.userId != userId)
+                return Forbid("User ID mismatch between token and payload.");
 
             var savedSearch = await _userService.RemoveSavedSearchAsync(search);
             if (savedSearch == null)
@@ -200,12 +218,12 @@ namespace AutoFiCore.Controllers
 
             return Ok(savedSearch);
         }
-
         /// <summary>
         /// Retrieves a user by their ID.
         /// </summary>
         /// <param name="id">The user's ID.</param>
         /// <returns>Returns the user details or not found error.</returns>
+        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<ActionResult<User>> GetUserById(int id)
         {
@@ -225,9 +243,14 @@ namespace AutoFiCore.Controllers
         [HttpPost("save-search")]
         public async Task<ActionResult<UserSavedSearch>> SaveUserSearch([FromBody] UserSavedSearch search)
         {
-            var user = await _userService.GetUserByIdAsync(search.userId);
-            if (user == null)
-                return NotFound($"User with ID {search.userId} not found");
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("SaveUserSearch called. CorrelationId={CorrelationId}, UserId={UserId}, Search={Search}", correlationId, userId, search.search);
+
+            if (search.userId != userId)
+                return Forbid("User ID mismatch between token and payload.");
 
             var savedSearch = await _userService.AddUserSearchAsync(search);
             return Ok(savedSearch);
@@ -238,13 +261,20 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="userInteraction">The interaction details.</param>
         /// <returns>Returns the added interaction.</returns>
+     
         [Authorize]
         [HttpPost("add-interaction")]
         public async Task<ActionResult<UserInteractionsDTO>> AddUserInteraction([FromBody] UserInteractions userInteraction)
         {
-            var user = await _userService.GetUserByIdAsync(userInteraction.UserId);
-            if (user == null)
-                return NotFound($"User with ID {userInteraction.UserId} not found");
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("AddUserInteraction called. CorrelationId={CorrelationId}, UserId={UserId}, VehicleId={VehicleId}, Type={Type}",
+                correlationId, userId, userInteraction.VehicleId, userInteraction.InteractionType);
+
+            if (userInteraction.UserId != userId)
+                return Forbid("User ID mismatch between token and payload.");
 
             var vehicle = await _vehicleService.GetVehicleByIdAsync(userInteraction.VehicleId);
             if (vehicle == null)
@@ -258,6 +288,47 @@ namespace AutoFiCore.Controllers
                 VehicleId = savedInteraction.VehicleId,
                 InteractionType = savedInteraction.InteractionType,
                 CreatedAt = savedInteraction.CreatedAt
+            });
+        }
+
+        [DisableRateLimiting]
+        [AllowAnonymous]
+        [HttpPost("refresh")]
+        public async Task<IActionResult> Refresh()
+        {
+            var refreshToken = Request.Cookies["refreshToken"];
+            if (string.IsNullOrEmpty(refreshToken))
+                return Unauthorized();
+
+            var stored = await _refreshTokenService.GetAsync(refreshToken);
+            if (stored == null || stored.Expires < DateTime.UtcNow || stored.IsRevoked)
+                return Unauthorized();
+
+            var user = await _userService.GetUserByIdAsync(stored.UserId);
+            if (user == null) return Unauthorized();
+
+            var newAccessToken = _tokenProvider.CreateAccessToken(user);
+
+            if (stored.Expires < DateTime.UtcNow.AddDays(2))
+            {
+                var newRefreshToken = _tokenProvider.GenerateRefreshToken();
+                await _refreshTokenService.RotateAsync(stored, newRefreshToken);
+
+                Response.Cookies.Append("refreshToken", newRefreshToken, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Strict,
+                    Expires = DateTime.UtcNow.AddDays(7)
+                });
+            }
+
+            return Ok(new
+            {
+                accessToken = newAccessToken,
+                userId = user.Id,
+                userName = user.Name,
+                userEmail = user.Email
             });
         }
     }

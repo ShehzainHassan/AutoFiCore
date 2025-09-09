@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Data;
+﻿using AutoFiCore.Controllers;
+using AutoFiCore.Data;
 using AutoFiCore.Dto;
 using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -9,17 +10,19 @@ using Microsoft.AspNetCore.Mvc;
 /// </summary>
 [ApiController]
 [Route("api/auction")]
-public class AuctionSchedulerController:ControllerBase
+public class AuctionSchedulerController:SecureControllerBase
 {
    private readonly IAuctionSchedulerService _service;
+    private readonly ILogger<AuctionSchedulerController> _logger;
     /// <summary>
     /// Initializes a new instance of the <see cref="AuctionSchedulerController"/> class.
     /// </summary>
     /// <param name="auctionSchedulerService">Service for managing auction scheduling.</param>
-   public AuctionSchedulerController(IAuctionSchedulerService auctionSchedulerService)
-   {
-      _service = auctionSchedulerService;
-   }
+    public AuctionSchedulerController(IAuctionSchedulerService auctionSchedulerService, ILogger<AuctionSchedulerController> logger)
+    {
+        _service = auctionSchedulerService;
+        _logger = logger;
+    }
 
     /// <summary>
     /// Updates the scheduling details of an existing auction.
@@ -31,14 +34,17 @@ public class AuctionSchedulerController:ControllerBase
     /// otherwise returns <see cref="BadRequestObjectResult"/> with error details.
     /// </returns>
 
-   [Authorize]
-   [HttpPut("schedule/{id}")]
-   public async Task<IActionResult> UpdateScheduledAuction([FromRoute(Name = "id")] int auctionId, [FromBody] CreateAuctionDTO dto)
-   {
-        var result = await _service.UpdateScheduledAuctionAsync(auctionId, dto);
-        if (!result.IsSuccess)
-            return BadRequest(new { error = result.Error });
+    [Authorize]
+    [HttpPut("schedule/{id}")]
+    public async Task<IActionResult> UpdateScheduledAuction([FromRoute(Name = "id")] int auctionId, [FromBody] CreateAuctionDTO dto)
+    {
+        if (!IsUserContextValid(out var userId))
+            return Unauthorized(new { message = "Invalid token or user context." });
 
-        return Ok(result.Value);
-   }
+        var correlationId = SetCorrelationIdHeader();
+        _logger.LogInformation("UpdateScheduledAuction called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
+
+        var result = await _service.UpdateScheduledAuctionAsync(auctionId, dto);
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
+    }
 }

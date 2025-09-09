@@ -42,6 +42,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<ChatSession> ChatSessions { get; set; }
     public DbSet<PopularQueries> PopularQueries { get; set; } = null!;
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -345,6 +346,16 @@ public class ApplicationDbContext : DbContext
 
         });
 
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.UserId).IsRequired();
+            entity.Property(r => r.Token).IsRequired().HasMaxLength(256);
+            entity.Property(r => r.Expires).IsRequired();
+            entity.Property(r => r.IsRevoked).IsRequired();
+            entity.Property(r => r.Created).IsRequired();
+        });
+
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Model).HasDatabaseName("IX_Vehicles_Model");
@@ -407,6 +418,9 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<ChatMessage>().HasIndex(e => e.Sender).HasDatabaseName("IX_ChatMessages_Sender");
 
         modelBuilder.Entity<PopularQueries>().HasIndex(e => new { e.Count, e.LastAsked });
+
+        modelBuilder.Entity<RefreshToken>().HasIndex(r => r.Token).IsUnique();
+        modelBuilder.Entity<RefreshToken>().HasIndex(r => r.UserId);
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()

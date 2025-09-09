@@ -28,6 +28,7 @@ namespace AutoFiCore.Controllers
         /// <param name="startDate">Start date of the report range.</param>
         /// <param name="endDate">End date of the report range.</param>
         /// <returns>A <see cref="PerformanceReport"/> containing system performance metrics.</returns>
+        [AllowAnonymous]
         [HttpGet("performance-report")]
         public async Task<ActionResult<PerformanceReport>> GetPerformanceReport([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
@@ -43,6 +44,7 @@ namespace AutoFiCore.Controllers
         /// <param name="startDate">Start date of the report range.</param>
         /// <param name="endDate">End date of the report range.</param>
         /// <returns>An <see cref="ErrorReport"/> containing system error statistics.</returns>
+        [AllowAnonymous]
         [HttpGet("error-report")]
         public async Task<ActionResult<ErrorReport>> GetErrorReport([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
@@ -58,6 +60,7 @@ namespace AutoFiCore.Controllers
         /// <param name="startDate">Start date of the query analysis range.</param>
         /// <param name="endDate">End date of the query analysis range.</param>
         /// <returns>A list of <see cref="SlowQueryEntry"/> objects representing slow queries.</returns>
+        [AllowAnonymous]
         [HttpGet("slow-queries")]
         public async Task<ActionResult<List<SlowQueryEntry>>> IdentifySlowQueries([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {

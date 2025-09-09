@@ -31,6 +31,7 @@ namespace AutoFiCore.Controllers
         /// Returns the subscribed <see cref="Newsletter"/> object if successful;
         /// otherwise returns a <see cref="BadRequestObjectResult"/> or <see cref="ConflictObjectResult"/> with error details.
         /// </returns>
+        [AllowAnonymous]
         [HttpPost("subscribe-email")]
         [ProducesResponseType(typeof(Newsletter), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]

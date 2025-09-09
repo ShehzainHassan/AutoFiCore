@@ -15,7 +15,7 @@ namespace AutoFiCore.Validator
         public ContactInfoValidator()
         {
             RuleFor(x => x.FirstName).NotEmpty().WithMessage("First name is required.");
-            RuleFor(x => x.LastName).NotEmpty().WithMessage("Last name is required.");
+            RuleFor(x => x.LastName).MaximumLength(100).WithMessage("Last name is required.");
             RuleFor(x => x.SelectedOption).NotEmpty().WithMessage("Selected option is required.");
             RuleFor(x => x.VehicleName).NotEmpty().WithMessage("Vehicle name is required.");
             RuleFor(x => x.PostCode).NotEmpty().WithMessage("Post code is required.");

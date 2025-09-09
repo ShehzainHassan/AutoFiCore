@@ -1,6 +1,7 @@
 ﻿using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
+using AutoFiCore.Services;
 using BCrypt.Net;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
@@ -97,27 +98,29 @@ namespace AutoFiCore.Data
             _dbContext.UserLikes.Remove(like);
             return like;
         }
-        public async Task<AuthResponse?> LoginUserAsync(string email, string password, TokenProvider tokenProvider)
+        public async Task<AuthResponse?> LoginUserAsync(string email, string password, TokenProvider tokenProvider, IRefreshTokenService refreshTokenService)
         {
             var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
-            if (user == null)
-            {
-                return null;  
-            }
-            if (!BCrypt.Net.BCrypt.Verify(password, user.Password))
+            if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.Password))
             {
                 return null;
             }
+
             user.LastLoggedIn = DateTime.UtcNow;
             await _dbContext.SaveChangesAsync();
-            string token = tokenProvider.Create(user);
+
+            string accessToken = tokenProvider.CreateAccessToken(user);
+            string refreshToken = tokenProvider.GenerateRefreshToken();
+
+            await refreshTokenService.SaveAsync(user.Id, refreshToken);
+
             return new AuthResponse
             {
-                Token = token,
+                AccessToken = accessToken,
                 UserId = user.Id,
                 UserName = user.Name,
                 UserEmail = user.Email
-            };           
+            };
         }
         public async Task<DateTime?> GetOldestUserCreatedDateAsync()
         {
@@ -126,7 +129,6 @@ namespace AutoFiCore.Data
                 .Select(u => (DateTime?)u.CreatedUtc)
                 .FirstOrDefaultAsync();
         }
-
     }
 }
 

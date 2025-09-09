@@ -16,17 +16,19 @@ namespace AutoFiCore.Controllers
     /// </summary>
     [ApiController]
     [Route("auction")]
-    public class AuctionController : ControllerBase
+    public class AuctionController : SecureControllerBase
     {
         private readonly IAuctionService _auctionService;
+        private readonly ILogger<AuctionController> _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AuctionController"/> class.
         /// </summary>
         /// <param name="auctionService">Service for handling auction operations.</param>
-        public AuctionController(IAuctionService auctionService)
+        public AuctionController(IAuctionService auctionService, ILogger<AuctionController> logger)
         {
             _auctionService = auctionService;
+            _logger = logger;
         }
 
         //[Authorize(Roles = "Admin")]
@@ -35,6 +37,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="dto">Auction creation data.</param>
         /// <returns>Returns the created auction or an error.</returns>
+        [AllowAnonymous]
         [HttpPost]
         public async Task<IActionResult> CreateAuction([FromBody] CreateAuctionDTO dto)
         {
@@ -53,6 +56,7 @@ namespace AutoFiCore.Controllers
         /// <param name="id">ID of the auction to update.</param>
         /// <param name="dto">Data containing the new status.</param>
         /// <returns>Returns the updated auction status or an error.</returns>
+        [AllowAnonymous]
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateAuctionStatusDTO dto)
         {
@@ -75,7 +79,7 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns a list of auctions matching the specified filters.</returns>
         /// <response code="200">Returns the list of auctions.</response>
         /// <response code="400">If the request parameters are invalid.</response>
-
+        [AllowAnonymous]
         [HttpGet]
         [DisableRateLimiting]
         public async Task<IActionResult> GetAuctions([FromQuery] AuctionQueryParams filters)
@@ -89,6 +93,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="id">ID of the auction.</param>
         /// <returns>Returns the auction details or a not found error.</returns>
+        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAuction(int id)
         {
@@ -103,6 +108,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves the date of the oldest auction in the system.
         /// </summary>
         /// <returns>Returns the oldest auction date.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("oldest-auction")]
         public async Task<IActionResult> GetOldestAuctionDate()
@@ -122,12 +128,16 @@ namespace AutoFiCore.Controllers
         [HttpPost("{id}/bids")]
         public async Task<IActionResult> PlaceBid([FromRoute(Name = "id")] int auctionId, [FromBody] CreateBidDTO dto)
         {
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("PlaceBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}, Amount={Amount}",
+                correlationId, userId, auctionId, dto.Amount);
+
+            dto.UserId = userId;
             var result = await _auctionService.PlaceBidAsync(auctionId, dto);
-
-            if (!result.IsSuccess)
-                return BadRequest(new { error = result.Error });
-
-            return Ok(result.Value);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
         }
 
         /// <summary>
@@ -150,23 +160,21 @@ namespace AutoFiCore.Controllers
         /// Retrieves the bid history for the currently authenticated user.
         /// </summary>
         /// <returns>Returns the user's bid history or a not found error.</returns>
+
         [Authorize]
         [HttpGet("userBids")]
         public async Task<IActionResult> GetUserBidHistory()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetUserBidHistory called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
+
             var result = await _auctionService.GetUserBidHistoryAsync(userId);
-
-            if (!result.IsSuccess)
-                return NotFound(new { error = result.Error });
-
-            return Ok(result.Value);
+            return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Adds an auction to the authenticated user's watchlist.
@@ -177,18 +185,16 @@ namespace AutoFiCore.Controllers
         [HttpPost("{id}/watch")]
         public async Task<IActionResult> AddToWatchlist(int id)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var result = await _auctionService.AddToWatchListAsync(userId, id);
-            if (!result.IsSuccess)
-                return BadRequest(new { error = result.Error });
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("AddToWatchlist called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, id);
 
-            return Ok(result.Value!);
+            var result = await _auctionService.AddToWatchListAsync(userId, id);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Removes an auction from the authenticated user's watchlist.
@@ -199,18 +205,16 @@ namespace AutoFiCore.Controllers
         [HttpDelete("{id}/watch")]
         public async Task<IActionResult> RemoveFromWatchlist(int id)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var result = await _auctionService.RemoveFromWatchListAsync(userId, id);
-            if (!result.IsSuccess)
-                return BadRequest(new { error = result.Error });
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("RemoveFromWatchlist called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, id);
 
-            return Ok(result.Value);
+            var result = await _auctionService.RemoveFromWatchListAsync(userId, id);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Retrieves the authenticated user's watchlist.
@@ -220,67 +224,67 @@ namespace AutoFiCore.Controllers
         [HttpGet("user/watchlist")]
         public async Task<IActionResult> GetUserWatchlist()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var watchlists = await _auctionService.GetUserWatchListAsync(userId);
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetUserWatchlist called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
-            if (!watchlists.IsSuccess)
-                return NotFound(new { error = watchlists.Error });
-
-            return Ok(watchlists.Value);
+            var result = await _auctionService.GetUserWatchListAsync(userId);
+            return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Retrieves all users watching a specific auction.
         /// </summary>
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns a list of users watching the auction or a not found error.</returns>
+        [AllowAnonymous]
         [HttpGet("{auctionId}/watchers")]
         public async Task<IActionResult> GetAuctionWatchers(int auctionId)
         {
-            var watchlists = await _auctionService.GetAuctionWatchersAsync(auctionId);
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetAuctionWatchers called. CorrelationId={CorrelationId}, AuctionId={AuctionId}", correlationId, auctionId);
 
-            if (!watchlists.IsSuccess)
-                return NotFound(new { error = watchlists.Error });
-
-            return Ok(watchlists.Value);
+            var result = await _auctionService.GetAuctionWatchersAsync(auctionId);
+            return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Retrieves the highest bidder's user ID for a specific auction.
         /// </summary>
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns the highest bidder's ID or a not found error.</returns>
+        [AllowAnonymous]
         [HttpGet("highest-bidder/{auctionId}")]
         public async Task<IActionResult> GetHighestBidderId(int auctionId)
         {
-            var highestId = await _auctionService.GetHighestBidderIdAsync(auctionId);
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetHighestBidderId called. CorrelationId={CorrelationId}, AuctionId={AuctionId}", correlationId, auctionId);
 
-            if (!highestId.IsSuccess)
-                return NotFound(new { error = highestId.Error });
-
-            return Ok(highestId.Value);
+            var result = await _auctionService.GetHighestBidderIdAsync(auctionId);
+            return result.IsSuccess ? Ok(result.Value) : NotFound(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Processes and retrieves the result of a specific auction.
         /// </summary>
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns the auction result or an error.</returns>
+        [AllowAnonymous]
         [HttpGet("{auctionId}/result")]
         public async Task<IActionResult> GetAuctionResult(int auctionId)
         {
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetAuctionResult called. CorrelationId={CorrelationId}, AuctionId={AuctionId}", correlationId, auctionId);
+
             var result = await _auctionService.ProcessAuctionResultAsync(auctionId);
-
-            if (!result.IsSuccess)
-                return BadRequest(result.Error);
-
-            return Ok(result.Value);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
         }
+
 
         /// <summary>
         /// Verifies if the authenticated user is authorized for auction checkout.
@@ -291,7 +295,14 @@ namespace AutoFiCore.Controllers
         [HttpGet("{id}/checkout")]
         public IActionResult VerifyCheckoutAccess(int id)
         {
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("VerifyCheckoutAccess called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, id);
+
             return Ok(new { success = true, message = "User authorized for auction checkout." });
         }
+
     }
 }

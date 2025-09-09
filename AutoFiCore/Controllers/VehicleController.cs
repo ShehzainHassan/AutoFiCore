@@ -1,15 +1,16 @@
-using AutoFiCore.Models;
-using AutoFiCore.Services;
-using Microsoft.AspNetCore.Cors;
-using Microsoft.AspNetCore.Mvc;
-using AutoFiCore.Utilities;
-using System.Globalization;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore.Storage.Json;
 using AutoFiCore.Dto;
 using AutoFiCore.DTOs;
-using Newtonsoft.Json;
+using AutoFiCore.Models;
+using AutoFiCore.Services;
+using AutoFiCore.Utilities;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore.Storage.Json;
+using Newtonsoft.Json;
+using System.Globalization;
+using System.Text.Json;
 
 namespace AutoFiCore.Controllers
 {
@@ -50,6 +51,8 @@ namespace AutoFiCore.Controllers
         /// <param name="paginationParams">Pagination parameters (page size and offset).</param>
         /// <param name="status">Optional vehicle status to filter by.</param>
         /// <returns>Returns a list of vehicles.</returns>
+        [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Vehicle>>> GetAllVehiclesByStatus([FromQuery] PaginationParams paginationParams, [FromQuery] string? status = null)
         {
@@ -66,6 +69,8 @@ namespace AutoFiCore.Controllers
         /// <param name="make">Car make.</param>
         /// <param name="model">Car model.</param>
         /// <returns>Returns the normalized car features or NotFound if not available.</returns>
+        [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("features")]
         public async Task<ActionResult<NormalizedCarFeatureDto>> GetCarFeatures([FromQuery] string make, [FromQuery] string model)
         {
@@ -86,6 +91,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves all distinct car colors.
         /// </summary>
         /// <returns>Returns a list of car colors.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("get-colors")]
         public async Task<ActionResult<List<string>>> GetAllCarColors()
@@ -100,6 +106,7 @@ namespace AutoFiCore.Controllers
         /// <param name="paginationParams">Pagination parameters.</param>
         /// <param name="make">Vehicle make to filter by.</param>
         /// <returns>Returns a list of vehicles matching the make.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("by-make")]
         public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByMake([FromQuery] PaginationParams paginationParams, [FromQuery] string make)
@@ -115,6 +122,8 @@ namespace AutoFiCore.Controllers
         /// Retrieves all available vehicle options.
         /// </summary>
         /// <returns>Returns a list of vehicle options.</returns>
+        [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("get-vehicle-options")]
         public async Task<ActionResult<List<VehicleOptionsDTO>>> GetVehicleOptions()
         {
@@ -127,6 +136,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="filters">Filter criteria.</param>
         /// <returns>Returns a dictionary with color counts.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("colors-count")]
         public async Task<ActionResult<Dictionary<string, int>>> GetColorsCount([FromQuery] VehicleFilterDto filters)
@@ -141,6 +151,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="filters">Filter criteria.</param>
         /// <returns>Returns a dictionary with gearbox type counts.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("gearbox-count")]
         public async Task<ActionResult<Dictionary<string, int>>> GetGearboxCount([FromQuery] VehicleFilterDto filters)
@@ -155,6 +166,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="filters">Filter criteria.</param>
         /// <returns>Returns the total count of vehicles.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("total-vehicle-count")]
         public async Task<ActionResult<int>> GetTotalVehicleCount([FromQuery] VehicleFilterDto filters)
@@ -171,6 +183,8 @@ namespace AutoFiCore.Controllers
         /// <param name="paginationParams">Pagination parameters.</param>
         /// <param name="sortOrder">Optional sort order.</param>
         /// <returns>Returns a list of vehicles matching the search criteria.</returns>
+        [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("search-vehicles")]
         public async Task<ActionResult<IEnumerable<Vehicle>>> SearchVehicles([FromQuery] VehicleFilterDto filters, [FromQuery] PaginationParams paginationParams, [FromQuery] string? sortOrder = null)
         {
@@ -189,6 +203,7 @@ namespace AutoFiCore.Controllers
         /// <param name="paginationParams">Pagination parameters.</param>
         /// <param name="model">Vehicle model.</param>
         /// <returns>Returns a list of vehicles matching the model.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("by-model")]
         public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByModel([FromQuery] PaginationParams paginationParams, [FromQuery] string model)
@@ -204,6 +219,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves all distinct vehicle makes.
         /// </summary>
         /// <returns>Returns a list of vehicle makes.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("get-makes")]
         public async Task<ActionResult<List<string>>> GetAllMakes()
@@ -216,6 +232,7 @@ namespace AutoFiCore.Controllers
         /// Retrieves all distinct vehicle categories.
         /// </summary>
         /// <returns>Returns a list of vehicle categories.</returns>
+        [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("get-categories")]
         public async Task<ActionResult<List<string>>> GetAllCategories()
@@ -229,6 +246,8 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="id">Vehicle ID.</param>
         /// <returns>Returns the vehicle or NotFound if not found.</returns>
+        [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("{id}")]
         public async Task<ActionResult<Vehicle>> GetVehicleById(int id)
         {
@@ -243,6 +262,8 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="vin">Vehicle VIN.</param>
         /// <returns>Returns the vehicle or NotFound if not found.</returns>
+        [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("vin/{vin}")]
         public async Task<ActionResult<Vehicle>> GetVehicleByVin(string vin)
         {
@@ -258,6 +279,7 @@ namespace AutoFiCore.Controllers
         /// <param name="dto">Questionnaire details.</param>
         /// <param name="vehicleId">Vehicle ID associated with the questionnaire.</param>
         /// <returns>Returns the saved questionnaire and loan details.</returns>
+        [AllowAnonymous]
         [HttpPost("save-questionnaire")]
         public async Task<ActionResult<object>> SaveQuestionnaire([FromBody] QuestionnaireDTO dto, [FromQuery] int vehicleId)
         {
@@ -287,6 +309,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="vehicle">Vehicle object to create.</param>
         /// <returns>Returns the created vehicle.</returns>
+        [AllowAnonymous]
         [HttpPost]
         public async Task<ActionResult<Vehicle>> CreateVehicle(Vehicle vehicle)
         {
@@ -304,6 +327,7 @@ namespace AutoFiCore.Controllers
         /// <param name="id">Vehicle ID to update.</param>
         /// <param name="vehicle">Vehicle object with updated data.</param>
         /// <returns>Returns the updated vehicle.</returns>
+        [AllowAnonymous]
         [HttpPut("{id}")]
         public async Task<ActionResult<Vehicle>> UpdateVehicle(int id, Vehicle vehicle)
         {
@@ -323,6 +347,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="id">Vehicle ID to delete.</param>
         /// <returns>Returns NoContent if deleted or NotFound if vehicle does not exist.</returns>
+        [AllowAnonymous]
         [HttpDelete("{id}")]
         public async Task<ActionResult> DeleteVehicle(int id)
         {

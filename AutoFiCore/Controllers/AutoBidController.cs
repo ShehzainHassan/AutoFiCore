@@ -14,20 +14,22 @@ namespace AutoFiCore.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class AutoBidController : ControllerBase
+    public class AutoBidController : SecureControllerBase
     {
         private readonly IAutoBidService _autoBidService;
         private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger<AutoBidController> _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AutoBidController"/> class.
         /// </summary>
         /// <param name="autoBidService">Service for managing auto-bid logic.</param>
         /// <param name="unitOfWork">Unit of work for transactional operations.</param>
-        public AutoBidController(IAutoBidService autoBidService, IUnitOfWork unitOfWork)
+        public AutoBidController(IAutoBidService autoBidService, IUnitOfWork unitOfWork, ILogger<AutoBidController> logger)
         {
             _autoBidService = autoBidService;
             _unitOfWork = unitOfWork;
+            _logger = logger;
         }
 
         /// <summary>
@@ -39,13 +41,18 @@ namespace AutoFiCore.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateAutoBid([FromBody] CreateAutoBidDTO dto)
         {
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("CreateAutoBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, dto.AuctionId);
+
+            dto.UserId = userId;
             var result = await _autoBidService.CreateAutoBidAsync(dto);
 
-            if (!result.IsSuccess)
-                return BadRequest(new { error = result.Error });
-
-            return Ok(result.Value);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Updates an existing auto-bid configuration for a specific auction.
@@ -57,21 +64,16 @@ namespace AutoFiCore.Controllers
         [HttpPut("update/auction/{auctionId}")]
         public async Task<IActionResult> UpdateAutoBid(int auctionId, [FromBody] UpdateAutoBidDTO dto)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
-            }
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("UpdateAutoBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.UpdateAutoBidAsync(auctionId, userId, dto);
-
-            if (!result.IsSuccess)
-                return BadRequest(new { error = result.Error });
-
-            return Ok(result.Value);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
         }
+
 
         /// <summary>
         /// Cancels the auto-bid configuration for a specific auction.
@@ -82,20 +84,14 @@ namespace AutoFiCore.Controllers
         [HttpDelete("{auctionId}")]
         public async Task<IActionResult> CancelAutoBid(int auctionId)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
-            }
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("CancelAutoBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.CancelAutoBidAsync(auctionId, userId);
-
-            if (!result.IsSuccess)
-                return BadRequest(new { error = result.Error });
-
-            return Ok(new { message = "Auto-bid cancelled successfully" });
+            return result.IsSuccess ? Ok(new { message = "Auto-bid cancelled successfully" }) : BadRequest(new { error = result.Error });
         }
 
         /// <summary>
@@ -107,19 +103,14 @@ namespace AutoFiCore.Controllers
         [HttpGet("auction/{auctionId}")]
         public async Task<ActionResult<bool>> IsAutoBidSet(int auctionId)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
-            }
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("IsAutoBidSet called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.IsAutoBidSetAsync(auctionId, userId);
-            if (!result.IsSuccess)
-                return BadRequest(new { error = result.Error });
-
-            return Ok(result.Value);
+            return result.IsSuccess ? Ok(result.Value) : BadRequest(new { error = result.Error });
         }
 
         /// <summary>
@@ -131,20 +122,14 @@ namespace AutoFiCore.Controllers
         [HttpGet("{auctionId}")]
         public async Task<IActionResult> GetAutoBidWithStrategy(int auctionId)
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier) ??
-                              User.FindFirst(JwtRegisteredClaimNames.Sub);
-
-            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int userId))
-            {
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
-            }
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetAutoBidWithStrategy called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.GetAutoBidWithStrategyAsync(userId, auctionId);
-
-            if (!result.IsSuccess)
-                return NotFound(new { message = result.Error });
-
-            return Ok(result.Value);
+            return result.IsSuccess ? Ok(result.Value) : NotFound(new { message = result.Error });
         }
 
         /// <summary>
@@ -152,6 +137,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="auctionId">Auction ID to summarize.</param>
         /// <returns>Returns auto-bid summary or not found message.</returns>
+        [AllowAnonymous]
         [HttpGet("/api/auction/{auctionId}/autobids")]
         public async Task<ActionResult<AutoBidSummaryDto>> GetAuctionAutoBidSummary(int auctionId)
         {

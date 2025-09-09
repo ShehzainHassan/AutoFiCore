@@ -17,7 +17,7 @@ namespace AutoFiCore.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    public class AIAssistantController : ControllerBase
+    public class AIAssistantController : SecureControllerBase
     {
         private readonly IAIAssistantService _aiService;
         private readonly IUserContextService _userContextService;
@@ -41,22 +41,19 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="payload">The query payload to send to the AI service.</param>
         /// <returns>AI-generated response based on the input payload.</returns>
-        [HttpPost("query")]
         [Authorize]
+        [HttpPost("query")]
         public async Task<ActionResult<AIResponseModel>> QueryAI([FromBody] EnrichedAIQuery payload)
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
 
-            if (payload.UserId.ToString() != userIdClaim)
-                return StatusCode(StatusCodes.Status403Forbidden, new { error = "User ID mismatch between token and payload." });
+            if (payload.UserId != userId)
+                return Forbid("User ID mismatch between token and payload.");
 
-            var correlationId = Guid.NewGuid().ToString();
-            HttpContext.Response.Headers["X-Correlation-ID"] = correlationId;
-
+            var correlationId = SetCorrelationIdHeader();
             _logger.LogInformation("AI Query initiated. CorrelationId={CorrelationId}, UserId={UserId}, Question={Question}",
-                correlationId, payload.UserId, payload.Query.Question);
+                correlationId, userId, payload.Query.Question);
 
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
             var result = await _aiService.QueryFastApiAsync(payload, correlationId, jwtToken);
@@ -65,84 +62,91 @@ namespace AutoFiCore.Controllers
             return Ok(result);
         }
 
+
         /// <summary>
         /// Retrieves the user's auction and vehicle history to provide context for AI suggestions.
         /// </summary>
         /// <returns>User-specific auction, watchlist, and vehicle data.</returns>
-        [HttpGet("user-context")]
         [Authorize]
+        [HttpGet("user-context")]
         public async Task<IActionResult> GetUserContext()
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetUserContext called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var context = await _userContextService.GetUserContextAsync(userId);
             return Ok(context);
         }
 
+
         /// <summary>
         /// Retrieves contextual AI-generated suggestions based on the user's auction and vehicle history.
         /// </summary>
         /// <returns>List of personalized suggestions from the AI assistant.</returns>
-        [HttpGet("contextual-suggestions/{userId}")]
         [Authorize]
+        [HttpGet("contextual-suggestions/{userId}")]
         public async Task<IActionResult> GetContextualSuggestions(int userId)
         {
-            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userIdClaim))
+            if (!IsUserContextValid(out var tokenUserId))
                 return Unauthorized(new { error = "Missing user context." });
 
-            if (userId.ToString() != userIdClaim)
-                return StatusCode(StatusCodes.Status403Forbidden, new { error = "User ID mismatch" });
+            if (userId != tokenUserId)
+                return Forbid("User ID mismatch between token and route.");
 
-            var correlationId = Guid.NewGuid().ToString();
-            HttpContext.Response.Headers["X-Correlation-ID"] = correlationId;
-
-            _logger.LogInformation("Contextual suggestion request received. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("Contextual suggestion request. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-
             var suggestions = await _aiService.GetSuggestionsAsync(userId, correlationId, jwtToken);
 
             return Ok(suggestions);
         }
 
-        [HttpGet("chats")]
+
         [Authorize]
+        [HttpGet("chats")]
         public async Task<IActionResult> GetChatTitles()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
 
-            var titles = await _aiService.GetChatTitlesAsync(int.Parse(userId));
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetChatTitles called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
+
+            var titles = await _aiService.GetChatTitlesAsync(userId);
             return Ok(titles);
         }
 
-        [HttpGet("chats/{sessionId}")]
+
         [Authorize]
+        [HttpGet("chats/{sessionId}")]
         public async Task<IActionResult> GetChat(string sessionId)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
 
-            var chat = await _aiService.GetFullChatAsync(int.Parse(userId), sessionId);
-            if (chat == null) return NotFound(new { error = "Chat not found." });
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetChat called. CorrelationId={CorrelationId}, UserId={UserId}, SessionId={SessionId}", correlationId, userId, sessionId);
 
-            return Ok(chat);
+            var chat = await _aiService.GetFullChatAsync(userId, sessionId);
+            return chat != null ? Ok(chat) : NotFound(new { error = "Chat not found." });
         }
+
 
         [Authorize]
         [HttpDelete("chats/{sessionId}")]
         public async Task<IActionResult> DeleteSession(string sessionId)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
 
-            await _aiService.DeleteSessionAsync(sessionId, int.Parse(userId));
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("DeleteSession called. CorrelationId={CorrelationId}, UserId={UserId}, SessionId={SessionId}", correlationId, userId, sessionId);
+
+            await _aiService.DeleteSessionAsync(sessionId, userId);
             return NoContent();
         }
 
@@ -150,28 +154,33 @@ namespace AutoFiCore.Controllers
         [HttpDelete("chats")]
         public async Task<IActionResult> DeleteAllSessions()
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
 
-            await _aiService.DeleteAllSessionsAsync(int.Parse(userId));
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("DeleteAllSessions called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
+
+            await _aiService.DeleteAllSessionsAsync(userId);
             return NoContent();
         }
 
-        [HttpPut("chats/{sessionId}/title")]
         [Authorize]
+        [HttpPut("chats/{sessionId}/title")]
         public async Task<IActionResult> UpdateSessionTitle(string sessionId, [FromBody] UpdateChatTitle request)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
 
             if (string.IsNullOrWhiteSpace(request.NewTitle))
                 return BadRequest(new { error = "Title cannot be empty." });
 
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("UpdateSessionTitle called. CorrelationId={CorrelationId}, UserId={UserId}, SessionId={SessionId}, NewTitle={NewTitle}",
+                correlationId, userId, sessionId, request.NewTitle);
+
             try
             {
-                await _aiService.UpdateSessionTitleAsync(sessionId, int.Parse(userId), request.NewTitle);
+                await _aiService.UpdateSessionTitleAsync(sessionId, userId, request.NewTitle);
                 return Ok("Session updated successfully");
             }
             catch (InvalidOperationException ex)
@@ -180,29 +189,31 @@ namespace AutoFiCore.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Failed to update title for session {sessionId}.");
+                _logger.LogError(ex, "Failed to update title for session {SessionId}", sessionId);
                 return StatusCode(500, new { error = "Internal server error." });
             }
         }
 
-        [HttpPost("feedback")]
         [Authorize]
+        [HttpPost("feedback")]
         public async Task<IActionResult> SubmitFeedback([FromBody] AIQueryFeedbackDto feedbackDto)
         {
-            var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-            if (string.IsNullOrEmpty(jwtToken))
-                return Unauthorized(new { error = "Missing JWT token." });
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { error = "Missing user context." });
 
-            var correlationId = Guid.NewGuid().ToString();
-            HttpContext.Response.Headers["X-Correlation-ID"] = correlationId;
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("SubmitFeedback called. CorrelationId={CorrelationId}, UserId={UserId}, Vote={Vote}",
+                correlationId, userId, feedbackDto.Vote);
 
             try
             {
+                var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
                 var result = await _aiService.SubmitFeedbackAsync(feedbackDto, correlationId, jwtToken);
                 return Ok(result);
             }
             catch (HttpRequestException ex)
             {
+                _logger.LogError(ex, "Feedback submission failed. CorrelationId={CorrelationId}", correlationId);
                 return StatusCode(500, new { error = ex.Message, correlationId });
             }
         }
@@ -210,27 +221,23 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Retrieves the top popular queries from the FastAPI service.
         /// </summary>
-        [HttpGet("popular-queries")]
         [Authorize]
+        [HttpGet("popular-queries")]
         public async Task<ActionResult<List<PopularQueryDto>>> GetPopularQueries([FromQuery] int limit = 10)
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (string.IsNullOrEmpty(userId))
+            if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Missing user context." });
 
             if (limit < 1 || limit > 50)
                 return BadRequest(new { error = "Limit must be between 1 and 50." });
 
-            var correlationId = Guid.NewGuid().ToString();
-            HttpContext.Response.Headers["X-Correlation-ID"] = correlationId;
-
-            _logger.LogInformation("Popular queries request. CorrelationId={CorrelationId}, UserId={UserId}, Limit={Limit}",
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("GetPopularQueries called. CorrelationId={CorrelationId}, UserId={UserId}, Limit={Limit}",
                 correlationId, userId, limit);
-
-            var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
 
             try
             {
+                var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
                 var queries = await _aiService.GetPopularQueriesAsync(limit, correlationId, jwtToken);
                 return Ok(queries);
             }
@@ -240,6 +247,5 @@ namespace AutoFiCore.Controllers
                 return StatusCode(500, new { error = ex.Message, correlationId });
             }
         }
-    
     }
 }

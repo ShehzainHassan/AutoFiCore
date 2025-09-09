@@ -1,7 +1,8 @@
-using Microsoft.AspNetCore.Mvc;
 using AutoFiCore.Data;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace AutoFiCore.Controllers;
 
@@ -35,6 +36,7 @@ public class LoanCalculationController : ControllerBase
     /// including monthly payment, total interest, total cost, and loan metadata such as vehicle ID,
     /// loan amount, interest rate, and term.
     /// </returns>
+    [AllowAnonymous]
     [HttpPost("CalculateLoan")]
     [ProducesResponseType(typeof(LoanCalculation), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]

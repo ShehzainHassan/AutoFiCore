@@ -28,14 +28,16 @@ namespace AutoFiCore.Services
         private readonly IUserRepository _repository;
         private readonly ILogger<UserService> _logger;
         private readonly TokenProvider _tokenProvider;
+        private readonly IRefreshTokenService _refreshTokenService;
         private readonly IUnitOfWork _unitOfWork;
 
-        public UserService(IUserRepository repository, ILogger<UserService> logger, TokenProvider tokenProvider, IUnitOfWork unitOfWork)
+        public UserService(IUserRepository repository, ILogger<UserService> logger, TokenProvider tokenProvider, IUnitOfWork unitOfWork, IRefreshTokenService refreshTokenService)
         {
             _repository = repository;
             _logger = logger;
             _tokenProvider = tokenProvider;
             _unitOfWork = unitOfWork;
+            _refreshTokenService = refreshTokenService;
         }
         public async Task<Result<User>> AddUserAsync(User user)
         {
@@ -49,7 +51,7 @@ namespace AutoFiCore.Services
         }
         public async Task<AuthResponse?> LoginUserAsync(string email, string password)
         {
-            return await _repository.LoginUserAsync(email, password, _tokenProvider);
+            return await _repository.LoginUserAsync(email, password, _tokenProvider, _refreshTokenService);
         }
         public async Task<UserLikes> AddUserLikeAsync(UserLikes userLikes)
         {
@@ -93,7 +95,6 @@ namespace AutoFiCore.Services
             await _unitOfWork.SaveChangesAsync();
             return userInteractions;
         }
-
         public async Task<int> GetAllUsersCountAsync()
         {
             return await _unitOfWork.Users.GetAllUsersCountAsync();
@@ -101,8 +102,6 @@ namespace AutoFiCore.Services
         public async Task<DateTime?> GetOldestUserCreatedDateAsync()
         {
             return await _unitOfWork.Users.GetOldestUserCreatedDateAsync();
-
         }
-
     }
 }

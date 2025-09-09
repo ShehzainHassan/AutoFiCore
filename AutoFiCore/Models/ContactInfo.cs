@@ -22,7 +22,6 @@ namespace AutoFiCore.Models
         /// <summary>
         /// Last name of the user.
         /// </summary>
-        [Required]
         [StringLength(20, ErrorMessage = "Last name cannot exceed 20 characters.")]
         public string LastName { get; set; } = string.Empty;
 

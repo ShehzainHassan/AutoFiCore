@@ -50,7 +50,7 @@ catch (InvalidDataException ex) when (ex.Message.Contains("appsettings.json"))
         ["Jwt:Secret"] = "",
         ["Jwt:Issuer"] = "AutoFiCore",
         ["Jwt:Audience"] = "AutoFiCoreClient",
-        ["Jwt:ExpirationInMinutes"] = "60"
+        ["Jwt:ExpirationInMinutes"] = "15"
     });
 }
 
@@ -134,7 +134,7 @@ JwtSettings jwtSettings = new JwtSettings
     Secret = builder.Configuration["Jwt:Secret"] ?? throw new InvalidOperationException("JWT Secret key is not configured."),
     Issuer = builder.Configuration["Jwt:Issuer"] ?? "AutoFiCore",
     Audience = builder.Configuration["Jwt:Audience"] ?? "AutoFiCoreClient",
-    ExpirationInMinutes = int.Parse(builder.Configuration["Jwt:ExpirationInMinutes"] ?? "60")
+    ExpirationInMinutes = int.Parse(builder.Configuration["Jwt:ExpirationInMinutes"] ?? "15")
 };
 if (!apiSettings.UseMockApi)
 {
@@ -331,6 +331,9 @@ builder.Services.AddScoped<IUserContextService, UserContextService>();
 // Register AI Assistant Service
 builder.Services.AddScoped<IAIAssistantService, AIAssistantService>();
 
+// Register Token Refresh Service
+builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
+
 // Add services to the container.
 builder.Services.AddControllers();
 
@@ -376,10 +379,11 @@ if (string.IsNullOrEmpty(jwtSecret))
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
+        var jwtSecret = builder.Configuration["Jwt:Secret"];
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret!)),
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
@@ -505,6 +509,7 @@ app.UseRequestExecutionTimeLogging();
 
 // app.UseHttpsRedirection();
 
+app.UseMiddleware<TokenRefreshMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

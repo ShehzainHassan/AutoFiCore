@@ -11,17 +11,19 @@ namespace AutoFiCore.Controllers
     /// </summary>
     [ApiController]
     [Route("[controller]")]
-    public class ContactController : ControllerBase
+    public class ContactController : SecureControllerBase
     {
         private readonly IContactInfoService _contactInfoService;
+        private readonly ILogger<ContactController> _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ContactController"/> class.
         /// </summary>
         /// <param name="contactInfoService">Service for handling contact information operations.</param>
-        public ContactController(IContactInfoService contactInfoService)
+        public ContactController(IContactInfoService contactInfoService, ILogger<ContactController> logger)
         {
             _contactInfoService = contactInfoService;
+            _logger = logger;
         }
 
         /// <summary>
@@ -35,6 +37,13 @@ namespace AutoFiCore.Controllers
         [HttpPost("add")]
         public async Task<ActionResult<ContactInfo>> AddContactInfo([FromBody] ContactInfo contactInfo)
         {
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
+
+            var correlationId = SetCorrelationIdHeader();
+            _logger.LogInformation("AddContactInfo called. CorrelationId={CorrelationId}, UserId={UserId}, Phone={Phone}, Email={Email}",
+                correlationId, userId, contactInfo.PhoneNumber, contactInfo.Email);
+
             var addedContact = await _contactInfoService.AddContactInfoAsync(contactInfo);
             return Ok(addedContact);
         }
