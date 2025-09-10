@@ -94,6 +94,7 @@ namespace AutoFiCore.Controllers
         /// <param name="id">ID of the auction.</param>
         /// <returns>Returns the auction details or a not found error.</returns>
         [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetAuction(int id)
         {
@@ -146,6 +147,7 @@ namespace AutoFiCore.Controllers
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns the bid history or a not found error.</returns>
         [HttpGet("{id}/bids")]
+        [DisableRateLimiting]
         public async Task<IActionResult> GetBidHistory([FromRoute(Name = "id")] int auctionId)
         {
             var result = await _auctionService.GetBidHistoryAsync(auctionId);
@@ -162,6 +164,7 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns the user's bid history or a not found error.</returns>
 
         [Authorize]
+        [DisableRateLimiting]
         [HttpGet("userBids")]
         public async Task<IActionResult> GetUserBidHistory()
         {
@@ -221,6 +224,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <returns>Returns the user's watchlist or a not found error.</returns>
         [Authorize]
+        [DisableRateLimiting]
         [HttpGet("user/watchlist")]
         public async Task<IActionResult> GetUserWatchlist()
         {
@@ -241,6 +245,7 @@ namespace AutoFiCore.Controllers
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns a list of users watching the auction or a not found error.</returns>
         [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("{auctionId}/watchers")]
         public async Task<IActionResult> GetAuctionWatchers(int auctionId)
         {
@@ -258,6 +263,7 @@ namespace AutoFiCore.Controllers
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns the highest bidder's ID or a not found error.</returns>
         [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("highest-bidder/{auctionId}")]
         public async Task<IActionResult> GetHighestBidderId(int auctionId)
         {
@@ -275,6 +281,7 @@ namespace AutoFiCore.Controllers
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns the auction result or an error.</returns>
         [AllowAnonymous]
+        [DisableRateLimiting]
         [HttpGet("{auctionId}/result")]
         public async Task<IActionResult> GetAuctionResult(int auctionId)
         {
@@ -292,6 +299,7 @@ namespace AutoFiCore.Controllers
         /// <param name="id">ID of the auction.</param>
         /// <returns>Returns success if the user is authorized.</returns>
         [Authorize]
+        [DisableRateLimiting]
         [HttpGet("{id}/checkout")]
         public IActionResult VerifyCheckoutAccess(int id)
         {

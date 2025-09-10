@@ -95,6 +95,7 @@ builder.Services.AddCors(options =>
             .WithOrigins(allowedOrigins.ToArray())
             .AllowAnyMethod()
             .AllowAnyHeader()
+            .WithExposedHeaders("X-New-Access-Token")
             .AllowCredentials();
     });
 });
@@ -511,9 +512,9 @@ app.UseRequestExecutionTimeLogging();
 
 app.UseMiddleware<TokenRefreshMiddleware>();
 app.UseRateLimiter();
+app.UseMiddleware<CheckoutAuthorizationMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseMiddleware<CheckoutAuthorizationMiddleware>();
 app.MapControllers();
 app.MapHub<AuctionHub>("/hubs/auction").DisableRateLimiting();
 await app.RunAsync();
