@@ -12,14 +12,12 @@ namespace AutoFiCore.Controllers
             return int.TryParse(userIdClaim, out var userId) ? userId : 0;
         }
 
-        protected string SetCorrelationIdHeader()
+        protected string? GetCorrelationId()
         {
-            var correlationId = Guid.NewGuid().ToString();
-            HttpContext.Response.Headers["X-Correlation-ID"] = correlationId;
-            return correlationId;
+            return HttpContext.Items["X-Correlation-ID"]?.ToString();
         }
 
-        protected bool IsUserContextValid(out int userId)
+        protected virtual bool IsUserContextValid(out int userId)
         {
             userId = GetUserId();
             return userId != 0;

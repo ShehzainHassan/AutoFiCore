@@ -20,7 +20,7 @@ namespace AutoFiCore.Middleware
             _logger = logger;
         }
 
-        public async Task InvokeAsync(HttpContext context, IRefreshTokenService refreshTokenService, TokenProvider tokenProvider, IUserService userService)
+        public async Task InvokeAsync(HttpContext context, IRefreshTokenService refreshTokenService, ITokenProvider tokenProvider, IUserService userService)
         {
             var endpoint = context.GetEndpoint();
             if (endpoint?.Metadata?.GetMetadata<IAllowAnonymous>() != null)

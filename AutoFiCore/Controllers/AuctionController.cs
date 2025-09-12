@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Dto;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Dto;
 using AutoFiCore.Mappers;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
@@ -132,7 +133,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("PlaceBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}, Amount={Amount}",
                 correlationId, userId, auctionId, dto.Amount);
 
@@ -171,7 +172,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetUserBidHistory called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var result = await _auctionService.GetUserBidHistoryAsync(userId);
@@ -191,7 +192,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("AddToWatchlist called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, id);
 
             var result = await _auctionService.AddToWatchListAsync(userId, id);
@@ -211,7 +212,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("RemoveFromWatchlist called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, id);
 
             var result = await _auctionService.RemoveFromWatchListAsync(userId, id);
@@ -231,7 +232,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetUserWatchlist called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var result = await _auctionService.GetUserWatchListAsync(userId);
@@ -249,7 +250,7 @@ namespace AutoFiCore.Controllers
         [HttpGet("{auctionId}/watchers")]
         public async Task<IActionResult> GetAuctionWatchers(int auctionId)
         {
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetAuctionWatchers called. CorrelationId={CorrelationId}, AuctionId={AuctionId}", correlationId, auctionId);
 
             var result = await _auctionService.GetAuctionWatchersAsync(auctionId);
@@ -267,7 +268,7 @@ namespace AutoFiCore.Controllers
         [HttpGet("highest-bidder/{auctionId}")]
         public async Task<IActionResult> GetHighestBidderId(int auctionId)
         {
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetHighestBidderId called. CorrelationId={CorrelationId}, AuctionId={AuctionId}", correlationId, auctionId);
 
             var result = await _auctionService.GetHighestBidderIdAsync(auctionId);
@@ -285,7 +286,7 @@ namespace AutoFiCore.Controllers
         [HttpGet("{auctionId}/result")]
         public async Task<IActionResult> GetAuctionResult(int auctionId)
         {
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetAuctionResult called. CorrelationId={CorrelationId}, AuctionId={AuctionId}", correlationId, auctionId);
 
             var result = await _auctionService.ProcessAuctionResultAsync(auctionId);
@@ -306,7 +307,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("VerifyCheckoutAccess called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, id);
 
             return Ok(new { success = true, message = "User authorized for auction checkout." });

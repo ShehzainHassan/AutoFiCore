@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Models;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Models;
 using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;

@@ -1,4 +1,5 @@
 using AutoFiCore.Data;
+using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
@@ -12,11 +13,6 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-
-public interface IAuctionSchedulerService
-{
-    Task<Result<CreateAuctionDTO>> UpdateScheduledAuctionAsync(int auctionId, CreateAuctionDTO dto);
-}
 
 public class AuctionScheduler : BackgroundService, IAuctionSchedulerService
 {

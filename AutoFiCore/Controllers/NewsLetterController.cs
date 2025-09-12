@@ -33,21 +33,21 @@ namespace AutoFiCore.Controllers
         /// </returns>
         [AllowAnonymous]
         [HttpPost("subscribe-email")]
-        [ProducesResponseType(typeof(Newsletter), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status409Conflict)]
-        public async Task<ActionResult<Newsletter>> AddEmailToSubscribe([FromBody] Newsletter newsletter)
+        public async Task<ActionResult<Newsletter>> AddEmailToSubscribe(Newsletter newsletter)
         {
             var result = await _newsLetterService.SubscribeToNewsLetterAsync(newsletter);
-            if (!result.IsSuccess)
-            {
-                if (result.Errors.Any())
-                    return BadRequest(new { errors = result.Errors });
 
+            if (result.IsSuccess)
+                return Ok(result.Value);
+
+            if (!string.IsNullOrEmpty(result.Error) && result.Error.Contains("already subscribed", StringComparison.OrdinalIgnoreCase))
                 return Conflict(new { message = result.Error });
-            }
 
-            return Ok(result.Value);
+            if (result.Errors != null && result.Errors.Any())
+                return BadRequest(new { errors = result.Errors });
+
+            return BadRequest(new { message = result.Error });
         }
+
     }
 }

@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Dto;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using AutoFiCore.Utilities;

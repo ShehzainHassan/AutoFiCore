@@ -1,6 +1,6 @@
 ﻿using AutoFiCore.Models;
 
-namespace AutoFiCore.Data
+namespace AutoFiCore.Data.Interfaces
 {
     public interface IContactInfoRepository
     {

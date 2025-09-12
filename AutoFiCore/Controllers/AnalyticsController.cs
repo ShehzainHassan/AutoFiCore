@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Dto;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
@@ -92,7 +93,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("TrackAuctionView called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}, Source={Source}",
                 correlationId, userId, auctionId, source);
 

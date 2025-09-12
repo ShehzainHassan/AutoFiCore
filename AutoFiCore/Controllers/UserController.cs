@@ -19,7 +19,7 @@ namespace AutoFiCore.Controllers
     {
         private readonly IUserService _userService;
         private readonly IVehicleService _vehicleService;
-        private readonly TokenProvider _tokenProvider;
+        private readonly ITokenProvider _tokenProvider;
         private readonly IRefreshTokenService _refreshTokenService;
         private readonly ILogger<UserController> _logger;
 
@@ -28,7 +28,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="userService">Service for handling user-related operations.</param>
         /// <param name="vehicleService">Service for handling vehicle-related operations.</param>
-        public UserController(IUserService userService, IVehicleService vehicleService, TokenProvider tokenProvider, IRefreshTokenService refreshTokenService, ILogger<UserController> logger)
+        public UserController(IUserService userService, IVehicleService vehicleService, ITokenProvider tokenProvider, IRefreshTokenService refreshTokenService, ILogger<UserController> logger)
         {
             _userService = userService;
             _vehicleService = vehicleService;
@@ -50,14 +50,16 @@ namespace AutoFiCore.Controllers
 
             if (!result.IsSuccess)
             {
-                if (result.Errors.Any())
+                if (result.Errors != null && result.Errors.Any())
                     return BadRequest(new { errors = result.Errors });
 
-                return Conflict(new { message = result.Error });
+                if (!string.IsNullOrEmpty(result.Error))
+                    return Conflict(new { message = result.Error });
             }
 
             return Ok(result.Value);
         }
+
 
         /// <summary>
         /// Authenticates a user with email and password.
@@ -81,7 +83,7 @@ namespace AutoFiCore.Controllers
                 SameSite = SameSiteMode.Strict,
                 Expires = refreshToken.Expires
             });
-         
+
             return Ok(response);
         }
 
@@ -111,7 +113,7 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns the date of the oldest user creation.</returns>
         [AllowAnonymous]
         [HttpGet("oldest-user")]
-        public async Task<ActionResult> GetOldestCreatedUsre()
+        public async Task<ActionResult> GetOldestCreatedUser()
         {
             var date = await _userService.GetOldestUserCreatedDateAsync();
             return Ok(date);
@@ -129,7 +131,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context. " });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("AddUserLike called. CorrelationId={CorrelationId}, UserId={UserId}, VIN={Vin}", correlationId, userId, userLikes.vehicleVin);
 
             var vehicle = await _vehicleService.GetVehicleByVinAsync(userLikes.vehicleVin);
@@ -153,7 +155,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("RemoveUserLike called. CorrelationId={CorrelationId}, UserId={UserId}, VIN={Vin}", correlationId, userId, userLikes.vehicleVin);
 
             var vehicle = await _vehicleService.GetVehicleByVinAsync(userLikes.vehicleVin);
@@ -177,7 +179,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetUserLikedVins called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var vins = await _userService.GetUserLikedVinsAsync(userId);
@@ -192,7 +194,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetUserSearches called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var searches = await _userService.GetUserSavedSearches(userId);
@@ -206,7 +208,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("DeleteUserSearch called. CorrelationId={CorrelationId}, UserId={UserId}, Search={Search}", correlationId, userId, search.search);
 
             if (search.userId != userId)
@@ -246,7 +248,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("SaveUserSearch called. CorrelationId={CorrelationId}, UserId={UserId}, Search={Search}", correlationId, userId, search.search);
 
             if (search.userId != userId)
@@ -261,7 +263,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="userInteraction">The interaction details.</param>
         /// <returns>Returns the added interaction.</returns>
-     
+
         [Authorize]
         [HttpPost("add-interaction")]
         public async Task<ActionResult<UserInteractionsDTO>> AddUserInteraction([FromBody] UserInteractions userInteraction)
@@ -269,7 +271,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("AddUserInteraction called. CorrelationId={CorrelationId}, UserId={UserId}, VehicleId={VehicleId}, Type={Type}",
                 correlationId, userId, userInteraction.VehicleId, userInteraction.InteractionType);
 
@@ -323,13 +325,14 @@ namespace AutoFiCore.Controllers
                 });
             }
 
-            return Ok(new
+            return Ok(new AuthResponse
             {
-                accessToken = newAccessToken,
-                userId = user.Id,
-                userName = user.Name,
-                userEmail = user.Email
+                AccessToken = newAccessToken,
+                UserId = user.Id,
+                UserName = user.Name,
+                UserEmail = user.Email
             });
         }
+
     }
 }

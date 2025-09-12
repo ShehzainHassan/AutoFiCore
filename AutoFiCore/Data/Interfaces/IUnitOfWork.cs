@@ -1,18 +1,20 @@
-﻿namespace AutoFiCore.Data
+﻿using Microsoft.EntityFrameworkCore;
+
+namespace AutoFiCore.Data.Interfaces
 {
-    public interface IUnitOfWork:IDisposable
+    public interface IUnitOfWork : IDisposable
     {
         IVehicleRepository Vehicles { get; }
         IUserRepository Users { get; }
         IContactInfoRepository ContactInfo { get; }
-        INewsLetterRepository NewsLetter { get; }
-        IAuctionRepository Auctions { get; }    
+        IAuctionRepository Auctions { get; }
         IBidRepository Bids { get; }
         IWatchlistRepository Watchlist { get; }
+        INewsLetterRepository NewsLetter { get; }
         IAutoBidRepository AutoBid { get; }
         INotificationRepository Notification { get; }
         IAnalyticsRepository Analytics { get; }
-        IReportRepository Report { get; }   
+        IReportRepository Report { get; }
         IMetricsRepository Metrics { get; }
         IPerformanceRepository Performance { get; }
         IChatRepository ChatRepository { get; }
@@ -20,5 +22,6 @@
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();
         Task RollbackTransactionAsync();
+        ApplicationDbContext DbContext { get; }
     }
 }

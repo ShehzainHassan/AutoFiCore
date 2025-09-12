@@ -1,22 +1,10 @@
-﻿using AutoFiCore.Hubs;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Hubs;
 using AutoFiCore.Models;
 using Microsoft.AspNetCore.SignalR;
 using System.Threading.Tasks;
 namespace AutoFiCore.Services
 {
-    public interface IAuctionNotifier
-    {
-        Task NotifyNewBid(int auctionId);
-        Task NotifyAuctionEnd(Auction auction);
-        Task NotifyOutbid(int userId, int auctionId);
-        Task NotifyReserveMet(int auctionId);
-        Task NotifyAuctionExtended(int auctionId, DateTime newEndTime);
-        Task NotifyAuctionWon(int userId, int auctionId);
-        Task NotifyAuctionLost(int userId, int auctionId);
-        Task NotifyBidderCount(int auctionId, int activeBidders);
-        Task NotifyAuctionStatusChanged(int userId, int auctionId, string status);
-        Task NotifyAutoBidExecuted(int userId, int auctionId, decimal amount);
-    }
     public class AuctionNotifier : IAuctionNotifier
     {
         private readonly IHubContext<AuctionHub> _hubContext;

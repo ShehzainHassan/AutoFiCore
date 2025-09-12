@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Storage;
+﻿using AutoFiCore.Data.Interfaces;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace AutoFiCore.Data
 {
@@ -6,6 +7,7 @@ namespace AutoFiCore.Data
     {
         private readonly ApplicationDbContext _context;
         private IDbContextTransaction? _transaction;
+        public ApplicationDbContext DbContext => _context; 
         public IVehicleRepository Vehicles { get; }
         public IUserRepository Users { get; }
         public IContactInfoRepository ContactInfo { get; }
@@ -20,7 +22,23 @@ namespace AutoFiCore.Data
         public IMetricsRepository Metrics { get; }
         public IPerformanceRepository Performance { get; }
         public IChatRepository ChatRepository { get; }
-        public UnitOfWork(ApplicationDbContext context, IVehicleRepository vehicleRepository, IUserRepository userRepository, IContactInfoRepository contactInfoRepository, INewsLetterRepository newsLetterRepository, IAuctionRepository auctions, IBidRepository bids, IWatchlistRepository watchlist, IAutoBidRepository autoBid, INotificationRepository notification, IAnalyticsRepository analytics, IReportRepository report, IMetricsRepository metrics, IPerformanceRepository performance, IChatRepository chatRepository)
+
+        public UnitOfWork(
+            ApplicationDbContext context,
+            IVehicleRepository vehicleRepository,
+            IUserRepository userRepository,
+            IContactInfoRepository contactInfoRepository,
+            INewsLetterRepository newsLetterRepository,
+            IAuctionRepository auctions,
+            IBidRepository bids,
+            IWatchlistRepository watchlist,
+            IAutoBidRepository autoBid,
+            INotificationRepository notification,
+            IAnalyticsRepository analytics,
+            IReportRepository report,
+            IMetricsRepository metrics,
+            IPerformanceRepository performance,
+            IChatRepository chatRepository)
         {
             _context = context;
             Vehicles = vehicleRepository;
@@ -38,14 +56,11 @@ namespace AutoFiCore.Data
             Performance = performance;
             ChatRepository = chatRepository;
         }
-        public async Task<int> SaveChangesAsync()
-        {
-            return await _context.SaveChangesAsync();
-        }
-        public async Task BeginTransactionAsync()
-        {
+
+        public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
+
+        public async Task BeginTransactionAsync() =>
             _transaction = await _context.Database.BeginTransactionAsync();
-        }
 
         public async Task CommitTransactionAsync()
         {
@@ -54,6 +69,7 @@ namespace AutoFiCore.Data
                 await _transaction.CommitAsync();
             }
         }
+
         public async Task RollbackTransactionAsync()
         {
             if (_transaction != null)
@@ -62,9 +78,6 @@ namespace AutoFiCore.Data
             }
         }
 
-        public void Dispose()
-        {
-            _context.Dispose();
-        }
+        public void Dispose() => _context.Dispose();
     }
 }

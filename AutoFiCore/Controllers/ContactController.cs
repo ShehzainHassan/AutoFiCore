@@ -40,7 +40,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("AddContactInfo called. CorrelationId={CorrelationId}, UserId={UserId}, Phone={Phone}, Email={Email}",
                 correlationId, userId, contactInfo.PhoneNumber, contactInfo.Email);
 

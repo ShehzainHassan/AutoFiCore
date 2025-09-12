@@ -1,4 +1,4 @@
-﻿using AutoFiCore.Data;
+﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
 using Microsoft.Extensions.Hosting;

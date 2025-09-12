@@ -3,7 +3,7 @@ using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Polly;
 
-namespace AutoFiCore.Data
+namespace AutoFiCore.Data.Interfaces
 {
     public interface IAutoBidRepository
     {

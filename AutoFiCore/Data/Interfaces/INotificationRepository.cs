@@ -4,7 +4,7 @@ using AutoFiCore.Models;
 using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;
 
-namespace AutoFiCore.Data
+namespace AutoFiCore.Data.Interfaces
 {
     public interface INotificationRepository
     {

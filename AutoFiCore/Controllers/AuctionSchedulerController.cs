@@ -1,5 +1,6 @@
 ﻿using AutoFiCore.Controllers;
 using AutoFiCore.Data;
+using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -41,7 +42,7 @@ public class AuctionSchedulerController:SecureControllerBase
         if (!IsUserContextValid(out var userId))
             return Unauthorized(new { message = "Invalid token or user context." });
 
-        var correlationId = SetCorrelationIdHeader();
+        var correlationId = GetCorrelationId();
         _logger.LogInformation("UpdateScheduledAuction called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
         var result = await _service.UpdateScheduledAuctionAsync(auctionId, dto);

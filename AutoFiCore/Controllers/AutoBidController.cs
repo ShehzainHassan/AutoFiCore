@@ -1,4 +1,3 @@
-using AutoFiCore.Data;
 using AutoFiCore.Dto;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
@@ -6,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
+using AutoFiCore.Data.Interfaces;
 
 namespace AutoFiCore.Controllers
 {
@@ -44,7 +44,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("CreateAutoBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, dto.AuctionId);
 
             dto.UserId = userId;
@@ -67,7 +67,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("UpdateAutoBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.UpdateAutoBidAsync(auctionId, userId, dto);
@@ -87,7 +87,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("CancelAutoBid called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.CancelAutoBidAsync(auctionId, userId);
@@ -106,7 +106,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("IsAutoBidSet called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.IsAutoBidSetAsync(auctionId, userId);
@@ -125,7 +125,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetAutoBidWithStrategy called. CorrelationId={CorrelationId}, UserId={UserId}, AuctionId={AuctionId}", correlationId, userId, auctionId);
 
             var result = await _autoBidService.GetAutoBidWithStrategyAsync(userId, auctionId);

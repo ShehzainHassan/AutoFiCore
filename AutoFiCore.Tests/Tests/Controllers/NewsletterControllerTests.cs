@@ -4,48 +4,61 @@ using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace AutoFiCore.Tests.Tests.Controllers
+namespace Tests.Controllers
 {
-    public class NewsletterControllerTests
+    public class NewsLetterControllerTests
     {
-        private readonly Mock<INewsLetterService> _mockService;
+        private readonly Mock<INewsLetterService> _serviceMock;
         private readonly NewsLetterController _controller;
 
-        public NewsletterControllerTests()
+        public NewsLetterControllerTests()
         {
-            _mockService = new Mock<INewsLetterService>();
-            _controller = new NewsLetterController(_mockService.Object);
+            _serviceMock = new Mock<INewsLetterService>();
+            _controller = new NewsLetterController(_serviceMock.Object);
         }
+
         [Fact]
-        public async Task AddEmailToSubscribe_ReturnsOk_WhenServiceSucceeds()
+        public async Task AddEmailToSubscribe_ReturnsOk_WhenSuccess()
         {
-            // Arrange
-            var newsletter = new Newsletter { Email = "test@example.com" };
+            var newsletter = new Newsletter { Id = 1, Email = "test@example.com" };
+            var result = Result<Newsletter>.Success(newsletter);
+            _serviceMock.Setup(s => s.SubscribeToNewsLetterAsync(newsletter)).ReturnsAsync(result);
 
-            var success = Result<Newsletter>.Success(newsletter);
+            var response = await _controller.AddEmailToSubscribe(newsletter);
 
-            _mockService
-                .Setup(s => s.SubscribeToNewsLetterAsync(newsletter))
-                .ReturnsAsync(success);
+            var ok = Assert.IsType<OkObjectResult>(response.Result);
+            Assert.Equal(newsletter, ok.Value);
+        }
 
-            // Act
-            var actionResult = await _controller.AddEmailToSubscribe(newsletter);
+        [Fact]
+        public async Task AddEmailToSubscribe_ReturnsBadRequest_WhenErrors()
+        {
+            var newsletter = new Newsletter { Id = 1, Email = "test@example.com" };
+            var errors = new List<string> { "Invalid email" };
+            var result = Result<Newsletter>.Failure(errors);
+            _serviceMock.Setup(s => s.SubscribeToNewsLetterAsync(newsletter)).ReturnsAsync(result);
 
-            // Assert
-            var ok = Assert.IsType<OkObjectResult>(actionResult.Result);
-            var returned = Assert.IsType<Newsletter>(ok.Value);
-            Assert.Equal(newsletter.Email, returned.Email);
+            var response = await _controller.AddEmailToSubscribe(newsletter);
 
-            _mockService.Verify(
-                s => s.SubscribeToNewsLetterAsync(newsletter),
-                Times.Once);
+            var bad = Assert.IsType<BadRequestObjectResult>(response.Result);
+            Assert.Contains("errors", bad.Value!.ToString());
+        }
+
+        [Fact]
+        public async Task AddEmailToSubscribe_ReturnsConflict_WhenError()
+        {
+            var newsletter = new Newsletter { Id = 1, Email = "test@example.com" };
+            var result = Result<Newsletter>.Failure("Already subscribed");
+            _serviceMock.Setup(s => s.SubscribeToNewsLetterAsync(newsletter)).ReturnsAsync(result);
+
+            var response = await _controller.AddEmailToSubscribe(newsletter);
+
+            var conflict = Assert.IsType<ConflictObjectResult>(response.Result);
+            Assert.Contains("message", conflict.Value!.ToString());
         }
     }
 }

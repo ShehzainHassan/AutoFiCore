@@ -41,7 +41,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetNotifications called. CorrelationId={CorrelationId}, UserId={UserId}, UnreadOnly={UnreadOnly}, Page={Page}, PageSize={PageSize}",
                 correlationId, userId, unreadOnly, page, pageSize);
 
@@ -59,7 +59,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized("Invalid or missing user ID");
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("MarkAsRead called. CorrelationId={CorrelationId}, UserId={UserId}, NotificationId={NotificationId}", correlationId, userId, id);
 
             var result = await _notificationService.MarkAsReadAsync(id);
@@ -83,7 +83,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized("Invalid or missing user ID");
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetNotificationById called. CorrelationId={CorrelationId}, UserId={UserId}, NotificationId={NotificationId}", correlationId, userId, id);
 
             var result = await _notificationService.GetNotificationByIdAsync(id);
@@ -104,7 +104,7 @@ namespace AutoFiCore.Controllers
             if (!IsUserContextValid(out var userId))
                 return Unauthorized("Invalid or missing user ID");
 
-            var correlationId = SetCorrelationIdHeader();
+            var correlationId = GetCorrelationId();
             _logger.LogInformation("GetUnreadNotificationCount called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var count = await _notificationService.GetUnreadCountAsync(userId);

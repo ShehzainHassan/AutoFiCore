@@ -1,247 +1,207 @@
 ﻿using AutoFiCore.Data;
+using AutoFiCore.Dto;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
+using AutoFiCore.Utilities;
 using Microsoft.Extensions.Logging;
 using Moq;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Xunit;
-using AutoFiCore.Dto;
-using Microsoft.Extensions.Configuration;
-namespace AutoFiCore.Tests.Tests.Controllers
+
+namespace Tests.Services
 {
     public class UserServiceTests
     {
-        private readonly Mock<IUserRepository> _mockRepository;
-        private readonly Mock<IUnitOfWork> _mockUnitOfWork;
-        private readonly Mock<ILogger<UserService>> _mockLogger;
-        private readonly Mock<IConfiguration> _mockConfiguration;
-        private readonly TokenProvider _tokenProvider;
+        private readonly Mock<IUserRepository> _userRepositoryMock;
+        private readonly Mock<ILogger<UserService>> _loggerMock;
+        private readonly Mock<ITokenProvider> _tokenProviderMock;
+        private readonly Mock<IUnitOfWork> _unitOfWorkMock;
+        private readonly Mock<IRefreshTokenService> _refreshTokenServiceMock;
+        private readonly Mock<IUserRepository> _unitOfWorkUsersMock;
         private readonly UserService _service;
 
         public UserServiceTests()
         {
-            _mockRepository = new Mock<IUserRepository>();
-            _mockUnitOfWork = new Mock<IUnitOfWork>();
-            _mockLogger = new Mock<ILogger<UserService>>();
-            _mockConfiguration = new Mock<IConfiguration>();
-            _tokenProvider = new TokenProvider(_mockConfiguration.Object);
-
-            _mockUnitOfWork.Setup(u => u.Users).Returns(_mockRepository.Object);
-
-            _service = new UserService(_mockRepository.Object, _mockLogger.Object, _tokenProvider, _mockUnitOfWork.Object);
+            _userRepositoryMock = new Mock<IUserRepository>();
+            _loggerMock = new Mock<ILogger<UserService>>();
+            _tokenProviderMock = new Mock<ITokenProvider>();
+            _unitOfWorkMock = new Mock<IUnitOfWork>();
+            _refreshTokenServiceMock = new Mock<IRefreshTokenService>();
+            _unitOfWorkUsersMock = new Mock<IUserRepository>();
+            _unitOfWorkMock.SetupGet(u => u.Users).Returns(_unitOfWorkUsersMock.Object);
+            _service = new UserService(
+                _userRepositoryMock.Object,
+                _loggerMock.Object,
+                _tokenProviderMock.Object,
+                _unitOfWorkMock.Object,
+                _refreshTokenServiceMock.Object
+            );
         }
 
         [Fact]
-        public async Task AddUserAsync_ShouldReturnSuccess_WhenUserIsAdded()
+        public async Task AddUserAsync_ReturnsFailure_WhenEmailExists()
         {
-            var user = new User
-            {
-                Id = 26,
-                Name = "John",
-                Email = "john@example.com",
-                Password = "1234ABCa@"
-            };
-
-            _mockRepository.Setup(r => r.IsEmailExists(user.Email))
-                .ReturnsAsync(false);
-
-            _mockRepository.Setup(r => r.AddUserAsync(It.IsAny<User>()))
-                .ReturnsAsync((User u) =>
-                {
-                    u.Password = BCrypt.Net.BCrypt.HashPassword(u.Password);
-                    return u;
-                });
-
-            _mockUnitOfWork.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+            var user = new User { Email = "test@test.com" };
+            _userRepositoryMock.Setup(r => r.IsEmailExists(user.Email)).ReturnsAsync(true);
 
             var result = await _service.AddUserAsync(user);
 
-            if (!result.IsSuccess)
-            {
-                Console.WriteLine("Errors: " + string.Join(", ", result.Errors));
-                Console.WriteLine("ErrorMessage: " + result.Error);
-            }
+            Assert.False(result.IsSuccess);
+            Assert.Equal("User already exists", result.Error);
+        }
 
-            Assert.NotNull(result.Value);
+        [Fact]
+        public async Task AddUserAsync_ReturnsSuccess_WhenUserCreated()
+        {
+            var user = new User { Email = "test@test.com" };
+            _userRepositoryMock.Setup(r => r.IsEmailExists(user.Email)).ReturnsAsync(false);
+            _unitOfWorkUsersMock.Setup(r => r.AddUserAsync(user)).ReturnsAsync(user);
+            _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+
+            var result = await _service.AddUserAsync(user);
+
             Assert.True(result.IsSuccess);
-            Assert.Equal(user.Id, result.Value.Id);
-
-            _mockRepository.Verify(r => r.AddUserAsync(It.Is<User>(u => u.Email == user.Email)), Times.Once);
-            _mockUnitOfWork.Verify(u => u.SaveChangesAsync(), Times.Once);
+            Assert.Equal(user, result.Value);
         }
 
         [Fact]
-        public async Task LoginUserAsync_ShouldReturnAuthResponse_WhenCredentialsAreValid()
+        public async Task LoginUserAsync_DelegatesToRepository()
         {
-            var user = new User
-            {
-                Id = 2,
-                Name = "John",
-                Email = "john@example.com",
-                Password = BCrypt.Net.BCrypt.HashPassword("MyPassword")
-            };
+            var email = "test@test.com";
+            var password = "pass";
+            var authResponse = new AuthResponse { UserId = 1, UserName = "Test", UserEmail = email };
+            _userRepositoryMock.Setup(r => r.LoginUserAsync(email, password, _tokenProviderMock.Object, _refreshTokenServiceMock.Object))
+                .ReturnsAsync(authResponse);
 
-            _mockRepository.Setup(r => r.LoginUserAsync(user.Email, "MyPassword", It.IsAny<TokenProvider>()))
-                .ReturnsAsync(new AuthResponse
-                {
-                    Token = "mock-jwt-token",
-                    UserId = user.Id,
-                    UserName = user.Name,
-                    UserEmail = user.Email
-                });
+            var result = await _service.LoginUserAsync(email, password);
 
-            var result = await _service.LoginUserAsync(user.Email, "MyPassword");
-
-            Assert.NotNull(result);
-            Assert.Equal(user.Email, result!.UserEmail);
-            Assert.Equal(user.Id, result.UserId);
-
-            _mockRepository.Verify(r => r.LoginUserAsync(user.Email, "MyPassword", It.IsAny<TokenProvider>()), Times.Once);
+            Assert.Equal(authResponse, result);
         }
 
         [Fact]
-        public async Task GetUserByIdAsync_ShouldReturnUser_WhenUserExists()
+        public async Task AddUserLikeAsync_AddsLikeAndSaves()
         {
-            int userId = 5;
-
-            var user = new User
-            {
-                Id = userId,
-                Name = "Bob",
-                Email = "bob@example.com"
-            };
-
-            _mockRepository.Setup(r => r.GetUserByIdAsync(userId))
-                .ReturnsAsync(user);
-
-            var result = await _service.GetUserByIdAsync(userId);
-
-            Assert.NotNull(result);
-            Assert.Equal(userId, result!.Id);
-            Assert.Equal("Bob", result.Name);
-
-            _mockRepository.Verify(r => r.GetUserByIdAsync(userId), Times.Once);
-        }
-
-        [Fact]
-        public async Task AddUserLikeAsync_ShouldReturnLike_WhenAdded()
-        {
-            var like = new UserLikes { userId = 1, vehicleVin = "1FMCU9J97FUA88429" };
-
-            _mockRepository.Setup(r => r.AddUserLikeAsync(like))
-                .ReturnsAsync(like);
-
-            _mockUnitOfWork.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+            var like = new UserLikes { userId = 1 };
+            _unitOfWorkUsersMock.Setup(r => r.AddUserLikeAsync(like)).ReturnsAsync(like);
+            _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
 
             var result = await _service.AddUserLikeAsync(like);
 
             Assert.Equal(like, result);
-            _mockRepository.Verify(r => r.AddUserLikeAsync(like), Times.Once);
-            _mockUnitOfWork.Verify(u => u.SaveChangesAsync(), Times.Once);
+            _unitOfWorkUsersMock.Verify(r => r.AddUserLikeAsync(like), Times.Once);
+            _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
         }
 
         [Fact]
-        public async Task RemoveUserLikeAsync_ShouldReturnLike_WhenRemoved()
+        public async Task RemoveUserLikeAsync_RemovesLikeAndSaves()
         {
-            var like = new UserLikes { userId = 1, vehicleVin = "1FMCU9J97FUA88429" };
-
-            _mockRepository.Setup(r => r.RemoveUserLikeAsync(like))
-                .ReturnsAsync(like);
-
-            _mockUnitOfWork.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+            var like = new UserLikes { userId = 1 };
+            _unitOfWorkUsersMock.Setup(r => r.RemoveUserLikeAsync(like)).ReturnsAsync(like);
+            _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
 
             var result = await _service.RemoveUserLikeAsync(like);
 
             Assert.Equal(like, result);
-            _mockRepository.Verify(r => r.RemoveUserLikeAsync(like), Times.Once);
-            _mockUnitOfWork.Verify(u => u.SaveChangesAsync(), Times.Once);
+            _unitOfWorkUsersMock.Verify(r => r.RemoveUserLikeAsync(like), Times.Once);
+            _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
         }
 
         [Fact]
-        public async Task AddUserSearchAsync_ShouldReturnSearch_WhenAdded()
+        public async Task RemoveSavedSearchAsync_RemovesSearchAndSaves()
         {
-            var search = new UserSavedSearch { userId = 1, search = "BMW" };
-
-            _mockRepository.Setup(r => r.AddUserSearchAsync(search))
-                .ReturnsAsync(search);
-
-            _mockUnitOfWork.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
-
-            var result = await _service.AddUserSearchAsync(search);
-
-            Assert.Equal(search, result);
-            _mockRepository.Verify(r => r.AddUserSearchAsync(search), Times.Once);
-            _mockUnitOfWork.Verify(u => u.SaveChangesAsync(), Times.Once);
-        }
-
-        [Fact]
-        public async Task RemoveSavedSearchAsync_ShouldReturnSearch_WhenRemoved()
-        {
-            var search = new UserSavedSearch { userId = 1, search = "BMW" };
-
-            _mockRepository.Setup(r => r.RemoveUserSearchAsync(search))
-                .ReturnsAsync(search);
-
-            _mockUnitOfWork.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+            var search = new UserSavedSearch { userId = 1 };
+            _unitOfWorkUsersMock.Setup(r => r.RemoveUserSearchAsync(search)).ReturnsAsync(search);
+            _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
 
             var result = await _service.RemoveSavedSearchAsync(search);
 
             Assert.Equal(search, result);
-            _mockRepository.Verify(r => r.RemoveUserSearchAsync(search), Times.Once);
-            _mockUnitOfWork.Verify(u => u.SaveChangesAsync(), Times.Once);
+            _unitOfWorkUsersMock.Verify(r => r.RemoveUserSearchAsync(search), Times.Once);
+            _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
         }
 
         [Fact]
-        public async Task GetUserLikedVinsAsync_ShouldReturnVinList()
+        public async Task GetUserByIdAsync_ReturnsUser()
         {
-            int userId = 2;
+            var user = new User { Id = 1 };
+            _userRepositoryMock.Setup(r => r.GetUserByIdAsync(1)).ReturnsAsync(user);
 
-            var vins = new List<string> { "1FMCU9J97FUA88429", "1FMCU9J97FUA88429" };
+            var result = await _service.GetUserByIdAsync(1);
 
-            _mockRepository.Setup(r => r.GetUserLikesVehicles(userId))
-                .ReturnsAsync(vins);
+            Assert.Equal(user, result);
+        }
 
-            var result = await _service.GetUserLikedVinsAsync(userId);
+        [Fact]
+        public async Task AddUserSearchAsync_AddsSearchAndSaves()
+        {
+            var search = new UserSavedSearch { userId = 1 };
+            _unitOfWorkUsersMock.Setup(r => r.AddUserSearchAsync(search)).ReturnsAsync(search);
+            _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+
+            var result = await _service.AddUserSearchAsync(search);
+
+            Assert.Equal(search, result);
+            _unitOfWorkUsersMock.Verify(r => r.AddUserSearchAsync(search), Times.Once);
+            _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetUserLikedVinsAsync_ReturnsVins()
+        {
+            var vins = new List<string> { "VIN1", "VIN2" };
+            _userRepositoryMock.Setup(r => r.GetUserLikesVehicles(1)).ReturnsAsync(vins);
+
+            var result = await _service.GetUserLikedVinsAsync(1);
 
             Assert.Equal(vins, result);
-            _mockRepository.Verify(r => r.GetUserLikesVehicles(userId), Times.Once);
         }
 
         [Fact]
-        public async Task GetUserSavedSearches_ShouldReturnSearchList()
+        public async Task GetUserSavedSearches_ReturnsSearches()
         {
-            int userId = 3;
+            var searches = new List<string> { "search1", "search2" };
+            _userRepositoryMock.Setup(r => r.GetUserSavedSearches(1)).ReturnsAsync(searches);
 
-            var searches = new List<string> { "BMW", "Audi" };
-
-            _mockRepository.Setup(r => r.GetUserSavedSearches(userId))
-                .ReturnsAsync(searches);
-
-            var result = await _service.GetUserSavedSearches(userId);
+            var result = await _service.GetUserSavedSearches(1);
 
             Assert.Equal(searches, result);
-            _mockRepository.Verify(r => r.GetUserSavedSearches(userId), Times.Once);
         }
 
         [Fact]
-        public async Task AddUserInteractionAsync_ShouldReturnInteraction_WhenAdded()
+        public async Task AddUserInteractionAsync_AddsInteractionAndSaves()
         {
-            var interaction = new UserInteractions
-            {
-                UserId = 1,
-                VehicleId = 1,
-                InteractionType = "view"
-            };
-
-            _mockRepository.Setup(r => r.AddUserInteraction(interaction))
-                .ReturnsAsync(interaction);
-
-            _mockUnitOfWork.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
+            var interaction = new UserInteractions { UserId = 1 };
+            _unitOfWorkUsersMock.Setup(r => r.AddUserInteraction(interaction)).ReturnsAsync(interaction);
+            _unitOfWorkMock.Setup(u => u.SaveChangesAsync()).ReturnsAsync(1);
 
             var result = await _service.AddUserInteractionAsync(interaction);
 
             Assert.Equal(interaction, result);
-            _mockRepository.Verify(r => r.AddUserInteraction(interaction), Times.Once);
-            _mockUnitOfWork.Verify(u => u.SaveChangesAsync(), Times.Once);
+            _unitOfWorkUsersMock.Verify(r => r.AddUserInteraction(interaction), Times.Once);
+            _unitOfWorkMock.Verify(u => u.SaveChangesAsync(), Times.Once);
+        }
+
+        [Fact]
+        public async Task GetAllUsersCountAsync_ReturnsCount()
+        {
+            _unitOfWorkUsersMock.Setup(r => r.GetAllUsersCountAsync()).ReturnsAsync(5);
+
+            var result = await _service.GetAllUsersCountAsync();
+
+            Assert.Equal(5, result);
+        }
+
+        [Fact]
+        public async Task GetOldestUserCreatedDateAsync_ReturnsDate()
+        {
+            var date = DateTime.UtcNow;
+            _unitOfWorkUsersMock.Setup(r => r.GetOldestUserCreatedDateAsync()).ReturnsAsync(date);
+
+            var result = await _service.GetOldestUserCreatedDateAsync();
+
+            Assert.Equal(date, result);
         }
     }
 }

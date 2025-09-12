@@ -1,9 +1,9 @@
-﻿using AutoFiCore.Data;
-using AutoFiCore.Dto;
+﻿using AutoFiCore.Dto;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using AutoFiCore.Utilities;
+using AutoFiCore.Data.Interfaces;
 
 namespace AutoFiCore.Services
 {
@@ -27,11 +27,11 @@ namespace AutoFiCore.Services
     {
         private readonly IUserRepository _repository;
         private readonly ILogger<UserService> _logger;
-        private readonly TokenProvider _tokenProvider;
+        private readonly ITokenProvider _tokenProvider;
         private readonly IRefreshTokenService _refreshTokenService;
         private readonly IUnitOfWork _unitOfWork;
 
-        public UserService(IUserRepository repository, ILogger<UserService> logger, TokenProvider tokenProvider, IUnitOfWork unitOfWork, IRefreshTokenService refreshTokenService)
+        public UserService(IUserRepository repository, ILogger<UserService> logger, ITokenProvider tokenProvider, IUnitOfWork unitOfWork, IRefreshTokenService refreshTokenService)
         {
             _repository = repository;
             _logger = logger;

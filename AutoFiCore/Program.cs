@@ -19,6 +19,7 @@ using System.Text;
 using Npgsql;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using AutoFiCore.Data.Interfaces;
 
 NpgsqlConnection.GlobalTypeMapper.EnableDynamicJson();
 WebApplicationBuilder builder;
@@ -335,6 +336,9 @@ builder.Services.AddScoped<IAIAssistantService, AIAssistantService>();
 // Register Token Refresh Service
 builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
+// Register Token Provider Service
+builder.Services.AddScoped<ITokenProvider, TokenProvider>();    
+
 // Add services to the container.
 builder.Services.AddControllers();
 
@@ -488,6 +492,7 @@ StartupValidator.ValidateEnvironment(builder.Configuration, app.Environment);
 
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<ApiPerformanceMiddleware>();
+app.UseMiddleware<CorrelationIdMiddleware>();
 
 // Initialize database
 await DbInitializer.InitializeAsync(app.Services, app.Environment);

@@ -1,792 +1,401 @@
-﻿using Xunit;
-using Moq;
-using AutoFiCore.Controllers;
-using AutoFiCore.Services;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Mvc;
-using AutoFiCore.Models;
+﻿using AutoFiCore.Controllers;
 using AutoFiCore.Dto;
 using AutoFiCore.DTOs;
+using AutoFiCore.Models;
+using AutoFiCore.Services;
+using AutoFiCore.Utilities;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Moq;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Xunit;
 
-namespace AutoFiCore.Tests.Controllers
+namespace Tests.Controllers
 {
     public class VehicleControllerTests
     {
-        private readonly Mock<IVehicleService> _mockVehicleService;
-        private readonly Mock<ILogger<VehicleController>> _mockLogger;
-        private readonly Mock<ILoanService> _mockLoanService;
-        private readonly Mock<IEmailService> _mockEmailService;
-        private readonly Mock<IPdfService> _mockPdfService;
-
+        private readonly Mock<IVehicleService> _vehicleServiceMock;
+        private readonly Mock<ILoanService> _loanServiceMock;
+        private readonly Mock<IEmailService> _emailServiceMock;
+        private readonly Mock<IPdfService> _pdfServiceMock;
+        private readonly Mock<ILogger<VehicleController>> _loggerMock;
         private readonly VehicleController _controller;
 
         public VehicleControllerTests()
         {
-            _mockVehicleService = new Mock<IVehicleService>();
-            _mockLogger = new Mock<ILogger<VehicleController>>();
-            _mockLoanService = new Mock<ILoanService>();
-            _mockEmailService = new Mock<IEmailService>();
-            _mockPdfService = new Mock<IPdfService>();
-
+            _vehicleServiceMock = new Mock<IVehicleService>();
+            _loanServiceMock = new Mock<ILoanService>();
+            _emailServiceMock = new Mock<IEmailService>();
+            _pdfServiceMock = new Mock<IPdfService>();
+            _loggerMock = new Mock<ILogger<VehicleController>>();
             _controller = new VehicleController(
-                _mockVehicleService.Object,
-                _mockLogger.Object,
-                _mockLoanService.Object,
-                _mockEmailService.Object,
-                _mockPdfService.Object
+                _vehicleServiceMock.Object,
+                _loggerMock.Object,
+                _loanServiceMock.Object,
+                _emailServiceMock.Object,
+                _pdfServiceMock.Object
             );
         }
 
         [Fact]
-        public async Task GetAllMakes_ReturnsOk_WithExpectedMakes()
+        public async Task GetAllVehiclesByStatus_ReturnsOk()
         {
-            var expectedMakes = new List<string> { "BMW", "Mercedes", "Audi" };
+            var pagination = new PaginationParams { PageView = 10, Offset = 0 };
+            var vehicles = new List<Vehicle>
+            {
+                new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" }
+            };
 
-            _mockVehicleService
-                .Setup(s => s.GetAllVehiclesMakesAsync())
-                .ReturnsAsync(expectedMakes);
+            var vehicleListResult = new VehicleListResult
+            {
+                Vehicles = vehicles,
+                TotalCount = vehicles.Count
+            };
 
-            var result = await _controller.GetAllMakes();
+            _vehicleServiceMock
+                .Setup(s => s.GetAllVehiclesByStatusAsync(10, 0, null))
+                .ReturnsAsync(vehicleListResult);
 
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualMakes = Assert.IsAssignableFrom<List<string>>(okResult.Value);
+            var response = await _controller.GetAllVehiclesByStatus(pagination, null);
 
-            Assert.Equal(expectedMakes, actualMakes);
-
-            _mockVehicleService.Verify(s => s.GetAllVehiclesMakesAsync(), Times.Once);
+            var ok = Assert.IsType<OkObjectResult>(response.Result);
+            Assert.Equal(vehicleListResult, ok.Value);
         }
 
         [Fact]
-        public async Task GetAllCarColors_ReturnsOk_WithExpectedColors()
+        public async Task GetCarFeatures_ReturnsNotFound_WhenNoFeatures()
         {
-            var expectedColors = new List<string> { "Red", "Blue", "Green" };
+            _vehicleServiceMock.Setup(s => s.GetAllCarFeaturesAsync()).ReturnsAsync(new List<VehicleModelJSON>());
 
-            _mockVehicleService
-                .Setup(s => s.GetDistinctColorsAsync())
-                .ReturnsAsync(expectedColors);
+            var result = await _controller.GetCarFeatures("make", "model");
+
+            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.Contains("No car features found", notFound.Value.ToString());
+        }
+
+        [Fact]
+        public async Task GetCarFeatures_ReturnsNotFound_WhenNoMatch()
+        {
+            _vehicleServiceMock.Setup(s => s.GetAllCarFeaturesAsync()).ReturnsAsync(new List<VehicleModelJSON> { new VehicleModelJSON() });
+            _vehicleServiceMock.Setup(s => s.GetCarFeature(It.IsAny<List<VehicleModelJSON>>(), "make", "model")).Returns((VehicleModelJSON)null);
+
+            var result = await _controller.GetCarFeatures("make", "model");
+
+            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.Contains("No data found", notFound.Value.ToString());
+        }
+
+        [Fact]
+        public async Task GetCarFeatures_ReturnsOk_WhenFound()
+        {
+            var features = new VehicleModelJSON();
+            _vehicleServiceMock.Setup(s => s.GetAllCarFeaturesAsync()).ReturnsAsync(new List<VehicleModelJSON> { features });
+            _vehicleServiceMock.Setup(s => s.GetCarFeature(It.IsAny<List<VehicleModelJSON>>(), "make", "model")).Returns(features);
+
+            var result = await _controller.GetCarFeatures("make", "model");
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.IsType<NormalizedCarFeatureDto>(ok.Value);
+        }
+
+        [Fact]
+        public async Task GetAllCarColors_ReturnsOk()
+        {
+            var colors = new List<string> { "Red", "Blue" };
+            _vehicleServiceMock.Setup(s => s.GetDistinctColorsAsync()).ReturnsAsync(colors);
 
             var result = await _controller.GetAllCarColors();
 
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualColors = Assert.IsAssignableFrom<List<string>>(okResult.Value);
-
-            Assert.Equal(expectedColors, actualColors);
-
-            _mockVehicleService.Verify(s => s.GetDistinctColorsAsync(), Times.Once);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(colors, ok.Value);
         }
 
         [Fact]
-        public async Task GetVehiclesByMake_ValidMake_ReturnsOk()
+        public async Task GetVehiclesByMake_ReturnsOk()
         {
-            var expectedResult = new VehicleListResult
+            var pagination = new PaginationParams { PageView = 10, Offset = 0 };
+            var vehicles = new List<Vehicle>
             {
-                Vehicles = new List<Vehicle>
-                {
-                    new Vehicle { Id = 1, Make = "BMW", Model = "X5" }
-                },
-                TotalCount = 1
+                new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" }
             };
 
-            _mockVehicleService
-                .Setup(s => s.GetVehiclesByMakeAsync(10, 0, "BMW"))
-                .ReturnsAsync(expectedResult);
-
-            var result = await _controller.GetVehiclesByMake(10, 0, "BMW");
-
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualResult = Assert.IsAssignableFrom<VehicleListResult>(okResult.Value);
-
-            Assert.Equal(expectedResult.TotalCount, actualResult.TotalCount);
-            Assert.Equal(expectedResult.Vehicles.Count(), actualResult.Vehicles.Count());
-
-            _mockVehicleService.Verify(s => s.GetVehiclesByMakeAsync(10, 0, "BMW"), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetVehiclesByMake_InvalidMake_ReturnsBadRequest()
-        {
-            var result = await _controller.GetVehiclesByMake(10, 0, "");
-
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetColorsCount_ValidFilters_ReturnsOk()
-        {
-            var filters = new VehicleFilterDto { Make = "BMW" };
-            var expectedCounts = new Dictionary<string, int>
+            var vehicleListResult = new VehicleListResult
             {
-                { "Red", 3 },
-                { "Blue", 2 }
+                Vehicles = vehicles,
+                TotalCount = vehicles.Count
             };
 
-            _mockVehicleService
-                .Setup(s => s.GetAvailableColorsCountAsync(filters))
-                .ReturnsAsync(expectedCounts);
+            _vehicleServiceMock
+                .Setup(s => s.GetVehiclesByMakeAsync(10, 0, "A"))
+                .ReturnsAsync(vehicleListResult);
+
+            var response = await _controller.GetVehiclesByMake(pagination, "A");
+
+            var ok = Assert.IsType<OkObjectResult>(response.Result);
+            Assert.Equal(vehicleListResult, ok.Value);
+        }
+
+        [Fact]
+        public async Task GetVehicleOptions_ReturnsOk()
+        {
+            var options = new List<VehicleOptionsDTO> { new VehicleOptionsDTO() };
+            _vehicleServiceMock.Setup(s => s.GetVehicleOptionsAsync()).ReturnsAsync(options);
+
+            var result = await _controller.GetVehicleOptions();
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(options, ok.Value);
+        }
+
+        [Fact]
+        public async Task GetColorsCount_ReturnsOk()
+        {
+            var filters = new VehicleFilterDto();
+            var dict = new Dictionary<string, int> { { "Red", 2 } };
+            _vehicleServiceMock.Setup(s => s.GetAvailableColorsCountAsync(It.IsAny<VehicleFilterDto>())).ReturnsAsync(dict);
 
             var result = await _controller.GetColorsCount(filters);
 
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualCounts = Assert.IsAssignableFrom<Dictionary<string, int>>(okResult.Value);
-
-            Assert.Equal(expectedCounts, actualCounts);
-
-            _mockVehicleService.Verify(s => s.GetAvailableColorsCountAsync(filters), Times.Once);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(dict, ok.Value);
         }
 
         [Fact]
-        public async Task GetColorsCount_InvalidFilters_ReturnsBadRequest()
+        public async Task GetGearboxCount_ReturnsOk()
         {
-            var filters = new VehicleFilterDto
-            {
-                Make = "",
-                Model = "",
-                StartPrice = -100,
-                EndPrice = -200,
-                Mileage = -10,
-                StartYear = 2025,
-                EndYear = 2000
-            };
-
-            var result = await _controller.GetColorsCount(filters);
-
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetGearboxCount_ValidFilters_ReturnsOkWithCounts()
-        {
-            var filters = new VehicleFilterDto { Make = "BMW" };
-            var expectedCounts = new Dictionary<string, int>
-            {
-                { "Automatic", 10 },
-                { "Manual", 5 }
-            };
-
-            _mockVehicleService
-                .Setup(s => s.GetGearboxCountsAsync(filters))
-                .ReturnsAsync(expectedCounts);
+            var filters = new VehicleFilterDto();
+            var dict = new Dictionary<string, int> { { "Auto", 3 } };
+            _vehicleServiceMock.Setup(s => s.GetGearboxCountsAsync(It.IsAny<VehicleFilterDto>())).ReturnsAsync(dict);
 
             var result = await _controller.GetGearboxCount(filters);
 
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualCounts = Assert.IsAssignableFrom<Dictionary<string, int>>(okResult.Value);
-
-            Assert.Equal(expectedCounts, actualCounts);
-
-            _mockVehicleService.Verify(s => s.GetGearboxCountsAsync(filters), Times.Once);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(dict, ok.Value);
         }
 
         [Fact]
-        public async Task GetGearboxCount_InvalidFilters_ReturnsBadRequest()
+        public async Task GetTotalVehicleCount_ReturnsOk()
         {
-            var filters = new VehicleFilterDto
-            {
-                Make = "",
-                Model = "",
-                StartPrice = -40000,
-                EndPrice = -24000,
-                Mileage = -10,
-                StartYear = 3000,   
-                EndYear = 1000,    
-                Gearbox = "",
-                Status = ""
-            };
-
-            var result = await _controller.GetGearboxCount(filters);
-
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetTotalVehicleCount_ValidFilters_ReturnsOk()
-        {
-            var filters = new VehicleFilterDto { Make = "Audi" };
-            var expectedCount = 4;
-
-            _mockVehicleService
-                .Setup(s => s.GetTotalCountAsync(filters))
-                .ReturnsAsync(expectedCount);
+            var filters = new VehicleFilterDto();
+            _vehicleServiceMock.Setup(s => s.GetTotalCountAsync(It.IsAny<VehicleFilterDto>())).ReturnsAsync(5);
 
             var result = await _controller.GetTotalVehicleCount(filters);
 
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualCount = Assert.IsType<int>(okResult.Value);
-
-            Assert.Equal(expectedCount, actualCount);
-
-            _mockVehicleService.Verify(s => s.GetTotalCountAsync(filters), Times.Once);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(5, ok.Value);
         }
 
         [Fact]
-        public async Task GetTotalVehicleCount_InvalidFilters_ReturnsBadRequest()
+        public async Task SearchVehicles_ReturnsOk()
         {
-            var filters = new VehicleFilterDto {
-                Make = "",
-                Model = "",
-                StartPrice = -40000,
-                EndPrice = -24000,
-                Mileage = -10,
-                StartYear = 3000,
-                EndYear = 1000,
-                Gearbox = "",
-                Status = ""
-            };
+            var filters = new VehicleFilterDto();
+            var pagination = new PaginationParams { PageView = 10, Offset = 0 };
+            var vehicles = new List<Vehicle> { new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" } };
+            _vehicleServiceMock.Setup(s => s.SearchVehiclesAsync(It.IsAny<VehicleFilterDto>(), 10, 0, null)).ReturnsAsync(vehicles);
 
-            var result = await _controller.GetTotalVehicleCount(filters);
+            var result = await _controller.SearchVehicles(filters, pagination, null);
 
-            Assert.IsType<BadRequestObjectResult>(result.Result);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(vehicles, ok.Value);
         }
 
-        [Fact]
-        public async Task SearchVehicles_ValidRequest_ReturnsOkWithVehicles()
-        {
-            var filters = new VehicleFilterDto { Make = "BMW" };
-            int pageView = 10;
-            int offset = 0;
-            string? sortOrder = null;
 
-            var expectedVehicles = new List<Vehicle>
+        [Fact]
+        public async Task GetVehiclesByModel_ReturnsOk()
+        {
+            var pagination = new PaginationParams { PageView = 10, Offset = 0 };
+            var vehicles = new List<Vehicle>
             {
-                new Vehicle { Id = 1, Make = "BMW", Model = "X5" },
-                new Vehicle { Id = 2, Make = "BMW", Model = "320i" }
+                new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" }
             };
 
-            _mockVehicleService
-                .Setup(s => s.SearchVehiclesAsync(filters, pageView, offset, sortOrder))
-                .ReturnsAsync(expectedVehicles);
-
-            var result = await _controller.SearchVehicles(filters, pageView, offset, sortOrder);
-
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualVehicles = Assert.IsAssignableFrom<List<Vehicle>>(okResult.Value);
-
-            Assert.Equal(expectedVehicles.Count, actualVehicles.Count);
-            Assert.Equal(expectedVehicles, actualVehicles);
-
-            _mockVehicleService.Verify(s => s.SearchVehiclesAsync(filters, pageView, offset, sortOrder), Times.Once);
-        }
-
-        [Fact]
-        public async Task SearchVehicles_InvalidPagination_ReturnsBadRequest()
-        {
-            var filters = new VehicleFilterDto { Make = "BMW" };
-            int pageView = -1;
-            int offset = 0;
-
-            var result = await _controller.SearchVehicles(filters, pageView, offset);
-
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetVehicleById_ReturnsOk_WhenVehicleExists()
-        {
-            // Arrange
-            int vehicleId = 1;
-            var expectedVehicle = new Vehicle { Id = vehicleId, Make = "BMW", Model = "X5" };
-
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByIdAsync(vehicleId))
-                .ReturnsAsync(expectedVehicle);
-
-            // Act
-            var result = await _controller.GetVehicleById(vehicleId);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualVehicle = Assert.IsType<Vehicle>(okResult.Value);
-
-            Assert.Equal(expectedVehicle.Id, actualVehicle.Id);
-            Assert.Equal(expectedVehicle.Make, actualVehicle.Make);
-            Assert.Equal(expectedVehicle.Model, actualVehicle.Model);
-        }
-
-        [Fact]
-        public async Task GetVehicleById_ReturnsNotFound_WhenVehicleDoesNotExist()
-        {
-            // Arrange
-            int vehicleId = -1;
-
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByIdAsync(vehicleId))
-                .ReturnsAsync((Vehicle?)null);
-
-            // Act
-            var result = await _controller.GetVehicleById(vehicleId);
-
-            // Assert
-            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetVehiclesByModel_ValidModel_ReturnsOk()
-        {
-            // Arrange
-            int pageView = 10;
-            int offset = 0;
-            string model = "X5";
-
-            var expectedResult = new VehicleListResult
+            var vehicleListResult = new VehicleListResult
             {
-                Vehicles = new List<Vehicle>
-                {
-                    new Vehicle { Id = 1, Make = "BMW", Model = "X5" }
-                },
-                TotalCount = 1
+                Vehicles = vehicles,
+                TotalCount = vehicles.Count
             };
 
-            _mockVehicleService
-                .Setup(s => s.GetVehiclesByModelAsync(pageView, offset, model))
-                .ReturnsAsync(expectedResult);
+            _vehicleServiceMock
+                .Setup(s => s.GetVehiclesByModelAsync(10, 0, "B"))
+                .ReturnsAsync(vehicleListResult);
 
-            // Act
-            var result = await _controller.GetVehiclesByModel(pageView, offset, model);
+            var response = await _controller.GetVehiclesByModel(pagination, "B");
 
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualResult = Assert.IsAssignableFrom<VehicleListResult>(okResult.Value);
+            var ok = Assert.IsType<OkObjectResult>(response.Result);
+            Assert.Equal(vehicleListResult, ok.Value);
+        }
+        [Fact]
+        public async Task GetAllMakes_ReturnsOk()
+        {
+            var makes = new List<string> { "A", "B" };
+            _vehicleServiceMock.Setup(s => s.GetAllVehiclesMakesAsync()).ReturnsAsync(makes);
 
-            Assert.Equal(expectedResult.TotalCount, actualResult.TotalCount);
-            Assert.Equal(expectedResult.Vehicles.Count(), actualResult.Vehicles.Count());
+            var result = await _controller.GetAllMakes();
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(makes, ok.Value);
         }
 
         [Fact]
-        public async Task GetVehiclesByModel_InvalidModel_ReturnsBadRequest()
+        public async Task GetAllCategories_ReturnsOk()
         {
-            // Arrange
-            int pageView = 10;
-            int offset = 0;
-            string invalidModel = ""; 
+            var categories = new List<string> { "SUV", "Sedan" };
+            _vehicleServiceMock.Setup(s => s.GetAllVehiclesCategoriesAsync()).ReturnsAsync(categories);
 
-            // Act
-            var result = await _controller.GetVehiclesByModel(pageView, offset, invalidModel);
+            var result = await _controller.GetAllCategories();
 
-            // Assert
-            Assert.IsType<BadRequestObjectResult>(result.Result);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(categories, ok.Value);
         }
 
         [Fact]
-        public async Task GetVehiclesByModel_InvalidPagination_ReturnsBadRequest()
+        public async Task GetVehicleById_ReturnsNotFound_WhenNull()
         {
-            // Arrange
-            int pageView = -5; 
-            int offset = 0;
-            string model = "X5";
+            _vehicleServiceMock.Setup(s => s.GetVehicleByIdAsync(1)).ReturnsAsync((Vehicle)null);
 
-            // Act
-            var result = await _controller.GetVehiclesByModel(pageView, offset, model);
+            var result = await _controller.GetVehicleById(1);
 
-            // Assert
-            Assert.IsType<BadRequestObjectResult>(result.Result);
+            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.Contains("not found", notFound.Value.ToString());
         }
+
+        [Fact]
+        public async Task GetVehicleById_ReturnsOk_WhenFound()
+        {
+            var vehicle = new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" };
+            _vehicleServiceMock.Setup(s => s.GetVehicleByIdAsync(1)).ReturnsAsync(vehicle);
+
+            var result = await _controller.GetVehicleById(1);
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(vehicle, ok.Value);
+        }
+
+        [Fact]
+        public async Task GetVehicleByVin_ReturnsNotFound_WhenNull()
+        {
+            _vehicleServiceMock.Setup(s => s.GetVehicleByVinAsync("vin")).ReturnsAsync((Vehicle)null);
+
+            var result = await _controller.GetVehicleByVin("vin");
+
+            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.Contains("not found", notFound.Value.ToString());
+        }
+
         [Fact]
         public async Task GetVehicleByVin_ReturnsOk_WhenFound()
         {
-            // Arrange
-            string vin = "5UXKR0C54F0678901";
-            var expectedVehicle = new Vehicle { Id = 1, Vin = vin, Make = "BMW", Model = "X5" };
+            var vehicle = new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" };
+            _vehicleServiceMock.Setup(s => s.GetVehicleByVinAsync("vin")).ReturnsAsync(vehicle);
 
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByVinAsync(vin))
-                .ReturnsAsync(expectedVehicle);
+            var result = await _controller.GetVehicleByVin("vin");
 
-            // Act
-            var result = await _controller.GetVehicleByVin(vin);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var vehicle = Assert.IsType<Vehicle>(okResult.Value);
-
-            Assert.Equal(expectedVehicle.Id, vehicle.Id);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(vehicle, ok.Value);
         }
 
         [Fact]
-        public async Task GetVehicleByVin_ReturnsNotFound_WhenNotFound()
+        public async Task SaveQuestionnaire_ReturnsOk()
         {
-            // Arrange
-            string vin = "INVALID_VIN";
+            var dto = new QuestionnaireDTO { Email = "test@test.com", BorrowAmount = 10000, DrivingLicense = "DL", MaritalStatus = "Single", DOB = DateOnly.FromDateTime(DateTime.Now), EmploymentStatus = "Employed", Phone = "123" };
+            var questionnaire = new Questionnaire();
+            var loan = new LoanCalculation();
+            var pdf = new byte[] { 1, 2, 3 };
+            _vehicleServiceMock.Setup(s => s.SaveQuestionnaireAsync(dto)).ReturnsAsync(questionnaire);
+            _loanServiceMock.Setup(s => s.CalculateLoanAsync(It.IsAny<LoanRequest>())).ReturnsAsync(loan);
+            _pdfServiceMock.Setup(s => s.GenerateLoanPdf(questionnaire, loan)).Returns(pdf);
+            _emailServiceMock.Setup(s => s.SendLoanEmailAsync(dto.Email, pdf)).Returns(Task.CompletedTask);
 
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByVinAsync(vin))
-                .ReturnsAsync((Vehicle)null!);
+            var result = await _controller.SaveQuestionnaire(dto, 1);
 
-            // Act
-            var result = await _controller.GetVehicleByVin(vin);
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            var response = Assert.IsType<SaveQuestionnaireResponse>(ok.Value);
+            Assert.Equal(questionnaire, response.Questionnaire);
+            Assert.Equal(loan, response.Loan);
+        }
 
-            // Assert
-            Assert.IsType<NotFoundObjectResult>(result.Result);
+        [Fact]
+        public async Task CreateVehicle_ReturnsBadRequest_WhenExists()
+        {
+            var vehicle = new Vehicle { Vin = "12345678901234567", Make = "A", Model = "B" };
+            _vehicleServiceMock.Setup(s => s.GetVehicleByVinAsync(vehicle.Vin)).ReturnsAsync(vehicle);
+
+            var result = await _controller.CreateVehicle(vehicle);
+
+            var bad = Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Contains("already exists", bad.Value.ToString());
         }
 
         [Fact]
         public async Task CreateVehicle_ReturnsCreated_WhenSuccess()
         {
-            // Arrange
-            var vehicle = new Vehicle { Id = 1, Vin = "5UXKR0C54F0678901", Make = "BMW", Model = "X5" };
+            var vehicle = new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" };
+            _vehicleServiceMock.Setup(s => s.GetVehicleByVinAsync(vehicle.Vin)).ReturnsAsync((Vehicle)null);
+            _vehicleServiceMock.Setup(s => s.CreateVehicleAsync(vehicle)).ReturnsAsync(vehicle);
 
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByVinAsync(vehicle.Vin))
-                .ReturnsAsync((Vehicle)null!);
-
-            _mockVehicleService
-                .Setup(s => s.CreateVehicleAsync(vehicle))
-                .ReturnsAsync(vehicle);
-
-            // Act
             var result = await _controller.CreateVehicle(vehicle);
 
-            // Assert
-            var createdAtActionResult = Assert.IsType<CreatedAtActionResult>(result.Result);
-            var createdVehicle = Assert.IsType<Vehicle>(createdAtActionResult.Value);
-
-            Assert.Equal(vehicle.Id, createdVehicle.Id);
-        }
-
-        [Fact]
-        public async Task CreateVehicle_ReturnsBadRequest_WhenDuplicateVin()
-        {
-            // Arrange
-            var vehicle = new Vehicle { Id = 1, Vin = "5UXKR0C54F0678901", Make = "BMW", Model = "X5" };
-
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByVinAsync(vehicle.Vin))
-                .ReturnsAsync(vehicle);
-
-            // Act
-            var result = await _controller.CreateVehicle(vehicle);
-
-            // Assert
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task UpdateVehicle_ReturnsOk_WhenSuccess()
-        {
-            // Arrange
-            var vehicle = new Vehicle { Id = 1, Vin = "5UXKR0C54F0678901", Make = "BMW", Model = "X5" };
-
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByIdAsync(vehicle.Id))
-                .ReturnsAsync(vehicle);
-
-            _mockVehicleService
-                .Setup(s => s.UpdateVehicleAsync(vehicle))
-                .ReturnsAsync(vehicle);
-
-            // Act
-            var result = await _controller.UpdateVehicle(vehicle.Id, vehicle);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var updatedVehicle = Assert.IsType<Vehicle>(okResult.Value);
-
-            Assert.Equal(vehicle.Id, updatedVehicle.Id);
+            var created = Assert.IsType<CreatedAtActionResult>(result.Result);
+            Assert.Equal(vehicle, created.Value);
         }
 
         [Fact]
         public async Task UpdateVehicle_ReturnsBadRequest_WhenIdMismatch()
         {
-            // Arrange
-            var vehicle = new Vehicle { Id = 1, Vin = "5UXKR0C54F0678901", Make = "BMW", Model = "X5" };
+            var vehicle = new Vehicle { Id = 2, Vin = "12345678901234567", Make = "A", Model = "B" };
 
-            // Act
-            var result = await _controller.UpdateVehicle(99, vehicle);
+            var result = await _controller.UpdateVehicle(1, vehicle);
 
-            // Assert
-            Assert.IsType<BadRequestObjectResult>(result.Result);
+            var bad = Assert.IsType<BadRequestObjectResult>(result.Result);
+            Assert.Contains("ID mismatch", bad.Value.ToString());
         }
 
         [Fact]
-        public async Task UpdateVehicle_ReturnsNotFound_WhenVehicleDoesNotExist()
+        public async Task UpdateVehicle_ReturnsNotFound_WhenNotFound()
         {
-            // Arrange
-            var vehicle = new Vehicle { Id = 1, Vin = "5UXKR0C54F0678901", Make = "BMW", Model = "X5" };
+            var vehicle = new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" };
+            _vehicleServiceMock.Setup(s => s.GetVehicleByIdAsync(1)).ReturnsAsync((Vehicle)null);
 
-            _mockVehicleService
-                .Setup(s => s.GetVehicleByIdAsync(vehicle.Id))
-                .ReturnsAsync((Vehicle)null!);
+            var result = await _controller.UpdateVehicle(1, vehicle);
 
-            // Act
-            var result = await _controller.UpdateVehicle(vehicle.Id, vehicle);
+            var notFound = Assert.IsType<NotFoundObjectResult>(result.Result);
+            Assert.Contains("not found", notFound.Value.ToString());
+        }
 
-            // Assert
-            Assert.IsType<NotFoundObjectResult>(result.Result);
+        [Fact]
+        public async Task UpdateVehicle_ReturnsOk_WhenSuccess()
+        {
+            var vehicle = new Vehicle { Id = 1, Vin = "12345678901234567", Make = "A", Model = "B" };
+            _vehicleServiceMock.Setup(s => s.GetVehicleByIdAsync(1)).ReturnsAsync(vehicle);
+            _vehicleServiceMock.Setup(s => s.UpdateVehicleAsync(vehicle)).ReturnsAsync(vehicle);
+
+            var result = await _controller.UpdateVehicle(1, vehicle);
+
+            var ok = Assert.IsType<OkObjectResult>(result.Result);
+            Assert.Equal(vehicle, ok.Value);
+        }
+
+        [Fact]
+        public async Task DeleteVehicle_ReturnsNotFound_WhenNotFound()
+        {
+            _vehicleServiceMock.Setup(s => s.DeleteVehicleAsync(1)).ReturnsAsync(false);
+
+            var result = await _controller.DeleteVehicle(1);
+
+            var notFound = Assert.IsType<NotFoundObjectResult>(result);
+            Assert.Contains("not found", notFound.Value.ToString());
         }
 
         [Fact]
         public async Task DeleteVehicle_ReturnsNoContent_WhenSuccess()
         {
-            // Arrange
-            int id = 1;
+            _vehicleServiceMock.Setup(s => s.DeleteVehicleAsync(1)).ReturnsAsync(true);
 
-            _mockVehicleService
-                .Setup(s => s.DeleteVehicleAsync(id))
-                .ReturnsAsync(true);
+            var result = await _controller.DeleteVehicle(1);
 
-            // Act
-            var result = await _controller.DeleteVehicle(id);
-
-            // Assert
             Assert.IsType<NoContentResult>(result);
         }
-
-        [Fact]
-        public async Task DeleteVehicle_ReturnsNotFound_WhenNotExist()
-        {
-            // Arrange
-            int id = -1;
-
-            _mockVehicleService
-                .Setup(s => s.DeleteVehicleAsync(id))
-                .ReturnsAsync(false);
-
-            // Act
-            var result = await _controller.DeleteVehicle(id);
-
-            // Assert
-            Assert.IsType<NotFoundObjectResult>(result);
-        }
-
-        [Fact]
-        public async Task SaveQuestionnaire_ReturnsOkResultWithLoanAndQuestionnaire()
-        {
-            // Arrange
-            var dto = new QuestionnaireDTO
-            {
-                DrivingLicense = "Full UK",
-                MaritalStatus = "Single",
-                DOB = new DateOnly(1995, 1, 1),
-                EmploymentStatus = "Employed",
-                BorrowAmount = 25000,
-                NotSure = false,
-                Email = "test@example.com",
-                Phone = "1234567890"
-            };
-
-            var questionnaire = new Questionnaire
-            {
-                Id = 1,
-                DrivingLicense = dto.DrivingLicense,
-                MaritalStatus = dto.MaritalStatus,
-                DOB = dto.DOB,
-                EmploymentStatus = dto.EmploymentStatus,
-                BorrowAmount = dto.BorrowAmount,
-                NotSure = dto.NotSure,
-                Email = dto.Email,
-                Phone = dto.Phone
-            };
-
-            var loanRequest = new LoanRequest
-            {
-                VehicleId = 10,
-                LoanAmount = dto.BorrowAmount,
-                InterestRate = 7.5m,
-                LoanTermMonths = 60
-            };
-
-            var loanCalculation = new LoanCalculation
-            {
-                Id = 1,
-                VehicleId = loanRequest.VehicleId,
-                LoanAmount = loanRequest.LoanAmount,
-                InterestRate = loanRequest.InterestRate,
-                LoanTermMonths = loanRequest.LoanTermMonths,
-                MonthlyPayment = 500,
-                TotalInterest = 5000,
-                TotalCost = 30000
-            };
-
-            var pdfBytes = new byte[] { 1, 2, 3, 4 };
-
-            _mockVehicleService
-                .Setup(s => s.SaveQuestionnaireAsync(dto))
-                .ReturnsAsync(questionnaire);
-
-            _mockLoanService
-                .Setup(s => s.CalculateLoanAsync(It.Is<LoanRequest>(lr => lr.VehicleId == loanRequest.VehicleId && lr.LoanAmount == loanRequest.LoanAmount)))
-                .ReturnsAsync(loanCalculation);
-
-            _mockPdfService
-                .Setup(s => s.GenerateLoanPdf(questionnaire, loanCalculation))
-                .Returns(pdfBytes);
-
-            _mockEmailService
-                .Setup(s => s.SendLoanEmailAsync(dto.Email, pdfBytes))
-                .Returns(Task.CompletedTask);
-
-            int vehicleId = 10;
-
-            // Act
-            var result = await _controller.SaveQuestionnaire(dto, vehicleId);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            dynamic response = okResult.Value!;
-
-            // Validate returned Questionnaire
-            Assert.Equal(questionnaire.Id, ((Questionnaire)response.Questionnaire).Id);
-            Assert.Equal(questionnaire.Email, ((Questionnaire)response.Questionnaire).Email);
-
-            // Validate returned LoanCalculation
-            Assert.Equal(loanCalculation.MonthlyPayment, ((LoanCalculation)response.Loan).MonthlyPayment);
-            Assert.Equal(loanCalculation.TotalCost, ((LoanCalculation)response.Loan).TotalCost);
-
-            // Verify service calls
-            _mockVehicleService.Verify(s => s.SaveQuestionnaireAsync(dto), Times.Once);
-            _mockLoanService.Verify(s => s.CalculateLoanAsync(It.IsAny<LoanRequest>()), Times.Once);
-            _mockPdfService.Verify(s => s.GenerateLoanPdf(questionnaire, loanCalculation), Times.Once);
-            _mockEmailService.Verify(s => s.SendLoanEmailAsync(dto.Email, pdfBytes), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetAllVehiclesByStatus_ReturnsOk_WithExpectedResult()
-        {
-            // Arrange
-            int pageView = 10, offset = 0;
-            string? status = "NEW";
-
-            var expectedResult = new VehicleListResult
-            {
-                Vehicles = new List<Vehicle>
-                {
-                    new Vehicle { Id = 1, Make = "BMW", Model = "X5", Status = "NEW" },
-                    new Vehicle { Id = 2, Make = "Audi", Model = "Q5", Status = "NEW" }
-                },
-                TotalCount = 2
-            };
-
-            _mockVehicleService
-                .Setup(s => s.GetAllVehiclesByStatusAsync(pageView, offset, status))
-                .ReturnsAsync(expectedResult);
-
-            // Act
-            var result = await _controller.GetAllVehiclesByStatus(pageView, offset, status);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualResult = Assert.IsAssignableFrom<VehicleListResult>(okResult.Value);
-
-            Assert.Equal(expectedResult.TotalCount, actualResult.TotalCount);
-            Assert.Equal(expectedResult.Vehicles.Count(), actualResult.Vehicles.Count());
-
-            _mockVehicleService.Verify(s => s.GetAllVehiclesByStatusAsync(pageView, offset, status), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetAllVehiclesByStatus_InvalidPagination_ReturnsBadRequest()
-        {
-            // Arrange
-            int pageView = -5, offset = 0;
-            string? status = "NEW";
-
-            // Act
-            var result = await _controller.GetAllVehiclesByStatus(pageView, offset, status);
-
-            // Assert
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetCarFeatures_ReturnsOk_WhenFeatureFound()
-        {
-            // Arrange
-            var make = "BMW";
-            var model = "X5";
-
-            var carFeatures = new List<VehicleModelJSON>
-            {
-                new VehicleModelJSON { Make = "BMW", Model = "X5", Year = 2022 },
-                new VehicleModelJSON { Make = "Audi", Model = "A4", Year = 2022  }
-            };
-
-            var expectedFeature = carFeatures.First(c => c.Make == make && c.Model == model);
-
-            _mockVehicleService
-                .Setup(s => s.GetAllCarFeaturesAsync())
-                .ReturnsAsync(carFeatures);
-
-            _mockVehicleService
-                .Setup(s => s.GetCarFeature(carFeatures, make, model))
-                .Returns(expectedFeature);
-
-            // Act
-            var result = await _controller.GetCarFeatures(make, model);
-
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var actualFeature = Assert.IsType<NormalizedCarFeatureDto>(okResult.Value);
-
-            Assert.Equal(expectedFeature.Make, actualFeature.Make);
-            Assert.Equal(expectedFeature.Model, actualFeature.Model);
-            Assert.Equal(expectedFeature.Features?.Engine?.Type, actualFeature.Features?.Engine?.Type);
-            Assert.Equal(expectedFeature.Features?.Engine?.Horsepower, actualFeature?.Features?.Engine?.Horsepower);
-            
-
-            _mockVehicleService.Verify(s => s.GetAllCarFeaturesAsync(), Times.Once);
-            _mockVehicleService.Verify(s => s.GetCarFeature(carFeatures, make, model), Times.Once);
-        }
-
-        [Fact]
-        public async Task GetCarFeatures_ReturnsBadRequest_WhenInvalidMakeOrModel()
-        {
-            // Arrange
-            var make = ""; 
-            var model = "X5";
-
-            // Act
-            var result = await _controller.GetCarFeatures(make, model);
-
-            // Assert
-            Assert.IsType<BadRequestObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetCarFeatures_ReturnsNotFound_WhenNoFeaturesFound()
-        {
-            // Arrange
-            var make = "BMW";
-            var model = "X5";
-
-            _mockVehicleService
-                .Setup(s => s.GetAllCarFeaturesAsync())
-                .ReturnsAsync(new List<VehicleModelJSON>());
-
-            // Act
-            var result = await _controller.GetCarFeatures(make, model);
-
-            // Assert
-            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
-        }
-
-        [Fact]
-        public async Task GetCarFeatures_ReturnsNotFound_WhenNoMatchFound()
-        {
-            // Arrange
-            var make = "BMW";
-            var model = "X6";
-
-            var carFeatures = new List<VehicleModelJSON>
-            {
-                new VehicleModelJSON { Make = "BMW", Model = "X5", Year = 2022 }
-            };
-
-            _mockVehicleService
-                .Setup(s => s.GetAllCarFeaturesAsync())
-                .ReturnsAsync(carFeatures);
-
-            _mockVehicleService
-                .Setup(s => s.GetCarFeature(carFeatures, make, model))
-                .Returns((VehicleModelJSON?)null);
-
-            // Act
-            var result = await _controller.GetCarFeatures(make, model);
-
-            // Assert
-            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
-
-            _mockVehicleService.Verify(s => s.GetAllCarFeaturesAsync(), Times.Once);
-            _mockVehicleService.Verify(s => s.GetCarFeature(carFeatures, make, model), Times.Once);
-        }
-
     }
 }

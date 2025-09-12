@@ -1,22 +1,11 @@
-﻿using AutoFiCore.Dto;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Dto;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace AutoFiCore.Data
 {
-    public interface IChatRepository
-    {
-        Task<ChatSession?> GetSessionAsync(string sessionId, int userId);
-        Task<List<ChatTitleDto>> GetUserChatsAsync(int userId);
-        Task AddSessionAsync(ChatSession session);
-        Task AddMessageAsync(ChatMessage message);
-        Task SaveChangesAsync();
-        Task UpdateSessionAsync(ChatSession session);
-        Task DeleteSessionAsync(string sessionId, int userId);
-        Task DeleteAllSessionsAsync(int userId);
-
-    }
 
     public class DbChatRepository : IChatRepository
     {
@@ -39,7 +28,6 @@ namespace AutoFiCore.Data
             _db.ChatMessages.Add(message);
             return Task.CompletedTask;
         }
-        public Task SaveChangesAsync() => _db.SaveChangesAsync();
         public Task<List<ChatTitleDto>> GetUserChatsAsync(int userId) =>
             _db.ChatSessions
             .Where(s => s.UserId == userId)
@@ -54,7 +42,6 @@ namespace AutoFiCore.Data
         public async Task UpdateSessionAsync(ChatSession session)
         {
             _db.ChatSessions.Update(session);
-            await _db.SaveChangesAsync();
         }
         public async Task DeleteSessionAsync(string sessionId, int userId)
         {
@@ -66,7 +53,6 @@ namespace AutoFiCore.Data
             {
                 _db.ChatMessages.RemoveRange(session.Messages);
                 _db.ChatSessions.Remove(session);
-                await _db.SaveChangesAsync();
             }
             else
             {
@@ -85,13 +71,71 @@ namespace AutoFiCore.Data
                 var allMessages = sessions.SelectMany(s => s.Messages);
                 _db.ChatMessages.RemoveRange(allMessages);
                 _db.ChatSessions.RemoveRange(sessions);
-                await _db.SaveChangesAsync();
             }
             else
             {
                 _logger.LogInformation($"DeleteAllSessionsAsync: No sessions found for user {userId}.");
             }
         }
-    
+        public async Task<string> SaveChatHistoryAsync(EnrichedAIQuery payload, AIResponseModel result)
+        {
+            if (string.IsNullOrWhiteSpace(payload.SessionId))
+            {
+                payload.SessionId = Guid.NewGuid().ToString();
+            }
+
+            var session = await GetSessionAsync(payload.SessionId, payload.UserId);
+
+            if (session == null)
+            {
+                string GenerateTitle(string question)
+                {
+                    if (string.IsNullOrWhiteSpace(question)) return "New Chat";
+                    var title = question.Length > 50 ? question[..50] : question;
+                    return title.Replace("\r", " ").Replace("\n", " ").Trim();
+                }
+
+                session = new ChatSession
+                {
+                    Id = payload.SessionId,
+                    UserId = payload.UserId,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    Title = GenerateTitle(payload.Query.Question),
+                    Messages = new List<ChatMessage>()
+                };
+
+                await AddSessionAsync(session);
+            }
+            else
+            {
+                session.UpdatedAt = DateTime.UtcNow;
+                _db.ChatSessions.Update(session);
+            }
+
+            var userMessage = new ChatMessage
+            {
+                ChatSessionId = session.Id,
+                Sender = "User",
+                Message = payload.Query.Question,
+                Timestamp = DateTime.UtcNow
+            };
+            await AddMessageAsync(userMessage);
+
+            var aiMessage = new ChatMessage
+            {
+                ChatSessionId = session.Id,
+                Sender = "AI",
+                Message = result.UiBlock,
+                Timestamp = DateTime.UtcNow,
+                UiType = result.UiType,
+                QueryType = result.QueryType,
+                SuggestedActions = result.SuggestedActions,
+                Sources = result.Sources,
+            };
+            await AddMessageAsync(aiMessage);
+
+            return session.Id;
+        }
     }
 }

@@ -1,6 +1,7 @@
-﻿using AutoFiCore.Data;
+﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 using AutoFiCore.Models;
+using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -16,19 +17,10 @@ using System.Threading.Tasks;
 
 namespace AutoFiCore.Services
 {
-    public interface IAIAssistantService
-    {
-        Task<AIResponseModel> QueryFastApiAsync(EnrichedAIQuery payload, string correlationId, string jwtToken);
-        Task<List<ChatTitleDto>> GetChatTitlesAsync(int userId);
-        Task<ChatSessionDto?> GetFullChatAsync(int userId, string sessionId);
-        Task<FeedbackResponseDto> SubmitFeedbackAsync(AIQueryFeedbackDto feedbackDto, string correlationId, string jwtToken);
-        Task<List<string>> GetSuggestionsAsync(int userId, string correlationId, string jwtToken);
-        Task<List<PopularQueryDto>> GetPopularQueriesAsync(int limit, string correlationId, string jwtToken);
-        Task DeleteSessionAsync(string sessionId, int userId);
-        Task DeleteAllSessionsAsync(int userId);
-        Task UpdateSessionTitleAsync(string sessionId, int userId, string newTitle);
-    }
-
+    /// <summary>
+    /// Provides AI assistant operations such as querying AI service, managing chat sessions,
+    /// generating suggestions, and handling feedback.
+    /// </summary>
     public class AIAssistantService : IAIAssistantService
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -37,6 +29,10 @@ namespace AutoFiCore.Services
         private readonly IUserContextService _userContextService;
         private readonly IMemoryCache _cache;
         private readonly ILogger<AIAssistantService> _logger;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AIAssistantService"/> class.
+        /// </summary>
         public AIAssistantService(IHttpClientFactory httpClientFactory, IUnitOfWork uow, ILogger<AIAssistantService> logger, IServiceScopeFactory scopeFactory, IUserContextService userContextService, IMemoryCache cache)
         {
             _httpClientFactory = httpClientFactory;
@@ -46,6 +42,10 @@ namespace AutoFiCore.Services
             _cache = cache;
             _scopeFactory = scopeFactory;
         }
+
+        /// <summary>
+        /// Sends a query to the external FastAPI service and persists the chat history.
+        /// </summary>
         public async Task<AIResponseModel> QueryFastApiAsync(EnrichedAIQuery payload, string correlationId, string jwtToken)
         {
             var client = _httpClientFactory.CreateClient("FastApi");
@@ -181,6 +181,11 @@ namespace AutoFiCore.Services
 
             return suggestions.Distinct().Take(10).ToList();
         }
+
+        /// <summary>
+        /// Retrieves AI-powered suggestions for a user, combining ML and .NET context.
+        /// Uses caching to improve performance.
+        /// </summary>
         public async Task<List<string>> GetSuggestionsAsync(int userId, string correlationId, string jwtToken)
         {
             var cacheKey = $"suggestions:{userId}";
@@ -203,72 +208,33 @@ namespace AutoFiCore.Services
         }
         private async Task<string> SaveChatHistoryAsync(EnrichedAIQuery payload, AIResponseModel result)
         {
+            using var scope = _scopeFactory.CreateScope();
+            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+            var strategy = uow.DbContext.Database.CreateExecutionStrategy();
+
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                string sessionId = null!;
 
-                // Generate a new session ID if none is provided
-                if (string.IsNullOrWhiteSpace(payload.SessionId))
+                await strategy.ExecuteAsync(async () =>
                 {
-                    payload.SessionId = Guid.NewGuid().ToString();
-                }
-
-                // Try to get existing session
-                var session = await uow.ChatRepository.GetSessionAsync(payload.SessionId, payload.UserId);
-
-                if (session == null)
-                {
-                    string GenerateTitle(string question)
+                    await uow.BeginTransactionAsync();
+                    try
                     {
-                        if (string.IsNullOrWhiteSpace(question)) return "New Chat";
-                        var title = question.Length > 50 ? question[..50] : question;
-                        title = title.Replace("\r", " ").Replace("\n", " ").Trim();
-                        return title;
+                        sessionId = await uow.ChatRepository.SaveChatHistoryAsync(payload, result);
+
+                        await uow.SaveChangesAsync();
+                        await uow.CommitTransactionAsync();
                     }
-
-                    session = new ChatSession
+                    catch
                     {
-                        Id = payload.SessionId,
-                        UserId = payload.UserId,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow,
-                        Title = GenerateTitle(payload.Query.Question),
-                        Messages = new List<ChatMessage>()
-                    };
+                        await uow.RollbackTransactionAsync();
+                        throw;
+                    }
+                });
 
-                    await uow.ChatRepository.AddSessionAsync(session);
-                }
-                else
-                {
-                    session.UpdatedAt = DateTime.UtcNow;
-                    await uow.ChatRepository.UpdateSessionAsync(session);
-                }
-
-                var userMessage = new ChatMessage
-                {
-                    ChatSessionId = session.Id,
-                    Sender = "User",
-                    Message = payload.Query.Question,
-                    Timestamp = DateTime.UtcNow
-                };
-                await uow.ChatRepository.AddMessageAsync(userMessage);
-
-                var aiMessage = new ChatMessage
-                {
-                    ChatSessionId = session.Id,
-                    Sender = "AI",
-                    Message = result.UiBlock,
-                    Timestamp = DateTime.UtcNow,
-                    UiType = result.UiType,
-                    QueryType = result.QueryType,
-                    SuggestedActions = result.SuggestedActions,
-                    Sources = result.Sources,
-                };
-                await uow.ChatRepository.AddMessageAsync(aiMessage);
-
-                await uow.ChatRepository.SaveChangesAsync();
-                return session.Id;
+                return sessionId;
             }
             catch (Exception ex)
             {
@@ -276,40 +242,28 @@ namespace AutoFiCore.Services
                 return null!;
             }
         }
+
+        /// <summary>
+        /// Gets all chat titles for a given user.
+        /// </summary>
         public async Task<List<ChatTitleDto>> GetChatTitlesAsync(int userId)
         {
             var chats = await _uow.ChatRepository.GetUserChatsAsync(userId);
             return chats;
         }
+
+        /// <summary>
+        /// Retrieves the full chat session details for the given user and session.
+        /// </summary>
         public async Task<ChatSessionDto?> GetFullChatAsync(int userId, string sessionId)
         {
-          
             var chat = await _uow.ChatRepository.GetSessionAsync(sessionId, userId);
-            if (chat == null) return null;
-
-            return new ChatSessionDto
-            {
-                Id = chat.Id,
-                Title = chat.Title,
-                CreatedAt = chat.CreatedAt,
-                UpdatedAt = chat.UpdatedAt,
-                Messages = chat.Messages
-                    .Select(m => new ChatMessageDto
-                    {
-                        Id = m.Id,
-                        Sender = m.Sender,
-                        Message = m.Message,
-                        Timestamp = m.Timestamp,
-                        Feedback = m.Feedback,
-                        UiType = m.UiType,
-                        QueryType = m.QueryType,
-                        SuggestedActions = m.SuggestedActions ?? new List<string>(),
-                        Sources = m.Sources ?? new List<string>(),
-                    })
-                    .OrderBy(m => m.Id)
-                    .ToList()
-            };
+            return chat == null ? null : ChatMapper.ToDto(chat);
         }
+
+        /// <summary>
+        /// Submits feedback about an AI query to the external FastAPI service.
+        /// </summary>
         public async Task<FeedbackResponseDto> SubmitFeedbackAsync(AIQueryFeedbackDto feedbackDto, string correlationId, string jwtToken)
         {
             var client = _httpClientFactory.CreateClient("FastApi");
@@ -344,6 +298,10 @@ namespace AutoFiCore.Services
 
             return result;
         }
+
+        /// <summary>
+        /// Retrieves a list of popular queries from the external FastAPI service.
+        /// </summary>
         public async Task<List<PopularQueryDto>> GetPopularQueriesAsync(int limit, string correlationId, string jwtToken)
         {
             var client = _httpClientFactory.CreateClient("FastApi");
@@ -365,12 +323,37 @@ namespace AutoFiCore.Services
 
             return result ?? new List<PopularQueryDto>();
         }
+
+        /// <summary>
+        /// Deletes a specific chat session for a user inside a transaction.
+        /// </summary>
         public async Task DeleteSessionAsync(string sessionId, int userId)
         {
             try
             {
-                await _uow.ChatRepository.DeleteSessionAsync(sessionId, userId);
-                _logger.LogInformation($"Deleted session {sessionId} for user {userId}.");
+                using var scope = _scopeFactory.CreateScope();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+                var strategy = uow.DbContext.Database.CreateExecutionStrategy();
+
+                await strategy.ExecuteAsync(async () =>
+                {
+                    await uow.BeginTransactionAsync();
+
+                    try
+                    {
+                        await uow.ChatRepository.DeleteSessionAsync(sessionId, userId);
+                        await uow.SaveChangesAsync();
+                        await uow.CommitTransactionAsync();
+
+                        _logger.LogInformation($"Deleted session {sessionId} for user {userId}.");
+                    }
+                    catch
+                    {
+                        await uow.RollbackTransactionAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -378,12 +361,36 @@ namespace AutoFiCore.Services
                 throw;
             }
         }
+
+        /// <summary>
+        /// Deletes all chat sessions for a user inside a transaction.
+        /// </summary>
         public async Task DeleteAllSessionsAsync(int userId)
         {
             try
             {
-                await _uow.ChatRepository.DeleteAllSessionsAsync(userId);
-                _logger.LogInformation($"Deleted all sessions for user {userId}.");
+                using var scope = _scopeFactory.CreateScope();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+                var strategy = uow.DbContext.Database.CreateExecutionStrategy();
+
+                await strategy.ExecuteAsync(async () =>
+                {
+                    await uow.BeginTransactionAsync();
+                    try
+                    {
+                        await uow.ChatRepository.DeleteAllSessionsAsync(userId);
+                        await uow.SaveChangesAsync();
+                        await uow.CommitTransactionAsync();
+
+                        _logger.LogInformation($"Deleted all sessions for user {userId}.");
+                    }
+                    catch
+                    {
+                        await uow.RollbackTransactionAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -391,26 +398,58 @@ namespace AutoFiCore.Services
                 throw;
             }
         }
+
+        /// <summary>
+        /// Updates the title of a chat session for a user inside a transaction.
+        /// </summary>
         public async Task UpdateSessionTitleAsync(string sessionId, int userId, string newTitle)
         {
-            var session = await _uow.ChatRepository.GetSessionAsync(sessionId, userId);
-
-            if (session == null)
+            try
             {
-                _logger.LogWarning(
-                    $"UpdateSessionTitleAsync: Session {sessionId} not found for user {userId}."
-                );
-                return;
+                using var scope = _scopeFactory.CreateScope();
+                var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+                var strategy = uow.DbContext.Database.CreateExecutionStrategy();
+
+                await strategy.ExecuteAsync(async () =>
+                {
+                    await uow.BeginTransactionAsync();
+                    try
+                    {
+                        var session = await uow.ChatRepository.GetSessionAsync(sessionId, userId);
+
+                        if (session == null)
+                        {
+                            _logger.LogWarning(
+                                $"UpdateSessionTitleAsync: Session {sessionId} not found for user {userId}."
+                            );
+                            await uow.RollbackTransactionAsync();
+                            return;
+                        }
+
+                        session.Title = newTitle;
+                        session.UpdatedAt = DateTime.UtcNow;
+
+                        await uow.ChatRepository.UpdateSessionAsync(session);
+                        await uow.SaveChangesAsync();
+                        await uow.CommitTransactionAsync();
+
+                        _logger.LogInformation(
+                            $"Session {sessionId} title successfully updated to '{newTitle}' for user {userId}."
+                        );
+                    }
+                    catch
+                    {
+                        await uow.RollbackTransactionAsync();
+                        throw;
+                    }
+                });
             }
-
-            session.Title = newTitle;
-            session.UpdatedAt = DateTime.UtcNow;
-
-            await _uow.ChatRepository.UpdateSessionAsync(session);
-
-            _logger.LogInformation(
-                $"Session {sessionId} title successfully updated to '{newTitle}' for user {userId}."
-            );
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating title for session {sessionId}.");
+                throw;
+            }
         }
     }
 }

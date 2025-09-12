@@ -2,7 +2,7 @@
 using AutoFiCore.Models;
 using AutoFiCore.Enums;
 
-namespace AutoFiCore.Data
+namespace AutoFiCore.Data.Interfaces
 {
     public interface IAuctionRepository
     {

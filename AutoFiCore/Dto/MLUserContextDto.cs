@@ -26,6 +26,15 @@ public class AnalyticsEventDto
 
 public class MLUserContextDto
 {
+    [JsonPropertyName("user_id")]
+    public int UserId { get; set; }
+
+    [JsonPropertyName("user_name")]
+    public string UserName { get; set; } = string.Empty;
+
+    [JsonPropertyName("user_email")]
+    public string UserEmail { get; set; } = string.Empty;
+
     [JsonPropertyName("user_interactions")]
     public List<UserInteractionDto> UserInteractions { get; set; } = new();
 

@@ -6,8 +6,12 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-
-public sealed class TokenProvider
+public interface ITokenProvider
+{
+    string CreateAccessToken(User user);
+    string GenerateRefreshToken();
+}
+public sealed class TokenProvider:ITokenProvider
 {
     private readonly IConfiguration _config;
 

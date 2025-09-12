@@ -11,6 +11,7 @@ using AutoFiCore.Utilities;
 using System.Diagnostics;
 using Microsoft.EntityFrameworkCore.Internal;
 using AutoFiCore.Dto;
+using AutoFiCore.Data.Interfaces;
 
 namespace AutoFiCore.Data;
 

@@ -1,4 +1,5 @@
 ﻿using AutoFiCore.Data;
+using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;

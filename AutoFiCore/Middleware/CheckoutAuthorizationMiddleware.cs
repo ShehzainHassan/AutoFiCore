@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using AutoFiCore.Data;
 using System.IdentityModel.Tokens.Jwt;
+using AutoFiCore.Data.Interfaces;
 
 public class CheckoutAuthorizationMiddleware
 {

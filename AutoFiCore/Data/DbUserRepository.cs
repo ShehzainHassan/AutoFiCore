@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Dto;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
@@ -12,11 +13,11 @@ using System.Threading.Tasks;
 
 namespace AutoFiCore.Data
 {
-    public class DbUserRepository:IUserRepository
+    public class DbUserRepository : IUserRepository
     {
         private readonly ApplicationDbContext _dbContext;
         private readonly ILogger<DbUserRepository> _logger;
-        public DbUserRepository(ApplicationDbContext dbContext,  ILogger<DbUserRepository> logger)
+        public DbUserRepository(ApplicationDbContext dbContext, ILogger<DbUserRepository> logger)
         {
             _dbContext = dbContext;
             _logger = logger;
@@ -98,7 +99,7 @@ namespace AutoFiCore.Data
             _dbContext.UserLikes.Remove(like);
             return like;
         }
-        public async Task<AuthResponse?> LoginUserAsync(string email, string password, TokenProvider tokenProvider, IRefreshTokenService refreshTokenService)
+        public async Task<AuthResponse?> LoginUserAsync(string email, string password, ITokenProvider tokenProvider, IRefreshTokenService refreshTokenService)
         {
             var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.Password))

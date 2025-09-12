@@ -1,78 +1,101 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using AutoFiCore.Controllers;
+using AutoFiCore.Models;
+using AutoFiCore.Services;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
+using Moq;
 using System.Threading.Tasks;
+using Xunit;
 
-namespace AutoFiCore.Tests.Tests.Controllers
+namespace Tests.Controllers
 {
-    using AutoFiCore.Controllers;
-    using AutoFiCore.Models;
-    using AutoFiCore.Services;
-    using Microsoft.AspNetCore.Mvc;
-    using Moq;
-    using Xunit;
-    using System.Threading.Tasks;
-    using System.Collections.Generic;
-
     public class ContactControllerTests
     {
-        private readonly Mock<IContactInfoService> _mockService;
-        private readonly ContactController _controller;
+        private readonly Mock<IContactInfoService> _contactInfoServiceMock;
+        private readonly Mock<ILogger<ContactController>> _loggerMock;
+        private readonly TestContactController _controller;
 
         public ContactControllerTests()
         {
-            _mockService = new Mock<IContactInfoService>();
-            _controller = new ContactController(_mockService.Object);
+            _contactInfoServiceMock = new Mock<IContactInfoService>();
+            _loggerMock = new Mock<ILogger<ContactController>>();
+            _controller = new TestContactController(_contactInfoServiceMock.Object, _loggerMock.Object);
         }
 
         [Fact]
-        public async Task AddContactInfo_ReturnsOkResult_WhenValid()
+        public async Task AddContactInfo_ReturnsOk_WhenUserContextValid()
         {
             // Arrange
-            var contact = new ContactInfo
+            var contactInfo = new ContactInfo
             {
-                FirstName = "Jane",
-                LastName = "Smith",
-                SelectedOption = "Inquiry",
-                VehicleName = "Audi A4",
-                PostCode = "54321",
-                Email = "jane@example.com",
-                PhoneNumber = "0987654321",
-                PreferredContactMethod = "Call",
-                Comment = "",
-                EmailMeNewResults = false
+                Id = 1,
+                FirstName = "John",
+                LastName = "Doe",
+                SelectedOption = "Test Drive",
+                VehicleName = "Test car",
+                PostCode = "12345",
+                Email = "john@example.com",
+                PhoneNumber = "1234567890",
+                PreferredContactMethod = "Email",
+                Comment = "Interested",
+                EmailMeNewResults = true
             };
-
-            _mockService.Setup(s => s.AddContactInfoAsync(contact))
-                .ReturnsAsync(contact);
+            _controller.SetUserContextValid(true, 42);
+            _contactInfoServiceMock.Setup(s => s.AddContactInfoAsync(contactInfo))
+                .ReturnsAsync(contactInfo);
 
             // Act
-            var result = await _controller.AddContactInfo(contact);
+            var result = await _controller.AddContactInfo(contactInfo);
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result.Result);
-            var returnedContact = Assert.IsType<ContactInfo>(okResult.Value);
-
-            Assert.Equal(contact.Email, returnedContact.Email);
-            Assert.Equal(contact.FirstName, returnedContact.FirstName);
-
-            _mockService.Verify(s => s.AddContactInfoAsync(contact), Times.Once);
+            Assert.Equal(contactInfo, okResult.Value);
         }
 
         [Fact]
-        public async Task AddContactInfo_ReturnsBadRequest_WhenInvalid()
+        public async Task AddContactInfo_ReturnsUnauthorized_WhenUserContextInvalid()
         {
             // Arrange
-            var invalidContact = new ContactInfo();
+            var contactInfo = new ContactInfo();
+            _controller.SetUserContextValid(false, 0);
 
             // Act
-            var result = await _controller.AddContactInfo(invalidContact);
+            var result = await _controller.AddContactInfo(contactInfo);
 
             // Assert
-            var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
-            Assert.NotNull(badRequest.Value);
+            var unauthorized = Assert.IsType<UnauthorizedObjectResult>(result.Result);
+            Assert.Contains("Invalid token", unauthorized.Value!.ToString());
+        }
+
+        private class TestContactController : ContactController
+        {
+            private bool _isUserContextValid;
+            private int _userId;
+
+            public TestContactController(
+                IContactInfoService contactInfoService,
+                ILogger<ContactController> logger)
+                : base(contactInfoService, logger)
+            {
+                ControllerContext = new ControllerContext
+                {
+                    HttpContext = new DefaultHttpContext()
+                };
+            }
+
+            public void SetUserContextValid(bool valid, int userId)
+            {
+                _isUserContextValid = valid;
+                _userId = userId;
+            }
+
+            protected override bool IsUserContextValid(out int userId)
+            {
+                userId = _userId;
+                return _isUserContextValid;
+            }
+
         }
     }
-
 }

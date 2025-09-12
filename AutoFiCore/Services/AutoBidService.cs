@@ -1,4 +1,4 @@
-﻿using AutoFiCore.Data;
+﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Mappers;

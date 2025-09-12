@@ -1,4 +1,4 @@
-﻿using AutoFiCore.Data;
+﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 
 public interface IPerformanceTrackingService
