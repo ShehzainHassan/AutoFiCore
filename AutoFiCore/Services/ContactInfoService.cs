@@ -1,14 +1,10 @@
 ﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Models;
+using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace AutoFiCore.Services
 {
-    public interface IContactInfoService
-    {
-        Task<ContactInfo> AddContactInfoAsync(ContactInfo contactInfo);
-    }
-
     public class ContactInfoService : IContactInfoService
     {
         private readonly IContactInfoRepository _repository;
@@ -22,11 +18,33 @@ namespace AutoFiCore.Services
             _unitOfWork = unitOfWork;
         }
 
-        public async Task<ContactInfo> AddContactInfoAsync(ContactInfo contactInfo)
+        public async Task<Result<ContactInfo>> AddContactInfoAsync(ContactInfo contactInfo)
         {
-            await _unitOfWork.ContactInfo.AddContactInfoAsync(contactInfo);
-            await _unitOfWork.SaveChangesAsync();
-            return contactInfo;
+            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
+
+            try
+            {
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    await _unitOfWork.BeginTransactionAsync();
+                    try
+                    {
+                        await _unitOfWork.ContactInfo.AddContactInfoAsync(contactInfo);
+                        await _unitOfWork.SaveChangesAsync();
+                        await _unitOfWork.CommitTransactionAsync();
+                        return Result<ContactInfo>.Success(contactInfo);
+                    }
+                    catch (Exception ex)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return Result<ContactInfo>.Failure("Unexpected error occurred while adding contact info.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return Result<ContactInfo>.Failure("Execution strategy failed.");
+            }
         }
     }
 }

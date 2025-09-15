@@ -3,6 +3,7 @@ using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using AutoFiCore.Utilities;
+using AutoFiCore.Data.Interfaces;
 
 namespace AutoFiCore.Controllers
 {
@@ -35,7 +36,7 @@ namespace AutoFiCore.Controllers
         /// </returns>
         [Authorize]
         [HttpPost("add")]
-        public async Task<ActionResult<ContactInfo>> AddContactInfo([FromBody] ContactInfo contactInfo)
+        public async Task<IActionResult> AddContactInfo([FromBody] ContactInfo contactInfo)
         {
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { message = "Invalid token or user context." });
@@ -45,7 +46,7 @@ namespace AutoFiCore.Controllers
                 correlationId, userId, contactInfo.PhoneNumber, contactInfo.Email);
 
             var addedContact = await _contactInfoService.AddContactInfoAsync(contactInfo);
-            return Ok(addedContact);
+            return Ok(addedContact.Value);
         }
     }
 }

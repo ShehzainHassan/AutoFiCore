@@ -4,6 +4,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using AutoFiCore.Services;
+using AutoFiCore.Data.Interfaces;
 
 public class DailyMetricsHostedService : BackgroundService
 {

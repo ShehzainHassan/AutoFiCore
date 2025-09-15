@@ -26,79 +26,140 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto)
         {
-            var vehicle = await _uow.Vehicles.GetVehicleByIdAsync(dto.VehicleId);
-            if (vehicle == null)
-                return Result<AuctionDTO>.Failure($"Vehicle {dto.VehicleId} not found");
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-            if (await _uow.Auctions.VehicleHasAuction(dto.VehicleId))
-                return Result<AuctionDTO>.Failure("An auction already exists for this vehicle");
-
-            var now = DateTime.UtcNow;
-            var previewTime = dto.PreviewStartTime ?? dto.ScheduledStartTime;
-
-            AuctionStatus status;
-            if (dto.ScheduledStartTime > now)
+            try
             {
-                status = previewTime <= now ? AuctionStatus.PreviewMode : AuctionStatus.Scheduled;
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        var vehicle = await _uow.Vehicles.GetVehicleByIdAsync(dto.VehicleId);
+                        if (vehicle == null)
+                            return Result<AuctionDTO>.Failure($"Vehicle {dto.VehicleId} not found");
+
+                        if (await _uow.Auctions.VehicleHasAuction(dto.VehicleId))
+                            return Result<AuctionDTO>.Failure("An auction already exists for this vehicle");
+
+                        var now = DateTime.UtcNow;
+                        var previewTime = dto.PreviewStartTime ?? dto.ScheduledStartTime;
+
+                        AuctionStatus status;
+                        if (dto.ScheduledStartTime > now)
+                        {
+                            status = previewTime <= now ? AuctionStatus.PreviewMode : AuctionStatus.Scheduled;
+                        }
+                        else
+                        {
+                            status = AuctionStatus.Active;
+                        }
+
+                        decimal reservePrice = dto.ReservePrice ?? dto.StartingPrice;
+                        bool isReserveMet = reservePrice <= dto.StartingPrice;
+                        DateTime? reserveMetAt = isReserveMet ? now : null;
+
+                        var auction = new Auction
+                        {
+                            VehicleId = dto.VehicleId,
+                            ScheduledStartTime = dto.ScheduledStartTime,
+                            StartUtc = dto.ScheduledStartTime,
+                            EndUtc = dto.EndUtc,
+                            StartingPrice = dto.StartingPrice,
+                            CurrentPrice = 0,
+                            ReservePrice = reservePrice,
+                            IsReserveMet = isReserveMet,
+                            ReserveMetAt = reserveMetAt,
+                            Status = status,
+                            PreviewStartTime = previewTime,
+                            CreatedUtc = now,
+                            UpdatedUtc = now
+                        };
+
+                        await _uow.Auctions.AddAuctionAsync(auction);
+                        await _uow.SaveChangesAsync();
+                        await _uow.CommitTransactionAsync();
+
+                        var dtoResult = AuctionMapper.ToDTO(auction);
+                        return Result<AuctionDTO>.Success(dtoResult);
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _logger.LogError(ex, "Failed to create auction for Vehicle {VehicleId}", dto.VehicleId);
+                        return Result<AuctionDTO>.Failure("Failed to create auction.");
+                    }
+                });
             }
-            else
+            catch (Exception ex)
             {
-                status = AuctionStatus.Active;
+                _logger.LogError(ex, "Execution strategy failed while creating auction for Vehicle {VehicleId}", dto.VehicleId);
+                return Result<AuctionDTO>.Failure("Unexpected error occurred while creating auction.");
             }
-
-            decimal reservePrice = dto.ReservePrice ?? dto.StartingPrice;
-            bool isReserveMet = reservePrice <= dto.StartingPrice;
-            DateTime? reserveMetAt = isReserveMet ? now : null;
-
-            var auction = new Auction
-            {
-                VehicleId = dto.VehicleId,
-                ScheduledStartTime = dto.ScheduledStartTime,
-                StartUtc = dto.ScheduledStartTime,
-                EndUtc = dto.EndUtc,
-                StartingPrice = dto.StartingPrice,
-                CurrentPrice = 0,
-                ReservePrice = reservePrice,
-                IsReserveMet = isReserveMet,
-                ReserveMetAt = reserveMetAt,
-                Status = status,
-                PreviewStartTime = previewTime,
-                CreatedUtc = now,
-                UpdatedUtc = now
-            };
-
-            var createdAuction = await _uow.Auctions.AddAuctionAsync(auction);
-            await _uow.SaveChangesAsync();
-
-            var dtoResult = AuctionMapper.ToDTO(auction);
-            return Result<AuctionDTO>.Success(dtoResult);
         }
         public async Task<Result<AuctionDTO?>> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status)
         {
-            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
-            if (auction == null)
-                return Result<AuctionDTO?>.Failure("Auction not found.");
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-            await _uow.Auctions.UpdateAuctionStatusAsync(auctionId, status);
+            try
+            {
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+                        if (auction == null)
+                        {
+                            await _uow.RollbackTransactionAsync();
+                            return Result<AuctionDTO?>.Failure("Auction not found.");
+                        }
 
-            await _uow.SaveChangesAsync();
-            return Result<AuctionDTO?>.Success(AuctionMapper.ToDTO(auction));
+                        await _uow.Auctions.UpdateAuctionStatusAsync(auctionId, status);
+                        await _uow.SaveChangesAsync();
+                        await _uow.CommitTransactionAsync();
+
+                        return Result<AuctionDTO?>.Success(AuctionMapper.ToDTO(auction));
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _logger.LogError(ex, "Failed to update auction {AuctionId} to status {Status}", auctionId, status);
+                        return Result<AuctionDTO?>.Failure("Failed to update auction status.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Execution strategy failed while updating auction {AuctionId}", auctionId);
+                return Result<AuctionDTO?>.Failure("Unexpected error occurred while updating auction status.");
+            }
         }
-        public async Task<List<AuctionDTO>> GetAuctionsAsync(AuctionQueryParams filters)
+        public async Task<Result<List<AuctionDTO>>> GetAuctionsAsync(AuctionQueryParams filters)
         {
-            var query = _uow.Auctions.Query()
-                .Include(a => a.Vehicle)
-                .Include(a => a.Bids);
+            try
+            {
+                var query = _uow.Auctions.Query()
+                    .Include(a => a.Vehicle)
+                    .Include(a => a.Bids);
 
-            var filteredQuery = AuctionQuery.ApplyFilters(query, filters);
-            var sortedQuery = AuctionQuery.ApplySorting(filteredQuery, filters);
+                var filteredQuery = AuctionQuery.ApplyFilters(query, filters);
+                var sortedQuery = AuctionQuery.ApplySorting(filteredQuery, filters);
 
-            var auctions = await sortedQuery
-                .Where(a => a.Status != AuctionStatus.Scheduled)
-                .AsNoTracking()
-                .ToListAsync();
+                var auctions = await sortedQuery
+                    .Where(a => a.Status != AuctionStatus.Scheduled)
+                    .AsNoTracking()
+                    .ToListAsync();
 
-            return auctions.Select(AuctionMapper.ToDTO).ToList();
+                var dtoList = auctions.Select(AuctionMapper.ToDTO).ToList();
+
+                return Result<List<AuctionDTO>>.Success(dtoList);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while retrieving auctions with filters: {@Filters}", filters);
+                return Result<List<AuctionDTO>>.Failure("Failed to retrieve auctions.");
+            }
         }
         public async Task<Result<AuctionDTO?>> GetAuctionByIdAsync(int id)
         {
@@ -158,100 +219,122 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<BidDTO>> PlaceBidAsync(int auctionId, CreateBidDTO dto)
         {
-            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
-            if (auction == null)
-                return Result<BidDTO>.Failure("Auction not found.");
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-            var user = await _uow.Users.GetUserByIdAsync(dto.UserId);
-            if (user == null)
-                return Result<BidDTO>.Failure("User not found.");
-
-            if (auction.Status != AuctionStatus.Active || auction.EndUtc <= DateTime.UtcNow)
-                return Result<BidDTO>.Failure("Auction has ended.");
-
-            var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
-            var previousBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
-            var previousHighestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
-
-            var bidValidationDto = new BidValidationDTO
+            try
             {
-                Amount = dto.Amount,
-                StartingPrice = auction.StartingPrice,
-                CurrentPrice = auction.CurrentPrice,
-                BidCount = bids.Count
-            };
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+                        if (auction == null)
+                            return Result<BidDTO>.Failure("Auction not found.");
 
-            var validator = new BidValidator();
-            var validationResult = validator.Validate(bidValidationDto);
-            if (!validationResult.IsValid)
-            {
-                var errors = string.Join(", ", validationResult.Errors.Select(e => e.ErrorMessage));
-                return Result<BidDTO>.Failure(errors);
+                        var user = await _uow.Users.GetUserByIdAsync(dto.UserId);
+                        if (user == null)
+                            return Result<BidDTO>.Failure("User not found.");
+
+                        if (auction.Status != AuctionStatus.Active || auction.EndUtc <= DateTime.UtcNow)
+                            return Result<BidDTO>.Failure("Auction has ended.");
+
+                        var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
+                        var previousBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
+                        var previousHighestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
+
+                        var bidValidationDto = new BidValidationDTO
+                        {
+                            Amount = dto.Amount,
+                            StartingPrice = auction.StartingPrice,
+                            CurrentPrice = auction.CurrentPrice,
+                            BidCount = bids.Count
+                        };
+
+                        var validator = new BidValidator();
+                        var validationResult = validator.Validate(bidValidationDto);
+                        if (!validationResult.IsValid)
+                        {
+                            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+                            return Result<BidDTO>.Failure(errors);
+                        }
+
+                        PreferredBidTiming? timing = null;
+                        if (dto.IsAuto == true)
+                        {
+                            var strategyEntity = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, auctionId);
+                            if (strategyEntity != null)
+                                timing = strategyEntity.PreferredBidTiming;
+                        }
+
+                        var bid = new Bid
+                        {
+                            AuctionId = auctionId,
+                            UserId = dto.UserId,
+                            Amount = dto.Amount,
+                            IsAuto = dto.IsAuto ?? false,
+                            CreatedUtc = DateTime.UtcNow,
+                            PreferredBidTiming = timing
+                        };
+
+                        await _uow.Bids.AddBidAsync(bid);
+                        await _uow.Auctions.UpdateCurrentPriceAsync(auctionId, dto.Amount);
+
+                        bool reserveJustMet = false;
+                        if (auction.ReservePrice.HasValue && !auction.IsReserveMet && bid.Amount >= auction.ReservePrice.Value)
+                        {
+                            auction.IsReserveMet = true;
+                            auction.ReserveMetAt = DateTime.UtcNow;
+                            await _uow.Auctions.UpdateReserveStatusAsync(auctionId);
+                            reserveJustMet = true;
+                        }
+
+                        var timeRemaining = auction.EndUtc - DateTime.UtcNow;
+                        if (timeRemaining.TotalMinutes <= auction.TriggerMinutes && auction.ExtensionCount < auction.MaxExtensions)
+                        {
+                            await _uow.Auctions.UpdateAuctionEndTimeAsync(auctionId, auction.ExtensionMinutes);
+                        }
+
+                        await _uow.SaveChangesAsync();
+
+                        var updatedBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
+
+                        if (reserveJustMet)
+                            await _auctionLifecycleService.HandleReserveMet(auction);
+                        else if (auction.IsReserveMet)
+                            await _auctionLifecycleService.HandleReserveMet(auction, bid.UserId);
+
+                        await _auctionLifecycleService.HandleBidderCountUpdate(auction, previousBidders, updatedBidders);
+                        await _auctionLifecycleService.HandleNewBid(auctionId);
+                        await _auctionLifecycleService.HandleOutbid(auction, previousHighestBidder);
+
+                        await _uow.CommitTransactionAsync();
+
+                        var bidDto = new BidDTO
+                        {
+                            BidId = bid.BidId,
+                            AuctionId = bid.AuctionId,
+                            UserId = bid.UserId,
+                            Amount = bid.Amount,
+                            IsAuto = bid.IsAuto,
+                            PlacedAt = bid.CreatedUtc
+                        };
+
+                        return Result<BidDTO>.Success(bidDto);
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _logger.LogError(ex, "Failed to place bid on auction {AuctionId} by user {UserId}", auctionId, dto.UserId);
+                        return Result<BidDTO>.Failure("Failed to place bid due to an unexpected error.");
+                    }
+                });
             }
-
-            PreferredBidTiming? timing = null;
-            if (dto.IsAuto == true)
+            catch (Exception ex)
             {
-                var strategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, auctionId);
-                if (strategy != null)
-                    timing = strategy.PreferredBidTiming;
+                _logger.LogError(ex, "Execution strategy failed while placing bid on auction {AuctionId}", auctionId);
+                return Result<BidDTO>.Failure("Unexpected error occurred while placing bid.");
             }
-
-            var bid = new Bid
-            {
-                AuctionId = auctionId,
-                UserId = dto.UserId,
-                Amount = dto.Amount,
-                IsAuto = dto.IsAuto ?? false,
-                CreatedUtc = DateTime.UtcNow,
-                PreferredBidTiming = timing
-            };
-
-            await _uow.Bids.AddBidAsync(bid);
-            await _uow.Auctions.UpdateCurrentPriceAsync(auctionId, dto.Amount);
-            await _uow.SaveChangesAsync();
-
-            bool reserveJustMet = false;
-            if (auction.ReservePrice.HasValue && !auction.IsReserveMet && bid.Amount >= auction.ReservePrice.Value)
-            {
-                auction.IsReserveMet = true;
-                auction.ReserveMetAt = DateTime.UtcNow;
-                await _uow.Auctions.UpdateReserveStatusAsync(auctionId);
-                reserveJustMet = true;
-            }
-
-            await _uow.SaveChangesAsync();
-
-            var updatedBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
-
-            if (reserveJustMet)
-                await _auctionLifecycleService.HandleReserveMet(auction);
-            else if (auction.IsReserveMet)
-                await _auctionLifecycleService.HandleReserveMet(auction, bid.UserId);
-
-            var timeRemaining = auction.EndUtc - DateTime.UtcNow;
-            if (timeRemaining.TotalMinutes <= auction.TriggerMinutes && auction.ExtensionCount < auction.MaxExtensions)
-            {
-                await _uow.Auctions.UpdateAuctionEndTimeAsync(auctionId, auction.ExtensionMinutes);
-                await _uow.SaveChangesAsync();
-                await _auctionLifecycleService.HandleAuctionExtended(auction);
-            }
-
-            await _auctionLifecycleService.HandleBidderCountUpdate(auction, previousBidders, updatedBidders);
-            await _auctionLifecycleService.HandleNewBid(auctionId);
-            await _auctionLifecycleService.HandleOutbid(auction, previousHighestBidder);
-
-            var bidDto = new BidDTO
-            {
-                BidId = bid.BidId,
-                AuctionId = bid.AuctionId,
-                UserId = bid.UserId,
-                Amount = bid.Amount,
-                IsAuto = bid.IsAuto,
-                PlacedAt = bid.CreatedUtc,
-            };
-
-            return Result<BidDTO>.Success(bidDto);
         }
         public async Task<Result<List<BidDTO>>> GetBidHistoryAsync(int auctionId)
         {
@@ -293,27 +376,77 @@ namespace AutoFiCore.Services
         }
         public async Task<Result<string>> AddToWatchListAsync(int userId, int auctionId)
         {
-            if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
-                return Result<string>.Failure("Auction not found.");
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-            if (await _uow.Users.GetUserByIdAsync(userId) is null)
-                return Result<string>.Failure("User not found.");
+            try
+            {
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
+                            return Result<string>.Failure("Auction not found.");
 
-            await _uow.Watchlist.AddToWatchlistAsync(userId, auctionId);
-            await _uow.SaveChangesAsync();
-            return Result<string>.Success("Auction added to watchlist.");
+                        if (await _uow.Users.GetUserByIdAsync(userId) is null)
+                            return Result<string>.Failure("User not found.");
+
+                        await _uow.Watchlist.AddToWatchlistAsync(userId, auctionId);
+                        await _uow.SaveChangesAsync();
+                        await _uow.CommitTransactionAsync();
+
+                        return Result<string>.Success("Auction added to watchlist.");
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _logger.LogError(ex, "Failed to add auction {AuctionId} to watchlist for user {UserId}", auctionId, userId);
+                        return Result<string>.Failure("Unexpected error while adding to watchlist.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Execution strategy failed while adding auction {AuctionId} to watchlist", auctionId);
+                return Result<string>.Failure("Unexpected error occurred.");
+            }
         }
         public async Task<Result<string>> RemoveFromWatchListAsync(int userId, int auctionId)
         {
-            if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
-                return Result<string>.Failure("Auction not found.");
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-            if (await _uow.Users.GetUserByIdAsync(userId) is null)
-                return Result<string>.Failure("User not found.");
+            try
+            {
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
+                            return Result<string>.Failure("Auction not found.");
 
-            await _uow.Watchlist.RemoveFromWatchlistAsync(userId, auctionId);
-            await _uow.SaveChangesAsync();
-            return Result<string>.Success("Removed auction from watchlist.");
+                        if (await _uow.Users.GetUserByIdAsync(userId) is null)
+                            return Result<string>.Failure("User not found.");
+
+                        await _uow.Watchlist.RemoveFromWatchlistAsync(userId, auctionId);
+                        await _uow.SaveChangesAsync();
+                        await _uow.CommitTransactionAsync();
+
+                        return Result<string>.Success("Removed auction from watchlist.");
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _logger.LogError(ex, "Failed to remove auction {AuctionId} from watchlist for user {UserId}", auctionId, userId);
+                        return Result<string>.Failure("Unexpected error while removing from watchlist.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Execution strategy failed while removing auction {AuctionId} from watchlist", auctionId);
+                return Result<string>.Failure("Unexpected error occurred.");
+            }
         }
         public async Task<Result<List<WatchlistDTO>>> GetUserWatchListAsync(int userId)
         {
@@ -358,10 +491,18 @@ namespace AutoFiCore.Services
             var highestBidderId = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
             return Result<int?>.Success(highestBidderId);
         }
-        public async Task<DateTime?> GetOldestAuctionDateAsync()
+        public async Task<Result<DateTime?>> GetOldestAuctionDateAsync()
         {
-            return await _uow.Auctions.GetOldestAuctionDateAsync();
+            try
+            {
+                var oldestDate = await _uow.Auctions.GetOldestAuctionDateAsync();
+                return Result<DateTime?>.Success(oldestDate);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error while retrieving oldest auction date.");
+                return Result<DateTime?>.Failure("Failed to retrieve oldest auction date.");
+            }
         }
-
     }
 }

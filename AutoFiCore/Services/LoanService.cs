@@ -1,12 +1,9 @@
 ﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Models;
+using AutoFiCore.Utilities;
 
 namespace AutoFiCore.Services
 {
-    public interface ILoanService
-    {
-        Task<LoanCalculation> CalculateLoanAsync(LoanRequest request);
-    }
     public class LoanService : ILoanService
     {
         private readonly IVehicleRepository _vehicleRepository;
@@ -21,14 +18,20 @@ namespace AutoFiCore.Services
             _logger = logger;
         }
 
-        public async Task<LoanCalculation> CalculateLoanAsync(LoanRequest request)
+        public async Task<Result<LoanCalculation>> CalculateLoanAsync(LoanRequest request)
         {
             if (request.LoanAmount <= 0)
-                throw new ArgumentException("Loan amount must be greater than zero");
+            {
+                _logger.LogWarning("Invalid loan amount: {Amount}", request.LoanAmount);
+                return Result<LoanCalculation>.Failure("Loan amount must be greater than zero.");
+            }
 
             var vehicle = await _vehicleRepository.GetVehicleByIdAsync(request.VehicleId);
             if (vehicle == null)
-                throw new ArgumentException($"Vehicle with ID {request.VehicleId} not found");
+            {
+                _logger.LogWarning("Vehicle with ID {VehicleId} not found", request.VehicleId);
+                return Result<LoanCalculation>.Failure($"Vehicle with ID {request.VehicleId} not found.");
+            }
 
             decimal monthlyRate = InterestRate / 100 / 12;
 
@@ -39,9 +42,9 @@ namespace AutoFiCore.Services
             decimal totalCost = monthlyPayment * LoanTermMonths;
             decimal totalInterest = totalCost - request.LoanAmount;
 
-            return new LoanCalculation
+            var calculation = new LoanCalculation
             {
-                Id = new Random().Next(1, 1000), 
+                Id = new Random().Next(1, 1000),
                 VehicleId = request.VehicleId,
                 LoanAmount = request.LoanAmount,
                 InterestRate = InterestRate,
@@ -50,6 +53,9 @@ namespace AutoFiCore.Services
                 TotalInterest = Math.Round(totalInterest, 2),
                 TotalCost = Math.Round(totalCost, 2)
             };
+
+            _logger.LogInformation("Loan calculation completed for vehicle {VehicleId}", request.VehicleId);
+            return Result<LoanCalculation>.Success(calculation);
         }
     }
 }

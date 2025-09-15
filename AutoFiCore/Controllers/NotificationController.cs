@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Services;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -99,7 +100,7 @@ namespace AutoFiCore.Controllers
         [Authorize]
         [DisableRateLimiting]
         [HttpGet("unread-count")]
-        public async Task<ActionResult<int>> GetUnreadNotificationCount()
+        public async Task<IActionResult> GetUnreadNotificationCount()
         {
             if (!IsUserContextValid(out var userId))
                 return Unauthorized("Invalid or missing user ID");
@@ -108,7 +109,7 @@ namespace AutoFiCore.Controllers
             _logger.LogInformation("GetUnreadNotificationCount called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var count = await _notificationService.GetUnreadCountAsync(userId);
-            return Ok(count);
+            return Ok(count.Value);
         }
     }
 }

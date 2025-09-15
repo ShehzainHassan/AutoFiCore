@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Services;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;

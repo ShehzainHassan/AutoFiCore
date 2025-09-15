@@ -1,4 +1,6 @@
 ﻿using AutoFiCore.Data;
+using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -25,49 +27,55 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Retrieves a performance report for the specified date range.
         /// </summary>
-        /// <param name="startDate">Start date of the report range.</param>
-        /// <param name="endDate">End date of the report range.</param>
-        /// <returns>A <see cref="PerformanceReport"/> containing system performance metrics.</returns>
         [AllowAnonymous]
         [HttpGet("performance-report")]
-        public async Task<ActionResult<PerformanceReport>> GetPerformanceReport([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetPerformanceReport([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
-            var report = await _systemHealthService.GetPerformanceReportAsync(utcStart, utcEnd);
-            return Ok(report);
+
+            var result = await _systemHealthService.GetPerformanceReportAsync(utcStart, utcEnd);
+
+            if (!result.IsSuccess)
+                return BadRequest(new { message = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Retrieves an error report for the specified date range.
         /// </summary>
-        /// <param name="startDate">Start date of the report range.</param>
-        /// <param name="endDate">End date of the report range.</param>
-        /// <returns>An <see cref="ErrorReport"/> containing system error statistics.</returns>
         [AllowAnonymous]
         [HttpGet("error-report")]
-        public async Task<ActionResult<ErrorReport>> GetErrorReport([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetErrorReport([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
-            var report = await _systemHealthService.GetErrorReportAsync(utcStart, utcEnd);
-            return Ok(report);
+
+            var result = await _systemHealthService.GetErrorReportAsync(utcStart, utcEnd);
+
+            if (!result.IsSuccess)
+                return BadRequest(new { message = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Identifies slow database queries executed within the specified date range.
         /// </summary>
-        /// <param name="startDate">Start date of the query analysis range.</param>
-        /// <param name="endDate">End date of the query analysis range.</param>
-        /// <returns>A list of <see cref="SlowQueryEntry"/> objects representing slow queries.</returns>
         [AllowAnonymous]
         [HttpGet("slow-queries")]
-        public async Task<ActionResult<List<SlowQueryEntry>>> IdentifySlowQueries([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> IdentifySlowQueries([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
-            var queries = await _systemHealthService.IdentifySlowQueriesAsync(utcStart, utcEnd);
-            return Ok(queries);
+
+            var result = await _systemHealthService.IdentifySlowQueriesAsync(utcStart, utcEnd);
+
+            if (!result.IsSuccess)
+                return BadRequest(new { message = result.Error });
+
+            return Ok(result.Value);
         }
     }
 }

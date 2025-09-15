@@ -1,11 +1,9 @@
 ﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 using AutoFiCore.Services;
+using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace AutoFiCore.Controllers
 {
@@ -22,12 +20,6 @@ namespace AutoFiCore.Controllers
         private readonly IUserContextService _userContextService;
         private readonly ILogger<AIAssistantController> _logger;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="AIAssistantController"/> class.
-        /// </summary>
-        /// <param name="aiService">Service for handling AI assistant operations.</param>
-        /// <param name="userContextService">Service for retrieving user context data.</param>
-        /// <param name="logger">Logger for tracking AI assistant activity.</param>
         public AIAssistantController(
             IAIAssistantService aiService,
             IUserContextService userContextService,
@@ -41,8 +33,6 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Sends a query payload to the AI service and returns the generated response.
         /// </summary>
-        /// <param name="payload">The query payload containing the question and context.</param>
-        /// <returns>An <see cref="AIResponseModel"/> containing the AI's response.</returns>
         [Authorize]
         [HttpPost("query")]
         public async Task<ActionResult<AIResponseModel>> QueryAI([FromBody] EnrichedAIQuery payload)
@@ -60,14 +50,19 @@ namespace AutoFiCore.Controllers
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
             var result = await _aiService.QueryFastApiAsync(payload, correlationId, jwtToken);
 
-            _logger.LogInformation("AI Query completed. CorrelationId={CorrelationId}, Answer={Answer}", correlationId, result.Answer);
-            return Ok(result);
+            if (!result.IsSuccess)
+            {
+                _logger.LogError("AI Query failed. CorrelationId={CorrelationId}, Error={Error}", correlationId, result.Error);
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = result.Error });
+            }
+
+            _logger.LogInformation("AI Query completed. CorrelationId={CorrelationId}, Answer={Answer}", correlationId, result.Value!.Answer);
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Retrieves the user's auction and vehicle history to provide context for AI suggestions.
         /// </summary>
-        /// <returns>User-specific auction, watchlist, and vehicle data.</returns>
         [Authorize]
         [HttpGet("user-context")]
         public async Task<IActionResult> GetUserContext()
@@ -78,15 +73,17 @@ namespace AutoFiCore.Controllers
             var correlationId = GetCorrelationId()!;
             _logger.LogInformation("GetUserContext called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
-            var context = await _userContextService.GetUserContextAsync(userId);
-            return Ok(context);
+            var result = await _userContextService.GetUserContextAsync(userId);
+
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Retrieves contextual AI-generated suggestions based on the user's history.
         /// </summary>
-        /// <param name="userId">The user ID for which suggestions are requested.</param>
-        /// <returns>A list of personalized suggestions.</returns>
         [Authorize]
         [HttpGet("contextual-suggestions/{userId}")]
         public async Task<IActionResult> GetContextualSuggestions(int userId)
@@ -101,15 +98,17 @@ namespace AutoFiCore.Controllers
             _logger.LogInformation("Contextual suggestion request. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-            var suggestions = await _aiService.GetSuggestionsAsync(userId, correlationId, jwtToken);
+            var result = await _aiService.GetSuggestionsAsync(userId, correlationId, jwtToken);
 
-            return Ok(suggestions);
+            if (!result.IsSuccess)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Retrieves the list of chat titles for the current user.
         /// </summary>
-        /// <returns>A list of chat session titles.</returns>
         [Authorize]
         [HttpGet("chats")]
         public async Task<IActionResult> GetChatTitles()
@@ -120,15 +119,17 @@ namespace AutoFiCore.Controllers
             var correlationId = GetCorrelationId()!;
             _logger.LogInformation("GetChatTitles called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
-            var titles = await _aiService.GetChatTitlesAsync(userId);
-            return Ok(titles);
+            var result = await _aiService.GetChatTitlesAsync(userId);
+
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Retrieves the full chat history for a specific session.
         /// </summary>
-        /// <param name="sessionId">The session ID of the chat.</param>
-        /// <returns>The full chat history or NotFound if not found.</returns>
         [Authorize]
         [HttpGet("chats/{sessionId}")]
         public async Task<IActionResult> GetChat(string sessionId)
@@ -139,14 +140,17 @@ namespace AutoFiCore.Controllers
             var correlationId = GetCorrelationId()!;
             _logger.LogInformation("GetChat called. CorrelationId={CorrelationId}, UserId={UserId}, SessionId={SessionId}", correlationId, userId, sessionId);
 
-            var chat = await _aiService.GetFullChatAsync(userId, sessionId);
-            return chat != null ? Ok(chat) : NotFound(new { error = "Chat not found." });
+            var result = await _aiService.GetFullChatAsync(userId, sessionId);
+
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Deletes a specific chat session by ID.
         /// </summary>
-        /// <param name="sessionId">The session ID of the chat to delete.</param>
         [Authorize]
         [HttpDelete("chats/{sessionId}")]
         public async Task<IActionResult> DeleteSession(string sessionId)
@@ -157,7 +161,11 @@ namespace AutoFiCore.Controllers
             var correlationId = GetCorrelationId()!;
             _logger.LogInformation("DeleteSession called. CorrelationId={CorrelationId}, UserId={UserId}, SessionId={SessionId}", correlationId, userId, sessionId);
 
-            await _aiService.DeleteSessionAsync(sessionId, userId);
+            var result = await _aiService.DeleteSessionAsync(sessionId, userId);
+
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });
+
             return NoContent();
         }
 
@@ -174,16 +182,17 @@ namespace AutoFiCore.Controllers
             var correlationId = GetCorrelationId()!;
             _logger.LogInformation("DeleteAllSessions called. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
 
-            await _aiService.DeleteAllSessionsAsync(userId);
+            var result = await _aiService.DeleteAllSessionsAsync(userId);
+
+            if (!result.IsSuccess)
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = result.Error });
+
             return NoContent();
         }
 
         /// <summary>
         /// Updates the title of a chat session.
         /// </summary>
-        /// <param name="sessionId">The session ID of the chat to update.</param>
-        /// <param name="request">The new title payload.</param>
-        /// <returns>OK if successful, NotFound if session not found.</returns>
         [Authorize]
         [HttpPut("chats/{sessionId}/title")]
         public async Task<IActionResult> UpdateSessionTitle(string sessionId, [FromBody] UpdateChatTitle request)
@@ -198,15 +207,17 @@ namespace AutoFiCore.Controllers
             _logger.LogInformation("UpdateSessionTitle called. CorrelationId={CorrelationId}, UserId={UserId}, SessionId={SessionId}, NewTitle={NewTitle}",
                 correlationId, userId, sessionId, request.NewTitle);
 
-            await _aiService.UpdateSessionTitleAsync(sessionId, userId, request.NewTitle);
-            return Ok("Session updated successfully");
+            var result = await _aiService.UpdateSessionTitleAsync(sessionId, userId, request.NewTitle);
+
+            if (!result.IsSuccess)
+                return NotFound(new { error = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Submits user feedback for a specific AI query response.
         /// </summary>
-        /// <param name="feedbackDto">The feedback details including vote and query info.</param>
-        /// <returns>The result of feedback submission.</returns>
         [Authorize]
         [HttpPost("feedback")]
         public async Task<IActionResult> SubmitFeedback([FromBody] AIQueryFeedbackDto feedbackDto)
@@ -220,14 +231,16 @@ namespace AutoFiCore.Controllers
 
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
             var result = await _aiService.SubmitFeedbackAsync(feedbackDto, correlationId, jwtToken);
-            return Ok(result);
+
+            if (!result.IsSuccess)
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = result.Error });
+
+            return Ok(result.Value);
         }
 
         /// <summary>
         /// Retrieves the top popular queries from the AI service.
         /// </summary>
-        /// <param name="limit">Maximum number of queries to return (1–50).</param>
-        /// <returns>A list of popular queries.</returns>
         [Authorize]
         [HttpGet("popular-queries")]
         public async Task<ActionResult<List<PopularQueryDto>>> GetPopularQueries([FromQuery] int limit = 10)
@@ -243,8 +256,12 @@ namespace AutoFiCore.Controllers
                 correlationId, userId, limit);
 
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
-            var queries = await _aiService.GetPopularQueriesAsync(limit, correlationId, jwtToken);
-            return Ok(queries);
+            var result = await _aiService.GetPopularQueriesAsync(limit, correlationId, jwtToken);
+
+            if (!result.IsSuccess)
+                return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = result.Error });
+
+            return Ok(result.Value);
         }
     }
 }

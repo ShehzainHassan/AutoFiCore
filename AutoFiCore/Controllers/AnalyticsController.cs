@@ -54,12 +54,12 @@ namespace AutoFiCore.Controllers
         [DisableRateLimiting]
         [HttpGet("dashboard")]
         //[Authorize(Roles = "Admin", "Manager")]
-        public async Task<ActionResult<ExecutiveDashboard>> GetDashboard([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetDashboard([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate, DateTimeKind.Utc);
             var dashboard = await _dashboardService.GetExecutiveDashboardAsync(utcStart, utcEnd);
-            return Ok(dashboard);
+            return Ok(dashboard.Value);
         }
 
         /// <summary>
@@ -124,15 +124,22 @@ namespace AutoFiCore.Controllers
         [HttpPost("track-payment")]
         public async Task<IActionResult> TrackPayment([FromBody] BidTrackingDTO bid)
         {
-            var alreadyCompleted = await _analyticsService.IsAuctionPaymentCompleted(bid.AuctionId);
-            if (alreadyCompleted)
-            {
-                return BadRequest(new { message = "Payment has already been tracked for this auction." });
-            }
+            var paymentResult = await _analyticsService.IsAuctionPaymentCompletedAsync(bid.AuctionId);
 
-            await _analyticsService.TrackPaymentCompleted(bid.AuctionId, bid.UserId, bid.Amount);
+            if (!paymentResult.IsSuccess)
+                return StatusCode(500, new { message = paymentResult.Error }); 
+
+            if (paymentResult.Value)
+                return BadRequest(new { message = "Payment has already been tracked for this auction." });
+
+            var trackResult = await _analyticsService.TrackPaymentCompletedAsync(bid.AuctionId, bid.UserId, bid.Amount);
+
+            if (!trackResult.IsSuccess)
+                return StatusCode(500, new { message = trackResult.Error });
+
             return Ok(new { message = "Payment tracked" });
         }
+
 
         /// <summary>
         /// Tracks the completion status of an auction.
@@ -158,12 +165,12 @@ namespace AutoFiCore.Controllers
         [DisableRateLimiting]
         [HttpGet("auctions")]
         //[Authorize(Roles = "Admin")]
-        public async Task<ActionResult<AuctionPerformanceReport>> GetAuctionAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetAuctionAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _dashboardService.GetAuctionDashboardAsync(utcStart, utcEnd);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -181,7 +188,7 @@ namespace AutoFiCore.Controllers
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetAuctionAnalyticsAsync(utcStart, utcEnd, category);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -198,7 +205,7 @@ namespace AutoFiCore.Controllers
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetUserAnalyticsAsync(utcStart, utcEnd);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -215,7 +222,7 @@ namespace AutoFiCore.Controllers
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetRevenueTableAnalyticsAsync(utcStart, utcEnd);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -228,13 +235,24 @@ namespace AutoFiCore.Controllers
         [HttpGet("payment-status")]
         public async Task<IActionResult> IsPaymentCompleted([FromQuery] int auctionId)
         {
-            bool isCompleted = await _analyticsService.IsAuctionPaymentCompleted(auctionId);
+            var result = await _analyticsService.IsAuctionPaymentCompletedAsync(auctionId);
+
+            if (!result.IsSuccess)
+            {
+                return StatusCode(500, new
+                {
+                    auctionId,
+                    error = result.Error
+                });
+            }
+
             return Ok(new
             {
                 auctionId,
-                paymentCompleted = isCompleted
+                paymentCompleted = result.Value
             });
         }
+
 
         /// <summary>
         /// Retrieves user activity analytics for the specified date range.
@@ -246,12 +264,12 @@ namespace AutoFiCore.Controllers
         [DisableRateLimiting]
         [HttpGet("users")]
         //[Authorize(Roles = "Admin")]
-        public async Task<ActionResult<UserActivityReport>> GetUserAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetUserAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _dashboardService.GetUserDashboardAsync(utcStart, utcEnd);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -264,12 +282,12 @@ namespace AutoFiCore.Controllers
         [DisableRateLimiting]
         [HttpGet("revenue")]
         //[Authorize(Roles = "Admin")]
-        public async Task<ActionResult<RevenueReport>> GetRevenueAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetRevenueAnalytics([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var result = await _reportService.GetRevenueReportAsync(utcStart, utcEnd);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -301,7 +319,7 @@ namespace AutoFiCore.Controllers
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var summary = await _reportService.GetSummaryAsync("Revenue", utcStart, utcEnd);
-            return Ok(summary);
+            return Ok(summary.Value);
         }
 
         /// <summary>
@@ -319,7 +337,7 @@ namespace AutoFiCore.Controllers
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var summary = await _reportService.GetSummaryAsync("Users", utcStart, utcEnd);
-            return Ok(summary);
+            return Ok(summary.Value);
         }
 
         /// <summary>
@@ -338,9 +356,19 @@ namespace AutoFiCore.Controllers
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
-            var fileResult = await _reportService.ExportReportAsync(reportType, utcStart, utcEnd, format);
+
+            var result = await _reportService.ExportReportAsync(reportType, utcStart, utcEnd, format);
+
+            if (!result.IsSuccess)
+            {
+                return BadRequest(new { error = result.Error });
+            }
+
+            var fileResult = result.Value!;
+
             return File(fileResult.Content, fileResult.ContentType, fileResult.FileName);
         }
+
 
         /// <summary>
         /// Retrieves a paginated list of recently downloaded reports.
@@ -354,7 +382,7 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> GetRecentDownloads([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             var result = await _reportService.GetRecentDownloadsAsync(page, pageSize);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -366,12 +394,12 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("system")]
-        public async Task<ActionResult<SystemHealthDashboard>> GetSystemHealthDashboard([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+        public async Task<IActionResult> GetSystemHealthDashboard([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
         {
             var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
             var utcEnd = DateTime.SpecifyKind(endDate.AddDays(1), DateTimeKind.Utc);
             var dashboard = await _systemHealthService.GetSystemHealthDashboardAsync(utcStart, utcEnd);
-            return Ok(dashboard);
+            return Ok(dashboard.Value);
         }
 
         /// <summary>
@@ -386,7 +414,7 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> GetErrorLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             var result = await _systemHealthService.GetErrorLogsPagedAsync(page, pageSize);
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -411,7 +439,7 @@ namespace AutoFiCore.Controllers
 
             var result = await _systemHealthService.GetResponseTimePointsAsync(startDate, endDate);
 
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -424,7 +452,7 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> GetOldestApiLog()
         {
             var result = await _systemHealthService.GetOldestApiLogTimestampAsync();
-            return Ok(result);
+            return Ok(result.Value);
         }
     }
 }

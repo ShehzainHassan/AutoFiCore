@@ -58,6 +58,12 @@ catch (InvalidDataException ex) when (ex.Message.Contains("appsettings.json"))
 QuestPDF.Settings.License = LicenseType.Community;
 
 builder.Services.AddMemoryCache();
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
+    options.InstanceName = "AutoFiCore_";
+});
+
 builder.Services.AddHttpClient("FastApi", client =>
 {
     client.BaseAddress = new Uri("http://localhost:8000/api/ai/");

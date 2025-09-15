@@ -86,7 +86,7 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> GetAuctions([FromQuery] AuctionQueryParams filters)
         {
             var auctions = await _auctionService.GetAuctionsAsync(filters);
-            return Ok(auctions);
+            return Ok(auctions.Value);
         }
 
         /// <summary>
@@ -116,7 +116,7 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> GetOldestAuctionDate()
         {
             var result = await _auctionService.GetOldestAuctionDateAsync();
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -312,6 +312,5 @@ namespace AutoFiCore.Controllers
 
             return Ok(new { success = true, message = "User authorized for auction checkout." });
         }
-
     }
 }

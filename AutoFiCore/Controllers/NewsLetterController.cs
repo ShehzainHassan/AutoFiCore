@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Models;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Models;
 using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -33,7 +34,7 @@ namespace AutoFiCore.Controllers
         /// </returns>
         [AllowAnonymous]
         [HttpPost("subscribe-email")]
-        public async Task<ActionResult<Newsletter>> AddEmailToSubscribe(Newsletter newsletter)
+        public async Task<IActionResult> AddEmailToSubscribe(Newsletter newsletter)
         {
             var result = await _newsLetterService.SubscribeToNewsLetterAsync(newsletter);
 

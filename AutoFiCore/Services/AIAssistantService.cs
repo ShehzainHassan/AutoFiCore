@@ -5,15 +5,10 @@ using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.VisualBasic;
-using Polly;
-using Polly.CircuitBreaker;
-using Polly.Retry;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace AutoFiCore.Services
 {
@@ -30,29 +25,38 @@ namespace AutoFiCore.Services
         private readonly IMemoryCache _cache;
         private readonly ILogger<AIAssistantService> _logger;
 
+        private readonly JsonSerializerOptions _serializerOptions = new(JsonSerializerDefaults.Web);
+
         /// <summary>
-        /// Initializes a new instance of the <see cref="AIAssistantService"/> class.
+        /// Initializes a new instance of <see cref="AIAssistantService"/>.
         /// </summary>
-        public AIAssistantService(IHttpClientFactory httpClientFactory, IUnitOfWork uow, ILogger<AIAssistantService> logger, IServiceScopeFactory scopeFactory, IUserContextService userContextService, IMemoryCache cache)
+        public AIAssistantService(
+            IHttpClientFactory httpClientFactory,
+            IUnitOfWork uow,
+            ILogger<AIAssistantService> logger,
+            IServiceScopeFactory scopeFactory,
+            IUserContextService userContextService,
+            IMemoryCache cache)
         {
-            _httpClientFactory = httpClientFactory;
-            _uow = uow;
-            _logger = logger;
-            _userContextService = userContextService;
-            _cache = cache;
-            _scopeFactory = scopeFactory;
+            _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+            _uow = uow ?? throw new ArgumentNullException(nameof(uow));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _scopeFactory = scopeFactory ?? throw new ArgumentNullException(nameof(scopeFactory));
+            _userContextService = userContextService ?? throw new ArgumentNullException(nameof(userContextService));
+            _cache = cache ?? throw new ArgumentNullException(nameof(cache));
         }
 
         /// <summary>
         /// Sends a query to the external FastAPI service and persists the chat history.
         /// </summary>
-        public async Task<AIResponseModel> QueryFastApiAsync(EnrichedAIQuery payload, string correlationId, string jwtToken)
+        public async Task<Result<AIResponseModel>> QueryFastApiAsync(EnrichedAIQuery payload, string correlationId, string jwtToken)
         {
             var client = _httpClientFactory.CreateClient("FastApi");
             client.DefaultRequestHeaders.Add("X-Correlation-ID", correlationId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtToken);
 
-            var userContext = await _userContextService.GetUserContextAsync(payload.UserId);
+            var userContextResult = await _userContextService.GetUserContextAsync(payload.UserId);
+            var userContext = userContextResult.IsSuccess ? userContextResult.Value : null;
 
             var enrichedPayload = new
             {
@@ -66,41 +70,73 @@ namespace AutoFiCore.Services
             };
 
             var content = new StringContent(
-                JsonSerializer.Serialize(enrichedPayload),
+                JsonSerializer.Serialize(enrichedPayload, _serializerOptions),
                 Encoding.UTF8,
                 "application/json"
             );
 
-            HttpResponseMessage response;
             try
             {
-                response = await client.PostAsync("query", content);
+                var response = await client.PostAsync("query", content);
+                var resultJson = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("FastAPI query failed. StatusCode={StatusCode}, CorrelationId={CorrelationId}", response.StatusCode, correlationId);
+                    return Result<AIResponseModel>.Failure($"FastAPI returned {response.StatusCode}");
+                }
+
+                var result = JsonSerializer.Deserialize<AIResponseModel>(resultJson, _serializerOptions)!;
+                var sessionId = await SaveChatHistoryAsync(payload, result);
+                result.SessionId = sessionId;
+
+                return Result<AIResponseModel>.Success(result);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "FastAPI query request failed. CorrelationId={CorrelationId}", correlationId);
-                return new AIResponseModel { Answer = "AI service unavailable.", UiType = "TEXT" };
+                return Result<AIResponseModel>.Failure("AI service unavailable.");
             }
-
-            var resultJson = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
-            {
-                _logger.LogError("FastAPI query failed. StatusCode={StatusCode}, CorrelationId={CorrelationId}", response.StatusCode, correlationId);
-                return new AIResponseModel { Answer = "AI service unavailable.", UiType = "TEXT" };
-            }
-
-            var result = JsonSerializer.Deserialize<AIResponseModel>(resultJson)!;
-
-            var sessionId = await SaveChatHistoryAsync(payload, result);
-            result.SessionId = sessionId;
-
-            return result;
         }
+
+        /// <summary>
+        /// Retrieves AI-powered suggestions for a user, combining ML and .NET context.
+        /// </summary>
+        public async Task<Result<List<string>>> GetSuggestionsAsync(int userId, string correlationId, string jwtToken)
+        {
+            var cacheKey = $"suggestions:{userId}";
+
+            if (_cache.TryGetValue(cacheKey, out List<string>? cachedSuggestions) && cachedSuggestions != null)
+            {
+                _logger.LogInformation("Returning cached suggestions. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
+                return Result<List<string>>.Success(cachedSuggestions);
+            }
+
+            try
+            {
+                var mlContextResult = await _userContextService.FetchMLContextAsync(userId, correlationId, jwtToken);
+                var mlContext = mlContextResult.IsSuccess ? mlContextResult.Value : null;
+
+                var dotNetContextResult = await _userContextService.GetUserContextAsync(userId);
+                var dotNetContext = dotNetContextResult.IsSuccess ? dotNetContextResult.Value : null;
+
+                var suggestions = await GenerateHybridSuggestions(mlContext, dotNetContext);
+
+                _cache.Set(cacheKey, suggestions, TimeSpan.FromMinutes(10));
+                _logger.LogInformation("Suggestions cached. CorrelationId={CorrelationId}, Count={Count}", correlationId, suggestions.Count);
+
+                return Result<List<string>>.Success(suggestions);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate suggestions. CorrelationId={CorrelationId}", correlationId);
+                return Result<List<string>>.Failure("Failed to generate suggestions.");
+            }
+        }
+
         private async Task<List<string>> GenerateHybridSuggestions(MLUserContextDto? mlContext, UserContextDTO? dotNetContext)
         {
             var suggestions = new List<string>();
-
             var vehicleCache = new Dictionary<int, Vehicle>();
             var auctionCache = new Dictionary<int, Auction>();
 
@@ -152,14 +188,11 @@ namespace AutoFiCore.Services
             {
                 foreach (var auction in dotNetContext.AuctionHistory.Take(5))
                 {
-                    if (auction != null)
+                    var vehicle = await GetVehicleCachedAsync(auction.VehicleId);
+                    if (vehicle != null)
                     {
-                        var vehicle = await GetVehicleCachedAsync(auction.VehicleId);
-                        if (vehicle != null)
-                        {
-                            suggestions.Add($"I would like updates on upcoming auctions for {vehicle.Make} {vehicle.Model} {vehicle.Year}");
-                            suggestions.Add($"I want to know if {vehicle.Make} {vehicle.Model} {vehicle.Year} is still available");
-                        }
+                        suggestions.Add($"I would like updates on upcoming auctions for {vehicle.Make} {vehicle.Model} {vehicle.Year}");
+                        suggestions.Add($"I want to know if {vehicle.Make} {vehicle.Model} {vehicle.Year} is still available");
                     }
                 }
 
@@ -173,49 +206,21 @@ namespace AutoFiCore.Services
                 }
             }
 
-            if (suggestions.Count == 0)
-            {
-                _logger.LogWarning("No valid context found for suggestions.");
-                return new List<string>();
-            }
-
             return suggestions.Distinct().Take(10).ToList();
         }
 
         /// <summary>
-        /// Retrieves AI-powered suggestions for a user, combining ML and .NET context.
-        /// Uses caching to improve performance.
+        /// Persists chat history to the database in a transaction.
         /// </summary>
-        public async Task<List<string>> GetSuggestionsAsync(int userId, string correlationId, string jwtToken)
-        {
-            var cacheKey = $"suggestions:{userId}";
-
-            if (_cache.TryGetValue(cacheKey, out List<string>? cachedSuggestions) && cachedSuggestions != null)
-            {
-                _logger.LogInformation("Returning cached suggestions. CorrelationId={CorrelationId}, UserId={UserId}", correlationId, userId);
-                return cachedSuggestions;
-            }
-
-            var mlContext = await _userContextService.FetchMLContextAsync(userId, correlationId, jwtToken);
-            var dotNetContext = await _userContextService.GetUserContextAsync(userId);
-
-            var suggestions = await GenerateHybridSuggestions(mlContext, dotNetContext);
-
-            _cache.Set(cacheKey, suggestions, TimeSpan.FromMinutes(10));
-            _logger.LogInformation("Suggestions cached. CorrelationId={CorrelationId}, Count={Count}", correlationId, suggestions.Count);
-
-            return suggestions;
-        }
-        private async Task<string> SaveChatHistoryAsync(EnrichedAIQuery payload, AIResponseModel result)
+        private async Task<string?> SaveChatHistoryAsync(EnrichedAIQuery payload, AIResponseModel result)
         {
             using var scope = _scopeFactory.CreateScope();
             var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             var strategy = uow.DbContext.Database.CreateExecutionStrategy();
 
             try
             {
-                string sessionId = null!;
+                string? sessionId = null;
 
                 await strategy.ExecuteAsync(async () =>
                 {
@@ -223,7 +228,6 @@ namespace AutoFiCore.Services
                     try
                     {
                         sessionId = await uow.ChatRepository.SaveChatHistoryAsync(payload, result);
-
                         await uow.SaveChangesAsync();
                         await uow.CommitTransactionAsync();
                     }
@@ -239,32 +243,48 @@ namespace AutoFiCore.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to persist chat history");
-                return null!;
+                return null;
             }
         }
 
         /// <summary>
-        /// Gets all chat titles for a given user.
+        /// Gets chat titles for a user.
         /// </summary>
-        public async Task<List<ChatTitleDto>> GetChatTitlesAsync(int userId)
+        public async Task<Result<List<ChatTitleDto>>> GetChatTitlesAsync(int userId)
         {
-            var chats = await _uow.ChatRepository.GetUserChatsAsync(userId);
-            return chats;
+            try
+            {
+                var chats = await _uow.ChatRepository.GetUserChatsAsync(userId);
+                return Result<List<ChatTitleDto>>.Success(chats);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch chat titles for user {UserId}", userId);
+                return Result<List<ChatTitleDto>>.Failure("Failed to fetch chat titles.");
+            }
         }
 
         /// <summary>
-        /// Retrieves the full chat session details for the given user and session.
+        /// Gets the full chat session with messages for a user.
         /// </summary>
-        public async Task<ChatSessionDto?> GetFullChatAsync(int userId, string sessionId)
+        public async Task<Result<ChatSessionDto?>> GetFullChatAsync(int userId, string sessionId)
         {
-            var chat = await _uow.ChatRepository.GetSessionAsync(sessionId, userId);
-            return chat == null ? null : ChatMapper.ToDto(chat);
+            try
+            {
+                var chat = await _uow.ChatRepository.GetSessionAsync(sessionId, userId);
+                return Result<ChatSessionDto?>.Success(chat == null ? null : ChatMapper.ToDto(chat));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to fetch full chat. SessionId={SessionId}, UserId={UserId}", sessionId, userId);
+                return Result<ChatSessionDto?>.Failure("Failed to fetch chat session.");
+            }
         }
 
         /// <summary>
-        /// Submits feedback about an AI query to the external FastAPI service.
+        /// Submits feedback on an AI response to FastAPI.
         /// </summary>
-        public async Task<FeedbackResponseDto> SubmitFeedbackAsync(AIQueryFeedbackDto feedbackDto, string correlationId, string jwtToken)
+        public async Task<Result<FeedbackResponseDto>> SubmitFeedbackAsync(AIQueryFeedbackDto feedbackDto, string correlationId, string jwtToken)
         {
             var client = _httpClientFactory.CreateClient("FastApi");
             client.DefaultRequestHeaders.Add("X-Correlation-ID", correlationId);
@@ -276,77 +296,81 @@ namespace AutoFiCore.Services
                 vote = feedbackDto.Vote.ToString().ToUpperInvariant()
             };
 
-            var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            var content = new StringContent(JsonSerializer.Serialize(payload, _serializerOptions), Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Submitting feedback to FastAPI: MessageId={MessageId}, Vote={Vote}, CorrelationId={CorrelationId}",
-                feedbackDto.MessageId, feedbackDto.Vote, correlationId);
-
-            var response = await client.PostAsync("feedback", content);
-            var resultJson = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                _logger.LogError("FastAPI feedback submission failed. StatusCode={StatusCode}, Response={Response}, CorrelationId={CorrelationId}",
-                    response.StatusCode, resultJson, correlationId);
-                throw new HttpRequestException($"Feedback submission failed: {resultJson}");
+                var response = await client.PostAsync("feedback", content);
+                var resultJson = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("FastAPI feedback submission failed. StatusCode={StatusCode}, Response={Response}, CorrelationId={CorrelationId}",
+                        response.StatusCode, resultJson, correlationId);
+                    return Result<FeedbackResponseDto>.Failure("Feedback submission failed.");
+                }
+
+                var result = JsonSerializer.Deserialize<FeedbackResponseDto>(resultJson, _serializerOptions)!;
+                return Result<FeedbackResponseDto>.Success(result);
             }
-
-            var result = JsonSerializer.Deserialize<FeedbackResponseDto>(resultJson)!;
-
-            _logger.LogInformation("Feedback submitted successfully: MessageId={MessageId}, Feedback={Feedback}, CorrelationId={CorrelationId}",
-                result.MessageId, result.Feedback, correlationId);
-
-            return result;
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error submitting feedback. CorrelationId={CorrelationId}", correlationId);
+                return Result<FeedbackResponseDto>.Failure("Error submitting feedback.");
+            }
         }
 
         /// <summary>
-        /// Retrieves a list of popular queries from the external FastAPI service.
+        /// Fetches popular queries from FastAPI.
         /// </summary>
-        public async Task<List<PopularQueryDto>> GetPopularQueriesAsync(int limit, string correlationId, string jwtToken)
+        public async Task<Result<List<PopularQueryDto>>> GetPopularQueriesAsync(int limit, string correlationId, string jwtToken)
         {
             var client = _httpClientFactory.CreateClient("FastApi");
             client.DefaultRequestHeaders.Add("X-Correlation-ID", correlationId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtToken);
 
-            var response = await client.GetAsync($"popular-queries?limit={limit}");
-            var resultJson = await response.Content.ReadAsStringAsync();
-
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                _logger.LogError("FastAPI popular queries failed. CorrelationId={CorrelationId}, StatusCode={StatusCode}",
-                    correlationId, response.StatusCode);
-                throw new HttpRequestException($"FastAPI request failed with status code {response.StatusCode}");
+                var response = await client.GetAsync($"popular-queries?limit={limit}");
+                var resultJson = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("FastAPI popular queries failed. CorrelationId={CorrelationId}, StatusCode={StatusCode}", correlationId, response.StatusCode);
+                    return Result<List<PopularQueryDto>>.Failure("Failed to fetch popular queries.");
+                }
+
+                var result = JsonSerializer.Deserialize<List<PopularQueryDto>>(resultJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                return Result<List<PopularQueryDto>>.Success(result ?? new List<PopularQueryDto>());
             }
-
-            var result = JsonSerializer.Deserialize<List<PopularQueryDto>>(resultJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-            return result ?? new List<PopularQueryDto>();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching popular queries. CorrelationId={CorrelationId}", correlationId);
+                return Result<List<PopularQueryDto>>.Failure("Error fetching popular queries.");
+            }
         }
 
         /// <summary>
-        /// Deletes a specific chat session for a user inside a transaction.
+        /// Deletes a specific chat session for a user.
         /// </summary>
-        public async Task DeleteSessionAsync(string sessionId, int userId)
+        public async Task<Result<bool>> DeleteSessionAsync(string sessionId, int userId)
         {
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
                 var strategy = uow.DbContext.Database.CreateExecutionStrategy();
 
                 await strategy.ExecuteAsync(async () =>
                 {
                     await uow.BeginTransactionAsync();
-
                     try
                     {
                         await uow.ChatRepository.DeleteSessionAsync(sessionId, userId);
                         await uow.SaveChangesAsync();
                         await uow.CommitTransactionAsync();
-
-                        _logger.LogInformation($"Deleted session {sessionId} for user {userId}.");
                     }
                     catch
                     {
@@ -354,24 +378,25 @@ namespace AutoFiCore.Services
                         throw;
                     }
                 });
+
+                return Result<bool>.Success(true);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting session {sessionId} for user {userId}.");
-                throw;
+                _logger.LogError(ex, "Error deleting session {SessionId} for user {UserId}", sessionId, userId);
+                return Result<bool>.Failure("Error deleting session.");
             }
         }
 
         /// <summary>
-        /// Deletes all chat sessions for a user inside a transaction.
+        /// Deletes all chat sessions for a user.
         /// </summary>
-        public async Task DeleteAllSessionsAsync(int userId)
+        public async Task<Result<bool>> DeleteAllSessionsAsync(int userId)
         {
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
                 var strategy = uow.DbContext.Database.CreateExecutionStrategy();
 
                 await strategy.ExecuteAsync(async () =>
@@ -382,8 +407,6 @@ namespace AutoFiCore.Services
                         await uow.ChatRepository.DeleteAllSessionsAsync(userId);
                         await uow.SaveChangesAsync();
                         await uow.CommitTransactionAsync();
-
-                        _logger.LogInformation($"Deleted all sessions for user {userId}.");
                     }
                     catch
                     {
@@ -391,25 +414,28 @@ namespace AutoFiCore.Services
                         throw;
                     }
                 });
+
+                return Result<bool>.Success(true);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting all sessions for user {userId}.");
-                throw;
+                _logger.LogError(ex, "Error deleting all sessions for user {UserId}", userId);
+                return Result<bool>.Failure("Error deleting all sessions.");
             }
         }
 
         /// <summary>
-        /// Updates the title of a chat session for a user inside a transaction.
+        /// Updates the title of a chat session for a user.
         /// </summary>
-        public async Task UpdateSessionTitleAsync(string sessionId, int userId, string newTitle)
+        public async Task<Result<bool>> UpdateSessionTitleAsync(string sessionId, int userId, string newTitle)
         {
             try
             {
                 using var scope = _scopeFactory.CreateScope();
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
                 var strategy = uow.DbContext.Database.CreateExecutionStrategy();
+
+                bool updated = false;
 
                 await strategy.ExecuteAsync(async () =>
                 {
@@ -420,9 +446,7 @@ namespace AutoFiCore.Services
 
                         if (session == null)
                         {
-                            _logger.LogWarning(
-                                $"UpdateSessionTitleAsync: Session {sessionId} not found for user {userId}."
-                            );
+                            _logger.LogWarning("UpdateSessionTitleAsync: Session {SessionId} not found for user {UserId}", sessionId, userId);
                             await uow.RollbackTransactionAsync();
                             return;
                         }
@@ -434,9 +458,7 @@ namespace AutoFiCore.Services
                         await uow.SaveChangesAsync();
                         await uow.CommitTransactionAsync();
 
-                        _logger.LogInformation(
-                            $"Session {sessionId} title successfully updated to '{newTitle}' for user {userId}."
-                        );
+                        updated = true;
                     }
                     catch
                     {
@@ -444,11 +466,13 @@ namespace AutoFiCore.Services
                         throw;
                     }
                 });
+
+                return updated ? Result<bool>.Success(true): Result<bool>.Failure("Session not found.");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error updating title for session {sessionId}.");
-                throw;
+                _logger.LogError(ex, "Error updating session title {SessionId}", sessionId);
+                return Result<bool>.Failure("Error updating session title.");
             }
         }
     }

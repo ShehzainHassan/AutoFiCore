@@ -1,3 +1,4 @@
+using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 using AutoFiCore.DTOs;
 using AutoFiCore.Models;
@@ -294,13 +295,13 @@ namespace AutoFiCore.Controllers
             };
 
             var loanDetails = await _loanService.CalculateLoanAsync(loanRequest);
-            var pdfBytes = _pdfService.GenerateLoanPdf(questionnaire, loanDetails);
+            var pdfBytes = _pdfService.GenerateLoanPdf(questionnaire, loanDetails.Value!);
             await _emailService.SendLoanEmailAsync(questionnaire.Email, pdfBytes);
 
             return Ok(new SaveQuestionnaireResponse
             {
                 Questionnaire = questionnaire,
-                Loan = loanDetails
+                Loan = loanDetails.Value!
             });
         }
 

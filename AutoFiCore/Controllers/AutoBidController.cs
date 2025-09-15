@@ -17,18 +17,15 @@ namespace AutoFiCore.Controllers
     public class AutoBidController : SecureControllerBase
     {
         private readonly IAutoBidService _autoBidService;
-        private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<AutoBidController> _logger;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AutoBidController"/> class.
         /// </summary>
         /// <param name="autoBidService">Service for managing auto-bid logic.</param>
-        /// <param name="unitOfWork">Unit of work for transactional operations.</param>
-        public AutoBidController(IAutoBidService autoBidService, IUnitOfWork unitOfWork, ILogger<AutoBidController> logger)
+        public AutoBidController(IAutoBidService autoBidService, ILogger<AutoBidController> logger)
         {
             _autoBidService = autoBidService;
-            _unitOfWork = unitOfWork;
             _logger = logger;
         }
 
@@ -101,7 +98,7 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns true if auto-bid is set; otherwise false.</returns>
         [Authorize]
         [HttpGet("auction/{auctionId}")]
-        public async Task<ActionResult<bool>> IsAutoBidSet(int auctionId)
+        public async Task<IActionResult> IsAutoBidSet(int auctionId)
         {
             if (!IsUserContextValid(out var userId))
                 return Unauthorized(new { error = "Unauthorized: Missing or invalid user ID." });
@@ -139,13 +136,13 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns auto-bid summary or not found message.</returns>
         [AllowAnonymous]
         [HttpGet("/api/auction/{auctionId}/autobids")]
-        public async Task<ActionResult<AutoBidSummaryDto>> GetAuctionAutoBidSummary(int auctionId)
+        public async Task<IActionResult> GetAuctionAutoBidSummary(int auctionId)
         {
             var summary = await _autoBidService.GetAuctionAutoBidSummaryAsync(auctionId);
             if (summary == null)
                 return NotFound($"Auction with ID {auctionId} not found.");
 
-            return Ok(summary);
+            return Ok(summary.Value);
         }
     }
 }

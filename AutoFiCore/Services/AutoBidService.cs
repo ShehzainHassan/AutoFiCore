@@ -4,19 +4,10 @@ using AutoFiCore.Enums;
 using AutoFiCore.Mappers;
 using AutoFiCore.Models;
 using AutoFiCore.Utilities;
+using Microsoft.EntityFrameworkCore;
 
 namespace AutoFiCore.Services
 {
-    public interface IAutoBidService
-    {
-        Task<Result<CreateAutoBidDTO>> CreateAutoBidAsync(CreateAutoBidDTO dto);
-        Task<Result<string>> UpdateAutoBidAsync(int auctionId, int userId, UpdateAutoBidDTO dto);
-        Task<Result<string>> CancelAutoBidAsync(int auctionId, int userId);
-        Task<AutoBidSummaryDto?> GetAuctionAutoBidSummaryAsync(int auctionId);
-        Task ProcessAutoBidTrigger(int auctionId, decimal newBidAmount);
-        Task<Result<bool>> IsAutoBidSetAsync(int auctionId, int userId);
-        Task<Result<CreateAutoBidDTO?>> GetAutoBidWithStrategyAsync(int userId, int auctionId);
-    }
     public class AutoBidService : IAutoBidService
     {
         private readonly IUnitOfWork _uow;
@@ -174,247 +165,336 @@ namespace AutoFiCore.Services
             strategy.MaxSpreadBids = dto.PreferredBidTiming == PreferredBidTiming.SpreadEvenly ? dto.MaxSpreadBids : null;
             strategy.UpdatedAt = now;
         }
-        public async Task ProcessAutoBidTrigger(int auctionId, decimal newBidAmount)
+        public async Task<Result<string>> ProcessAutoBidTrigger(int auctionId, decimal newBidAmount)
         {
-            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
-            if (auction == null)
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
+
+            try
             {
-                _log.LogWarning("Auction with {AuctionId} not found", auctionId);
-                return;
-            }
-
-            if (auction.Status != AuctionStatus.Active)
-            {
-                _log.LogWarning("Auction is not active");
-                return;
-            }
-
-            var auctionsWithAutoBids = await _uow.Auctions.GetAuctionsWithActiveAutoBidsAsync();
-
-            _log.LogInformation("Found {Count} auctions with active autobids ", auctionsWithAutoBids.Count);
-
-            var bidCount = (await _uow.Bids.GetBidsByAuctionIdAsync(auctionId)).Count;
-            var autoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
-            var sortedAutoBids = autoBids.OrderBy(ab => ab.CreatedAt).ToList();
-            var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
-            var timeLeft = auction.EndUtc - DateTime.UtcNow;
-
-            foreach (var autoBid in sortedAutoBids)
-            {
-                try
+                return await strategy.ExecuteAsync(async () =>
                 {
-                    if (autoBid.UserId == highestBidder)
+                    await _uow.BeginTransactionAsync();
+                    try
                     {
-                        _log.LogInformation("User {UserId} is already highest bidder on auction {AuctionId}. Skipping auto-bid", autoBid.UserId, autoBid.AuctionId);
-                        continue;
-                    }
-                    var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(autoBid.UserId, auctionId);
-                    var increment = BidIncrementCalculator.GetIncrementByStrategy(newBidAmount, bidCount, autoBid.BidStrategyType);
-                    var nextBidAmount = newBidAmount + increment;
+                        var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+                        if (auction == null)
+                        {
+                            _log.LogWarning("Auction with {AuctionId} not found", auctionId);
+                            return Result<string>.Failure("Auction not found.");
+                        }
 
-                    if (bidStrategy == null)
-                    {
-                        _log.LogWarning("No bid strategy found for user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
-                        continue;
-                    }
-                    if (nextBidAmount > autoBid.MaxBidAmount)
-                    {
-                        _log.LogInformation("Next bid {Amount} exceeds user {UserId}'s max bid", nextBidAmount, autoBid.UserId);
-                        continue;
-                    }
+                        if (auction.Status != AuctionStatus.Active)
+                        {
+                            _log.LogWarning("Auction {AuctionId} is not active", auctionId);
+                            return Result<string>.Failure("Auction is not active.");
+                        }
 
-                    switch (bidStrategy.PreferredBidTiming)
-                    {
-                        case PreferredBidTiming.LastMinute:
-                            if (timeLeft.TotalSeconds <= 120 && await CanPlaceLastMinuteBid(autoBid, auctionId))
+                        var bidCount = (await _uow.Bids.GetBidsByAuctionIdAsync(auctionId)).Count;
+                        var autoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
+                        var sortedAutoBids = autoBids.OrderBy(ab => ab.CreatedAt).ToList();
+                        var highestBidder = await _uow.Bids.GetHighestBidderIdAsync(auctionId);
+                        var timeLeft = auction.EndUtc - DateTime.UtcNow;
+
+                        foreach (var autoBid in sortedAutoBids)
+                        {
+                            if (autoBid.UserId == highestBidder)
                             {
-                                await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
-                                return;
+                                _log.LogInformation("User {UserId} is already highest bidder on auction {AuctionId}. Skipping auto-bid", autoBid.UserId, auctionId);
+                                continue;
                             }
-                            break;
 
-                        case PreferredBidTiming.Immediate:
-                            if (await CanPlaceImmediateBid(autoBid, auctionId))
+                            var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(autoBid.UserId, auctionId);
+                            if (bidStrategy == null)
                             {
-                                await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
-                                return;
+                                _log.LogWarning("No bid strategy found for user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
+                                continue;
                             }
-                            break;
 
-                        case PreferredBidTiming.SpreadEvenly:
-                            if (await CanPlaceSpreadBid(autoBid, auctionId))
+                            var increment = BidIncrementCalculator.GetIncrementByStrategy(newBidAmount, bidCount, autoBid.BidStrategyType);
+                            var nextBidAmount = newBidAmount + increment;
+
+                            if (nextBidAmount > autoBid.MaxBidAmount)
                             {
-                                await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
-                                return;
+                                _log.LogInformation("Next bid {Amount} exceeds user {UserId}'s max bid", nextBidAmount, autoBid.UserId);
+                                continue;
                             }
-                            break;
+
+                            bool bidPlaced = false;
+
+                            switch (bidStrategy.PreferredBidTiming)
+                            {
+                                case PreferredBidTiming.LastMinute:
+                                    if (timeLeft.TotalSeconds <= 120 && await CanPlaceLastMinuteBid(autoBid, auctionId))
+                                    {
+                                        await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
+                                        bidPlaced = true;
+                                    }
+                                    break;
+
+                                case PreferredBidTiming.Immediate:
+                                    if (await CanPlaceImmediateBid(autoBid, auctionId))
+                                    {
+                                        await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
+                                        bidPlaced = true;
+                                    }
+                                    break;
+
+                                case PreferredBidTiming.SpreadEvenly:
+                                    if (await CanPlaceSpreadBid(autoBid, auctionId))
+                                    {
+                                        await PlaceAutoBid(autoBid, auctionId, nextBidAmount);
+                                        bidPlaced = true;
+                                    }
+                                    break;
+                            }
+
+                            if (bidPlaced)
+                            {
+                                await _uow.SaveChangesAsync();
+                                await _uow.CommitTransactionAsync();
+                                _log.LogInformation("Auto-bid placed by user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
+                                return Result<string>.Success($"Auto-bid placed by user {autoBid.UserId}.");
+                            }
+                        }
+
+                        await _uow.CommitTransactionAsync();
+                        return Result<string>.Failure("No eligible auto-bid placed.");
                     }
-                }
-                catch (Exception ex)
-                {
-                    _log.LogError(ex, "Exception while processing auto-bid for user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
-                }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _log.LogError(ex, "Exception while processing auto-bid trigger for auction {AuctionId}", auctionId);
+                        return Result<string>.Failure("Unexpected error occurred during auto-bid trigger.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Execution strategy failed during auto-bid trigger for auction {AuctionId}", auctionId);
+                return Result<string>.Failure("Execution strategy failed.");
             }
         }
         public async Task<Result<CreateAutoBidDTO>> CreateAutoBidAsync(CreateAutoBidDTO dto)
         {
-            var auction = await _uow.Auctions.GetAuctionByIdAsync(dto.AuctionId);
-            if (auction == null || auction.Status != AuctionStatus.Active)
-                return Result<CreateAutoBidDTO>.Failure("Auction not found or not active.");
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-            decimal highestBid = await _uow.Bids.GetHighestBidAmountAsync(auction.AuctionId, auction.StartingPrice);
-            int totalBids = (await _uow.Bids.GetBidsByAuctionIdAsync(auction.AuctionId)).Count;
-            var minIncrement = BidIncrementCalculator.GetIncrementByStrategy(highestBid, totalBids, dto.BidStrategyType);
-
-            if (dto.MaxBidAmount < auction.StartingPrice + minIncrement)
-                return Result<CreateAutoBidDTO>.Failure(
-                    $"MaxBidAmount must be at least {(auction.StartingPrice + minIncrement):C} based on the selected strategy.");
-
-            var existingAutoBid = await _uow.AutoBid.GetAutoBidWithStrategyAsync(dto.UserId, dto.AuctionId);
-            var now = DateTime.UtcNow;
-
-            if (existingAutoBid != null)
+            try
             {
-                var updateDto = new UpdateAutoBidDTO
+                return await strategy.ExecuteAsync(async () =>
                 {
-                    MaxBidAmount = dto.MaxBidAmount,
-                    BidStrategyType = (int?)dto.BidStrategyType,
-                    IsActive = dto.IsActive
-                };
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        var auction = await _uow.Auctions.GetAuctionByIdAsync(dto.AuctionId);
+                        if (auction == null || auction.Status != AuctionStatus.Active)
+                            return Result<CreateAutoBidDTO>.Failure("Auction not found or not active.");
 
-                var updateResult = await UpdateAutoBidAsync(dto.AuctionId, dto.UserId, updateDto);
+                        decimal highestBid = await _uow.Bids.GetHighestBidAmountAsync(auction.AuctionId, auction.StartingPrice);
+                        int totalBids = (await _uow.Bids.GetBidsByAuctionIdAsync(auction.AuctionId)).Count;
+                        var minIncrement = BidIncrementCalculator.GetIncrementByStrategy(highestBid, totalBids, dto.BidStrategyType);
 
-                var strategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, dto.AuctionId);
-                if (strategy != null)
-                {
-                    UpdateBidStrategyFromDto(strategy, dto, now);
-                }
+                        if (dto.MaxBidAmount < auction.StartingPrice + minIncrement)
+                            return Result<CreateAutoBidDTO>.Failure(
+                                $"MaxBidAmount must be at least {(auction.StartingPrice + minIncrement):C} based on the selected strategy.");
 
-                await _uow.SaveChangesAsync();
+                        var existingAutoBid = await _uow.AutoBid.GetAutoBidWithStrategyAsync(dto.UserId, dto.AuctionId);
+                        var now = DateTime.UtcNow;
 
-                return updateResult.IsSuccess
-                    ? Result<CreateAutoBidDTO>.Success(dto)
-                    : Result<CreateAutoBidDTO>.Failure(updateResult.Error ?? "Failed to update AutoBid.");
+                        if (existingAutoBid != null)
+                        {
+                            var updateDto = new UpdateAutoBidDTO
+                            {
+                                MaxBidAmount = dto.MaxBidAmount,
+                                BidStrategyType = (int?)dto.BidStrategyType,
+                                IsActive = dto.IsActive
+                            };
+
+                            var updateResult = await UpdateAutoBidAsync(dto.AuctionId, dto.UserId, updateDto);
+
+                            var strategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, dto.AuctionId);
+                            if (strategy != null)
+                            {
+                                UpdateBidStrategyFromDto(strategy, dto, now);
+                            }
+
+                            await _uow.SaveChangesAsync();
+                            await _uow.CommitTransactionAsync();
+
+                            return updateResult.IsSuccess
+                                ? Result<CreateAutoBidDTO>.Success(dto)
+                                : Result<CreateAutoBidDTO>.Failure(updateResult.Error ?? "Failed to update AutoBid.");
+                        }
+
+                        var autoBid = new AutoBid
+                        {
+                            UserId = dto.UserId,
+                            AuctionId = dto.AuctionId,
+                            MaxBidAmount = dto.MaxBidAmount,
+                            CurrentBidAmount = 0,
+                            BidStrategyType = dto.BidStrategyType,
+                            IsActive = dto.IsActive,
+                            CreatedAt = now,
+                            UpdatedAt = now
+                        };
+
+                        var strategyToAdd = CreateBidStrategyFromDto(dto, now);
+
+                        await _uow.AutoBid.AddAutoBidAsync(autoBid);
+                        await _uow.AutoBid.AddBidStrategyAsync(strategyToAdd);
+                        await _uow.SaveChangesAsync();
+                        await _uow.CommitTransactionAsync();
+
+                        _log.LogInformation("Auto-bid created for auction {Auction}", autoBid.AuctionId);
+                        return Result<CreateAutoBidDTO>.Success(dto);
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _log.LogError(ex, "Failed to create/update AutoBid for auction {AuctionId} and user {UserId}", dto.AuctionId, dto.UserId);
+                        return Result<CreateAutoBidDTO>.Failure("Unexpected error occurred while creating AutoBid.");
+                    }
+                });
             }
-
-            var autoBid = new AutoBid
+            catch (Exception ex)
             {
-                UserId = dto.UserId,
-                AuctionId = dto.AuctionId,
-                MaxBidAmount = dto.MaxBidAmount,
-                CurrentBidAmount = 0,
-                BidStrategyType = dto.BidStrategyType,
-                IsActive = dto.IsActive,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-
-            var strategyToAdd = CreateBidStrategyFromDto(dto, now);
-
-            await _uow.AutoBid.AddAutoBidAsync(autoBid);
-            await _uow.AutoBid.AddBidStrategyAsync(strategyToAdd);
-            await _uow.SaveChangesAsync();
-
-            _log.LogInformation("Auto-bid created for auction {Auction}", autoBid.AuctionId);
-
-            return Result<CreateAutoBidDTO>.Success(dto);
+                _log.LogError(ex, "Execution strategy failed for AutoBid creation on auction {AuctionId}", dto.AuctionId);
+                return Result<CreateAutoBidDTO>.Failure("Unexpected error occurred during AutoBid creation.");
+            }
         }
         public async Task<Result<string>> CancelAutoBidAsync(int auctionId, int userId)
         {
-            var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-            if (autoBid == null)
-                return Result<string>.Failure("Auto-bid not found");
+            try
+            {
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
 
-            if (!autoBid.IsActive)
-                return Result<string>.Failure("Auto-bid is already inactive");
+                        if (autoBid == null)
+                            return Result<string>.Failure("Auto-bid not found");
 
-            await _uow.AutoBid.SetInactiveAsync(userId, auctionId);
-            await _uow.SaveChangesAsync();
+                        if (!autoBid.IsActive)
+                            return Result<string>.Failure("Auto-bid is already inactive");
 
-            _log.LogInformation("Auto-bid and bid strategy removed for user {UserId} on auction {AuctionId}", userId, auctionId);
+                        await _uow.AutoBid.SetInactiveAsync(userId, auctionId);
+                        await _uow.SaveChangesAsync();
+                        await _uow.CommitTransactionAsync();
 
-            return Result<string>.Success("Auto-bid cancelled and bid strategy deleted successfully");
+                        _log.LogInformation("Auto-bid and bid strategy removed for user {UserId} on auction {AuctionId}", userId, auctionId);
+                        return Result<string>.Success("Auto-bid cancelled and bid strategy deleted successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _log.LogError(ex, "Failed to cancel AutoBid for user {UserId} on auction {AuctionId}", userId, auctionId);
+                        return Result<string>.Failure("Unexpected error occurred while cancelling AutoBid.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Execution strategy failed while cancelling AutoBid for auction {AuctionId}", auctionId);
+                return Result<string>.Failure("Unexpected error occurred during AutoBid cancellation.");
+            }
         }
         public async Task<Result<string>> UpdateAutoBidAsync(int auctionId, int userId, UpdateAutoBidDTO dto)
         {
-            var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
+            var strategy = _uow.DbContext.Database.CreateExecutionStrategy();
 
-
-            if (autoBid == null)
-                return Result<string>.Failure("Auto-bid not found");
-
-            if (autoBid.UserId != userId)
-                return Result<string>.Failure("User Id does not match. Access denied.");
-
-            var auction = await _uow.Auctions.GetAuctionByIdAsync(autoBid.AuctionId);
-            if (auction == null)
-                return Result<string>.Failure("Auction not found");
-
-            if (auction.Status != AuctionStatus.Active)
-                return Result<string>.Failure("Auction is not active.");
-
-            if (dto.MaxBidAmount < auction.CurrentPrice)
-                return Result<string>.Failure("MaxBidAmount cannot be less than current bid.");
-
-            if (dto.MaxBidAmount.HasValue)
-                autoBid.MaxBidAmount = dto.MaxBidAmount.Value;
-
-            if (dto.BidStrategyType.HasValue &&
-                Enum.IsDefined(typeof(BidStrategyType), dto.BidStrategyType.Value))
+            try
             {
-                autoBid.BidStrategyType = (BidStrategyType)dto.BidStrategyType.Value;
-            }
-
-            else if (dto.BidStrategyType.HasValue)
-            {
-                return Result<string>.Failure("Invalid bid strategy type.");
-            }
-            if (dto.IsActive.HasValue)
-                autoBid.IsActive = dto.IsActive.Value;
-            autoBid.UpdatedAt = DateTime.UtcNow;
-            var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(userId, auctionId);
-            if (bidStrategy != null)
-            {
-                if (dto.BidStrategyType.HasValue &&
-                    Enum.IsDefined(typeof(BidStrategyType), dto.BidStrategyType.Value))
+                return await strategy.ExecuteAsync(async () =>
                 {
-                    bidStrategy.Type = (BidStrategyType)dto.BidStrategyType.Value;
-                }
+                    await _uow.BeginTransactionAsync();
+                    try
+                    {
+                        var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
+                        if (autoBid == null)
+                            return Result<string>.Failure("Auto-bid not found");
 
-                bidStrategy.UpdatedAt = DateTime.UtcNow;
+                        if (autoBid.UserId != userId)
+                            return Result<string>.Failure("User Id does not match. Access denied.");
+
+                        var auction = await _uow.Auctions.GetAuctionByIdAsync(autoBid.AuctionId);
+                        if (auction == null)
+                            return Result<string>.Failure("Auction not found");
+
+                        if (auction.Status != AuctionStatus.Active)
+                            return Result<string>.Failure("Auction is not active.");
+
+                        if (dto.MaxBidAmount < auction.CurrentPrice)
+                            return Result<string>.Failure("MaxBidAmount cannot be less than current bid.");
+
+                        if (dto.MaxBidAmount.HasValue)
+                            autoBid.MaxBidAmount = dto.MaxBidAmount.Value;
+
+                        if (dto.BidStrategyType.HasValue)
+                        {
+                            if (Enum.IsDefined(typeof(BidStrategyType), dto.BidStrategyType.Value))
+                                autoBid.BidStrategyType = (BidStrategyType)dto.BidStrategyType.Value;
+                            else
+                                return Result<string>.Failure("Invalid bid strategy type.");
+                        }
+
+                        if (dto.IsActive.HasValue)
+                            autoBid.IsActive = dto.IsActive.Value;
+
+                        autoBid.UpdatedAt = DateTime.UtcNow;
+
+                        var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(userId, auctionId);
+                        if (bidStrategy != null)
+                        {
+                            if (dto.BidStrategyType.HasValue &&
+                                Enum.IsDefined(typeof(BidStrategyType), dto.BidStrategyType.Value))
+                            {
+                                bidStrategy.Type = (BidStrategyType)dto.BidStrategyType.Value;
+                            }
+
+                            bidStrategy.UpdatedAt = DateTime.UtcNow;
+                        }
+
+                        await _uow.SaveChangesAsync();
+                        await _uow.CommitTransactionAsync();
+
+                        _log.LogInformation("Auto-bid updated for auction {Auction}", autoBid.AuctionId);
+                        return Result<string>.Success("Auto-bid updated successfully");
+                    }
+                    catch (Exception ex)
+                    {
+                        await _uow.RollbackTransactionAsync();
+                        _log.LogError(ex, "Failed to update AutoBid for user {UserId} on auction {AuctionId}", userId, auctionId);
+                        return Result<string>.Failure("Unexpected error occurred while updating AutoBid.");
+                    }
+                });
             }
-            await _uow.SaveChangesAsync();
-
-            _log.LogInformation("Auto-bid updated for (auction {Auction})", autoBid.AuctionId);
-            return Result<string>.Success("Auto-bid updated successfully");
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Execution strategy failed while updating AutoBid for auction {AuctionId}", auctionId);
+                return Result<string>.Failure("Unexpected error occurred during AutoBid update.");
+            }
         }
-        public async Task<AutoBidSummaryDto?> GetAuctionAutoBidSummaryAsync(int auctionId)
+        public async Task<Result<AutoBidSummaryDto>> GetAuctionAutoBidSummaryAsync(int auctionId)
         {
             var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
             if (auction == null)
-                return null;
+                return Result<AutoBidSummaryDto>.Failure("Auction not found.");
 
             var autoBids = await _uow.AutoBid.GetActiveAutoBidsByAuctionIdAsync(auctionId);
-
-            if (autoBids == null || !autoBids.Any())
-            {
-                return new AutoBidSummaryDto
-                {
-                    AuctionId = auctionId,
-                    ActiveAutoBidCount = 0,
-                    AverageMaxAmount = 0
-                };
-            }
 
             var summary = new AutoBidSummaryDto
             {
                 AuctionId = auctionId,
-                ActiveAutoBidCount = autoBids.Count,
-                AverageMaxAmount = autoBids.Average(ab => ab.MaxBidAmount)
+                ActiveAutoBidCount = autoBids?.Count ?? 0,
+                AverageMaxAmount = (autoBids != null && autoBids.Any())
+                    ? autoBids.Average(ab => ab.MaxBidAmount)
+                    : 0
             };
 
-            return summary;
+            return Result<AutoBidSummaryDto>.Success(summary);
         }
         public async Task<Result<bool>> IsAutoBidSetAsync(int auctionId, int userId)
         {

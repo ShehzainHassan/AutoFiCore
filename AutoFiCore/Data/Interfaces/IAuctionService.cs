@@ -8,7 +8,7 @@ namespace AutoFiCore.Data.Interfaces
     {
         Task<Result<AuctionDTO>> CreateAuctionAsync(CreateAuctionDTO dto);
         Task<Result<AuctionDTO?>> UpdateAuctionStatusAsync(int auctionId, AuctionStatus status);
-        Task<List<AuctionDTO>> GetAuctionsAsync(AuctionQueryParams filters);
+        Task<Result<List<AuctionDTO>>> GetAuctionsAsync(AuctionQueryParams filters);
         Task<Result<AuctionDTO?>> GetAuctionByIdAsync(int id);
         Task<Result<BidDTO>> PlaceBidAsync(int auctionId, CreateBidDTO dto);
         Task<Result<List<BidDTO>>> GetBidHistoryAsync(int auctionId);
@@ -19,6 +19,6 @@ namespace AutoFiCore.Data.Interfaces
         Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId);
         Task<Result<int?>> GetHighestBidderIdAsync(int auctionId);
         Task<Result<AuctionResultDTO?>> ProcessAuctionResultAsync(int auctionId);
-        Task<DateTime?> GetOldestAuctionDateAsync();
+        Task<Result<DateTime?>> GetOldestAuctionDateAsync();
     }
 }

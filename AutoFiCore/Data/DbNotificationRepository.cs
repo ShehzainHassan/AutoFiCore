@@ -123,10 +123,7 @@ namespace AutoFiCore.Data
             {
                 return Result<Notification>.Failure("Notification not found"); 
             }
-
             notification.IsRead = true;
-            await _dbContext.SaveChangesAsync();
-
             return Result<Notification>.Success(notification);
         }
         public async Task<NotificationDTO?> GetNotificationByIdAsync(int notificationId)

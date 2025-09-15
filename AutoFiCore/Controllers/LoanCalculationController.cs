@@ -1,4 +1,5 @@
 using AutoFiCore.Data;
+using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Models;
 using AutoFiCore.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -40,9 +41,9 @@ public class LoanCalculationController : ControllerBase
     [HttpPost("CalculateLoan")]
     [ProducesResponseType(typeof(LoanCalculation), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<LoanCalculation>> Calculate([FromBody] LoanRequest request)
+    public async Task<IActionResult> Calculate([FromBody] LoanRequest request)
     {
         var result = await _loanService.CalculateLoanAsync(request);
-        return Ok(result);
+        return Ok(result.Value);
     }
 }
