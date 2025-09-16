@@ -21,7 +21,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     public async Task<Auction> AddAuctionAsync(Auction auction)
     {
         _dbContext.Auctions.Add(auction);
-        await _dbContext.SaveChangesAsync();
         return auction;
     }
     public async Task<List<Auction>> GetEndedAuctions()
@@ -58,7 +57,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         auction.UpdatedUtc = DateTime.UtcNow;
 
         _dbContext.Auctions.Update(auction);
-        await _dbContext.SaveChangesAsync();
 
         return auction;
     }
@@ -78,7 +76,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
     public async Task<Bid> AddBidAsync(Bid bid)
     {
         _dbContext.Bids.Add(bid);
-        await _dbContext.SaveChangesAsync();
         return bid;
     }
     public async Task<List<Bid>> GetBidsByAuctionIdAsync(int auctionId)
@@ -124,7 +121,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         {
             auction.CurrentPrice = newPrice;
             auction.UpdatedUtc = DateTime.UtcNow;
-            await _dbContext.SaveChangesAsync();
         }
     }
     public async Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes)
@@ -144,7 +140,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         {
             var watch = new Watchlist { UserId = userId, AuctionId = auctionId };
             _dbContext.Watchlists.Add(watch);
-            await _dbContext.SaveChangesAsync();
         }
     }
     public async Task RemoveFromWatchlistAsync(int userId, int auctionId)
@@ -155,7 +150,6 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         if (entry != null)
         {
             _dbContext.Watchlists.Remove(entry);
-            await _dbContext.SaveChangesAsync();
         }
     }
     public async Task<List<Watchlist>> GetUserWatchlistAsync(int userId)
@@ -220,6 +214,4 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             .Distinct()
             .ToListAsync();
     }
-
-
 }

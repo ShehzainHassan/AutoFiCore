@@ -62,10 +62,10 @@ namespace AutoFiCore.Middleware
                     return;
                 }
 
-                var newAccessToken = tokenProvider.CreateAccessToken(user);
+                var newAccessToken = tokenProvider.CreateAccessToken(user.Value!);
                 context.Response.Headers["X-New-Access-Token"] = newAccessToken;
 
-                _logger.LogInformation("Access token refreshed for UserId={UserId}", user.Id);
+                _logger.LogInformation("Access token refreshed for UserId={UserId}", user.Value!.Id);
             }
 
             await _next(context);

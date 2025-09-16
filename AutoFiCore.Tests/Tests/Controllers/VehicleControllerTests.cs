@@ -6,6 +6,7 @@ using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using AutoFiCore.Data.Interfaces;
 using Moq;
 using System;
 using System.Collections.Generic;

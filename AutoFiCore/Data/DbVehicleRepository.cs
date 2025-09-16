@@ -95,7 +95,6 @@ public class DbVehicleRepository : IVehicleRepository
             .ToListAsync();
         return fuelTypes;
     }
-
     public async Task<VehicleListResult> GetVehiclesByMakeAsync(int pageView, int offset, string make)
     {
         var query = _dbContext.Vehicles.AsNoTracking().Where(v => v.Make == make).OrderBy(v => v.Id);
@@ -181,8 +180,6 @@ public class DbVehicleRepository : IVehicleRepository
         };
 
         _dbContext.Questionnaires.Add(questionnaire);
-        await _dbContext.SaveChangesAsync();
-
         return questionnaire;
     }
     public Task<Vehicle> AddVehicleAsync(Vehicle vehicle)

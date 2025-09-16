@@ -1,4 +1,5 @@
-﻿using AutoFiCore.Enums;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -6,12 +7,6 @@ using System.Text.Json;
 
 namespace AutoFiCore.Data
 {
-    public interface IAnalyticsRepository
-    {
-        Task AddEventAsync(AnalyticsEvent analyticsEvent);
-        Task<Auction?> GetAuctionWithAnalyticsAsync(int auctionId);
-        Task<bool> IsPaymentCompletedAsync(int auctionId);
-    }
     public class DbAnalyticsRepository : IAnalyticsRepository
     {
         private readonly ApplicationDbContext _dbContext;
@@ -24,7 +19,6 @@ namespace AutoFiCore.Data
         public async Task AddEventAsync(AnalyticsEvent analyticsEvent)
         {
             _dbContext.AnalyticsEvents.Add(analyticsEvent);
-            await _dbContext.SaveChangesAsync();
         }
         public async Task<Auction?> GetAuctionWithAnalyticsAsync(int auctionId)
         {

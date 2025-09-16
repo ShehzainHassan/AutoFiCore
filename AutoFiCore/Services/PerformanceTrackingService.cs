@@ -1,14 +1,5 @@
 ﻿using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
-
-public interface IPerformanceTrackingService
-{
-    Task TrackAPIRequestAsync(string endpoint, TimeSpan responseTime, int statusCode);
-    Task TrackDatabaseQueryAsync(string queryType, TimeSpan duration);
-    Task TrackErrorEventAsync(int errorCode, string message);
-    Task<HourlyPerformanceMetrics> CalculateHourlyPerformanceMetricsAsync(DateTime hour);
-}
-
 public class PerformanceTrackingService : IPerformanceTrackingService
 {
     private readonly IUnitOfWork _uow;

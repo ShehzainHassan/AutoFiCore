@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Collections.Generic;
+using AutoFiCore.Data.Interfaces;
 using System.Net.Http;
 using System.Security.Claims;
 using System.Threading.Tasks;

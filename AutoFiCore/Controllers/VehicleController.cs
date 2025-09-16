@@ -55,13 +55,13 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Vehicle>>> GetAllVehiclesByStatus([FromQuery] PaginationParams paginationParams, [FromQuery] string? status = null)
+        public async Task<IActionResult> GetAllVehiclesByStatus([FromQuery] PaginationParams paginationParams, [FromQuery] string? status = null)
         {
             var vehicles = await _vehicleService.GetAllVehiclesByStatusAsync(
                 paginationParams.PageView,
                 paginationParams.Offset,
                 status);
-            return Ok(vehicles);
+            return Ok(vehicles.Value);
         }
 
         /// <summary>
@@ -73,18 +73,18 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("features")]
-        public async Task<ActionResult<NormalizedCarFeatureDto>> GetCarFeatures([FromQuery] string make, [FromQuery] string model)
+        public async Task<IActionResult> GetCarFeatures([FromQuery] string make, [FromQuery] string model)
         {
             var carFeatures = await _vehicleService.GetAllCarFeaturesAsync();
-            if (carFeatures == null || carFeatures.Count == 0)
+            if (carFeatures == null || carFeatures.Value!.Count == 0)
                 return NotFound("No car features found.");
 
-            var match = _vehicleService.GetCarFeature(carFeatures, make, model);
+            var match = _vehicleService.GetCarFeature(carFeatures.Value, make, model);
 
             if (match == null)
                 return NotFound($"No data found for {make} {model}.");
 
-            var normalized = NormalizeInput.NormalizeCarFeatures(match);
+            var normalized = NormalizeInput.NormalizeCarFeatures(match.Value!);
             return Ok(normalized);
         }
 
@@ -95,10 +95,10 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("get-colors")]
-        public async Task<ActionResult<List<string>>> GetAllCarColors()
+        public async Task<IActionResult> GetAllCarColors()
         {
             var result = await _vehicleService.GetDistinctColorsAsync();
-            return Ok(result);
+            return Ok(result.Value);
         }
 
         /// <summary>
@@ -110,13 +110,13 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("by-make")]
-        public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByMake([FromQuery] PaginationParams paginationParams, [FromQuery] string make)
+        public async Task<IActionResult> GetVehiclesByMake([FromQuery] PaginationParams paginationParams, [FromQuery] string make)
         {
             var vehicles = await _vehicleService.GetVehiclesByMakeAsync(
                 paginationParams.PageView,
                 paginationParams.Offset,
                 make);
-            return Ok(vehicles);
+            return Ok(vehicles.Value);
         }
 
         /// <summary>
@@ -126,10 +126,10 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("get-vehicle-options")]
-        public async Task<ActionResult<List<VehicleOptionsDTO>>> GetVehicleOptions()
+        public async Task<IActionResult> GetVehicleOptions()
         {
             var vehicleOptions = await _vehicleService.GetVehicleOptionsAsync();
-            return Ok(vehicleOptions);
+            return Ok(vehicleOptions.Value);
         }
 
         /// <summary>
@@ -140,11 +140,11 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("colors-count")]
-        public async Task<ActionResult<Dictionary<string, int>>> GetColorsCount([FromQuery] VehicleFilterDto filters)
+        public async Task<IActionResult> GetColorsCount([FromQuery] VehicleFilterDto filters)
         {
             filters = NormalizeInput.NormalizeFilters(filters);
             var count = await _vehicleService.GetAvailableColorsCountAsync(filters);
-            return Ok(count);
+            return Ok(count.Value);
         }
 
         /// <summary>
@@ -155,11 +155,11 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("gearbox-count")]
-        public async Task<ActionResult<Dictionary<string, int>>> GetGearboxCount([FromQuery] VehicleFilterDto filters)
+        public async Task<IActionResult> GetGearboxCount([FromQuery] VehicleFilterDto filters)
         {
             filters = NormalizeInput.NormalizeFilters(filters);
             var count = await _vehicleService.GetGearboxCountsAsync(filters);
-            return Ok(count);
+            return Ok(count.Value);
         }
 
         /// <summary>
@@ -170,11 +170,11 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("total-vehicle-count")]
-        public async Task<ActionResult<int>> GetTotalVehicleCount([FromQuery] VehicleFilterDto filters)
+        public async Task<IActionResult> GetTotalVehicleCount([FromQuery] VehicleFilterDto filters)
         {
             filters = NormalizeInput.NormalizeFilters(filters);
             var count = await _vehicleService.GetTotalCountAsync(filters);
-            return Ok(count);
+            return Ok(count.Value);
         }
 
         /// <summary>
@@ -187,7 +187,7 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("search-vehicles")]
-        public async Task<ActionResult<IEnumerable<Vehicle>>> SearchVehicles([FromQuery] VehicleFilterDto filters, [FromQuery] PaginationParams paginationParams, [FromQuery] string? sortOrder = null)
+        public async Task<IActionResult> SearchVehicles([FromQuery] VehicleFilterDto filters, [FromQuery] PaginationParams paginationParams, [FromQuery] string? sortOrder = null)
         {
             filters = NormalizeInput.NormalizeFilters(filters);
             var vehicles = await _vehicleService.SearchVehiclesAsync(
@@ -195,7 +195,7 @@ namespace AutoFiCore.Controllers
                 paginationParams.PageView,
                 paginationParams.Offset,
                 sortOrder);
-            return Ok(vehicles);
+            return Ok(vehicles.Value);
         }
 
         /// <summary>
@@ -207,13 +207,13 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("by-model")]
-        public async Task<ActionResult<IEnumerable<Vehicle>>> GetVehiclesByModel([FromQuery] PaginationParams paginationParams, [FromQuery] string model)
+        public async Task<IActionResult> GetVehiclesByModel([FromQuery] PaginationParams paginationParams, [FromQuery] string model)
         {
             var vehicles = await _vehicleService.GetVehiclesByModelAsync(
                 paginationParams.PageView,
                 paginationParams.Offset,
                 model);
-            return Ok(vehicles);
+            return Ok(vehicles.Value);
         }
 
         /// <summary>
@@ -223,10 +223,10 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("get-makes")]
-        public async Task<ActionResult<List<string>>> GetAllMakes()
+        public async Task<IActionResult> GetAllMakes()
         {
             var makes = await _vehicleService.GetAllVehiclesMakesAsync();
-            return Ok(makes);
+            return Ok(makes.Value);
         }
 
         /// <summary>
@@ -236,10 +236,10 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("get-categories")]
-        public async Task<ActionResult<List<string>>> GetAllCategories()
+        public async Task<IActionResult> GetAllCategories()
         {
             var categories = await _vehicleService.GetAllVehiclesCategoriesAsync();
-            return Ok(categories);
+            return Ok(categories.Value);
         }
 
         /// <summary>
@@ -250,12 +250,12 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("{id}")]
-        public async Task<ActionResult<Vehicle>> GetVehicleById(int id)
+        public async Task<IActionResult> GetVehicleById(int id)
         {
             var vehicle = await _vehicleService.GetVehicleByIdAsync(id);
             if (vehicle == null)
                 return NotFound($"Vehicle with ID {id} not found");
-            return Ok(vehicle);
+            return Ok(vehicle.Value);
         }
 
         /// <summary>
@@ -266,12 +266,12 @@ namespace AutoFiCore.Controllers
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("vin/{vin}")]
-        public async Task<ActionResult<Vehicle>> GetVehicleByVin(string vin)
+        public async Task<IActionResult> GetVehicleByVin(string vin)
         {
             var vehicle = await _vehicleService.GetVehicleByVinAsync(vin);
             if (vehicle == null)
                 return NotFound($"Vehicle with VIN {vin} not found");
-            return Ok(vehicle);
+            return Ok(vehicle.Value);
         }
 
         /// <summary>
@@ -282,7 +282,7 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns the saved questionnaire and loan details.</returns>
         [AllowAnonymous]
         [HttpPost("save-questionnaire")]
-        public async Task<ActionResult<object>> SaveQuestionnaire([FromBody] QuestionnaireDTO dto, [FromQuery] int vehicleId)
+        public async Task<IActionResult> SaveQuestionnaire([FromBody] QuestionnaireDTO dto, [FromQuery] int vehicleId)
         {
             var questionnaire = await _vehicleService.SaveQuestionnaireAsync(dto);
 
@@ -295,12 +295,12 @@ namespace AutoFiCore.Controllers
             };
 
             var loanDetails = await _loanService.CalculateLoanAsync(loanRequest);
-            var pdfBytes = _pdfService.GenerateLoanPdf(questionnaire, loanDetails.Value!);
-            await _emailService.SendLoanEmailAsync(questionnaire.Email, pdfBytes);
+            var pdfBytes = _pdfService.GenerateLoanPdf(questionnaire.Value!, loanDetails.Value!);
+            await _emailService.SendLoanEmailAsync(questionnaire.Value!.Email, pdfBytes);
 
             return Ok(new SaveQuestionnaireResponse
             {
-                Questionnaire = questionnaire,
+                Questionnaire = questionnaire.Value!,
                 Loan = loanDetails.Value!
             });
         }
@@ -312,14 +312,14 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns the created vehicle.</returns>
         [AllowAnonymous]
         [HttpPost]
-        public async Task<ActionResult<Vehicle>> CreateVehicle(Vehicle vehicle)
+        public async Task<IActionResult> CreateVehicle(Vehicle vehicle)
         {
             var existingVehicle = await _vehicleService.GetVehicleByVinAsync(vehicle.Vin);
             if (existingVehicle != null)
                 return BadRequest($"Vehicle with VIN {vehicle.Vin} already exists");
 
             var createdVehicle = await _vehicleService.CreateVehicleAsync(vehicle);
-            return CreatedAtAction(nameof(GetVehicleById), new { id = createdVehicle!.Id }, createdVehicle);
+            return CreatedAtAction(nameof(GetVehicleById), new { id = createdVehicle.Value!.Id }, createdVehicle);
         }
 
         /// <summary>
@@ -330,7 +330,7 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns the updated vehicle.</returns>
         [AllowAnonymous]
         [HttpPut("{id}")]
-        public async Task<ActionResult<Vehicle>> UpdateVehicle(int id, Vehicle vehicle)
+        public async Task<IActionResult> UpdateVehicle(int id, Vehicle vehicle)
         {
             if (id != vehicle.Id)
                 return BadRequest("ID mismatch");
@@ -340,7 +340,7 @@ namespace AutoFiCore.Controllers
                 return NotFound($"Vehicle with ID {id} not found");
 
             var updatedVehicle = await _vehicleService.UpdateVehicleAsync(vehicle);
-            return Ok(updatedVehicle);
+            return Ok(updatedVehicle.Value);
         }
 
         /// <summary>
@@ -350,10 +350,10 @@ namespace AutoFiCore.Controllers
         /// <returns>Returns NoContent if deleted or NotFound if vehicle does not exist.</returns>
         [AllowAnonymous]
         [HttpDelete("{id}")]
-        public async Task<ActionResult> DeleteVehicle(int id)
+        public async Task<IActionResult> DeleteVehicle(int id)
         {
             var result = await _vehicleService.DeleteVehicleAsync(id);
-            if (!result)
+            if (!result.IsSuccess)                
                 return NotFound($"Vehicle with ID {id} not found");
             return NoContent();
         }

@@ -13,7 +13,6 @@ namespace AutoFiCore.Data
             _dbContext = dbContext;
             _logger = logger;
         }
-
         public async Task<bool> IsAlreadySubscribed(string email)
         {
             var isExists = await _dbContext.Newsletters.AsNoTracking().AnyAsync(n => n.Email == email);

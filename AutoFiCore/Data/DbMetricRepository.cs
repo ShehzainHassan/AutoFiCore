@@ -1,22 +1,10 @@
-﻿using AutoFiCore.Enums;
+﻿using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace AutoFiCore.Data
 {
-    public interface IMetricsRepository
-    {
-        Task<decimal> GetRevenueTotalAsync(DateTime start, DateTime end);
-        Task SaveDailyMetricsAsync(IEnumerable<DailyMetric> metrics);
-        Task<int> GetAuctionViewsAsync(int auctionId);
-        Task<AuctionAnalytics?> GetAuctionAnalyticsAsync(int auctionId);
-        Task SaveAuctionAnalyticsAsync(AuctionAnalytics analytics);
-        Task<decimal> CalculateUserEngagementAsync(int userId, DateTime start, DateTime end);
-        Task<int> GetUserCountAsync(DateTime start, DateTime end);
-        Task<int> GetAuctionCountAsync(DateTime start, DateTime end);
-    }
-
-
     public class DbMetricsRepository : IMetricsRepository
     {
         private readonly ApplicationDbContext _db;
@@ -37,7 +25,7 @@ namespace AutoFiCore.Data
         public Task SaveDailyMetricsAsync(IEnumerable<DailyMetric> metrics)
         {
             _db.DailyMetrics.AddRange(metrics);
-            return _db.SaveChangesAsync();
+            return Task.CompletedTask;
         }
         public Task<AuctionAnalytics?> GetAuctionAnalyticsAsync(int auctionId) =>
             _db.AuctionAnalytics.FirstOrDefaultAsync(a => a.AuctionId == auctionId);
@@ -45,8 +33,6 @@ namespace AutoFiCore.Data
         {
             if (_db.Entry(analytics).State == EntityState.Detached)
                 _db.AuctionAnalytics.Add(analytics);
-
-            await _db.SaveChangesAsync();
         }
         public Task<int> GetAuctionViewsAsync(int auctionId)
         {

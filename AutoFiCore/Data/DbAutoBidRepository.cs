@@ -19,13 +19,11 @@ namespace AutoFiCore.Data
         public async Task<AutoBid> AddAutoBidAsync(AutoBid autoBid)
         {
             _dbContext.AutoBids.Add(autoBid);
-            await _dbContext.SaveChangesAsync();
             return autoBid;
         }
         public async Task<BidStrategy> AddBidStrategyAsync(BidStrategy bidStrategy)
         {
             _dbContext.BidStrategies.Add(bidStrategy);
-            await _dbContext.SaveChangesAsync();
             return bidStrategy;
         }
         public async Task<BidStrategy?> GetBidStrategyByUserAndAuctionAsync(int userId, int auctionId)
@@ -116,6 +114,5 @@ namespace AutoFiCore.Data
 
             return result;
         }
-
     }
 }

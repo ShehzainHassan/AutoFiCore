@@ -3,6 +3,7 @@ using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using AutoFiCore.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 public class MetricsCalculationService : IMetricsCalculationService
 {
@@ -19,17 +20,22 @@ public class MetricsCalculationService : IMetricsCalculationService
 
     public async Task<Result<bool>> CalculateDailyMetricsAsync(DateTime date)
     {
-        try
+        var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
         {
-            var start = date.Date;
-            var end = start.AddDays(1);
+            await _unitOfWork.BeginTransactionAsync();
+            try
+            {
+                var start = date.Date;
+                var end = start.AddDays(1);
 
-            var auctionCount = await _unitOfWork.Metrics.GetAuctionCountAsync(start, end);
-            var bidCount = await _unitOfWork.Bids.GetBidCountAsync(start, end);
-            var userCount = await _unitOfWork.Metrics.GetUserCountAsync(start, end);
-            var revenueTotal = await _repo.GetRevenueTotalAsync(start, end);
+                var auctionCount = await _unitOfWork.Metrics.GetAuctionCountAsync(start, end);
+                var bidCount = await _unitOfWork.Bids.GetBidCountAsync(start, end);
+                var userCount = await _unitOfWork.Metrics.GetUserCountAsync(start, end);
+                var revenueTotal = await _repo.GetRevenueTotalAsync(start, end);
 
-            var metrics = new List<DailyMetric>
+                var metrics = new List<DailyMetric>
             {
                 new() { Date = DateOnly.FromDateTime(start), MetricType = MetricType.AuctionCount, Count = auctionCount },
                 new() { Date = DateOnly.FromDateTime(start), MetricType = MetricType.BidCount, Count = bidCount },
@@ -37,14 +43,19 @@ public class MetricsCalculationService : IMetricsCalculationService
                 new() { Date = DateOnly.FromDateTime(start), MetricType = MetricType.RevenueTotal, Value = revenueTotal }
             };
 
-            await _repo.SaveDailyMetricsAsync(metrics);
-            return Result<bool>.Success(true);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to calculate daily metrics for Date={Date}", date);
-            return Result<bool>.Failure("Failed to calculate daily metrics.");
-        }
+                await _repo.SaveDailyMetricsAsync(metrics);
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
+
+                return Result<bool>.Success(true);
+            }
+            catch (Exception ex)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                _logger.LogError(ex, "Failed to calculate daily metrics for Date={Date}", date);
+                return Result<bool>.Failure("Failed to calculate daily metrics.");
+            }
+        });
     }
 
     public async Task<Result<bool>> UpdateAuctionAnalyticsAsync(int auctionId)

@@ -4,6 +4,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.WebUtilities;
+using AutoFiCore.Data.Interfaces;
 
 public class GlobalExceptionMiddleware
 {

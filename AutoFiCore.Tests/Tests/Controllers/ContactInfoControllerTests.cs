@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Moq;
-using System.Threading.Tasks;
+using AutoFiCore.Data.Interfaces;
 using Xunit;
 
 namespace Tests.Controllers

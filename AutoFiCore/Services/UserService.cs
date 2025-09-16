@@ -23,69 +23,258 @@ namespace AutoFiCore.Services
             _unitOfWork = unitOfWork;
             _refreshTokenService = refreshTokenService;
         }
+
+        /// <inheritdoc />
         public async Task<Result<User>> AddUserAsync(User user)
         {
-            var existingUser = await _repository.IsEmailExists(user.Email);
-            if (existingUser)
-                return Result<User>.Failure("User already exists");
+            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
 
-            var createdUser = await _unitOfWork.Users.AddUserAsync(user);
-            await _unitOfWork.SaveChangesAsync();
-            return Result<User>.Success(createdUser);
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    var existingUser = await _repository.IsEmailExists(user.Email);
+                    if (existingUser)
+                    {
+                        await _unitOfWork.RollbackTransactionAsync();
+                        return Result<User>.Failure("User already exists");
+                    }
+
+                    var createdUser = await _unitOfWork.Users.AddUserAsync(user);
+                    await _unitOfWork.SaveChangesAsync();
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    return Result<User>.Success(createdUser);
+                }
+                catch (Exception ex)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    _logger.LogError(ex, "Failed to add user. Email={Email}", user.Email);
+                    return Result<User>.Failure("Failed to add user.");
+                }
+            });
         }
-        public async Task<AuthResponse?> LoginUserAsync(string email, string password)
+
+        /// <inheritdoc />
+        public async Task<Result<AuthResponse>> LoginUserAsync(string email, string password)
         {
-            return await _repository.LoginUserAsync(email, password, _tokenProvider, _refreshTokenService);
+            try
+            {
+                var response = await _repository.LoginUserAsync(email, password, _tokenProvider, _refreshTokenService);
+
+                if (response == null)
+                    return Result<AuthResponse>.Failure("Invalid email or password.");
+
+                return Result<AuthResponse>.Success(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Login failed for Email={Email}", email);
+                return Result<AuthResponse>.Failure("An error occurred while logging in.");
+            }
         }
-        public async Task<UserLikes> AddUserLikeAsync(UserLikes userLikes)
+
+        /// <inheritdoc />
+        public async Task<Result<UserLikes>> AddUserLikeAsync(UserLikes userLikes)
         {
-            await _unitOfWork.Users.AddUserLikeAsync(userLikes);
-            await _unitOfWork.SaveChangesAsync();
-            return userLikes;
+            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    await _unitOfWork.Users.AddUserLikeAsync(userLikes);
+                    await _unitOfWork.SaveChangesAsync();
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    return Result<UserLikes>.Success(userLikes);
+                }
+                catch (Exception ex)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    _logger.LogError(ex, "Failed to add user like. UserId={UserId}", userLikes.userId);
+                    return Result<UserLikes>.Failure("Failed to add user like.");
+                }
+            });
         }
-        public async Task<UserLikes?> RemoveUserLikeAsync(UserLikes userLikes)
+
+        /// <inheritdoc />
+        public async Task<Result<UserLikes>> RemoveUserLikeAsync(UserLikes userLikes)
         {
-            await _unitOfWork.Users.RemoveUserLikeAsync(userLikes);
-            await _unitOfWork.SaveChangesAsync();
-            return userLikes;
+            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    await _unitOfWork.Users.RemoveUserLikeAsync(userLikes);
+                    await _unitOfWork.SaveChangesAsync();
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    return Result<UserLikes>.Success(userLikes);
+                }
+                catch (Exception ex)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    _logger.LogError(ex, "Failed to remove user like. UserId={UserId}", userLikes.userId);
+                    return Result<UserLikes>.Failure("Failed to remove user like.");
+                }
+            });
         }
-        public async Task<UserSavedSearch?> RemoveSavedSearchAsync(UserSavedSearch savedSearch)
+
+        /// <inheritdoc />
+        public async Task<Result<UserSavedSearch>> RemoveSavedSearchAsync(UserSavedSearch savedSearch)
         {
-            await _unitOfWork.Users.RemoveUserSearchAsync(savedSearch);
-            await _unitOfWork.SaveChangesAsync();
-            return savedSearch;
+            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    await _unitOfWork.Users.RemoveUserSearchAsync(savedSearch);
+                    await _unitOfWork.SaveChangesAsync();
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    return Result<UserSavedSearch>.Success(savedSearch);
+                }
+                catch (Exception ex)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    _logger.LogError(ex, "Failed to remove saved search. UserId={UserId}", savedSearch.userId);
+                    return Result<UserSavedSearch>.Failure("Failed to remove saved search.");
+                }
+            });
         }
-        public async Task<User?> GetUserByIdAsync(int id)
+
+        /// <inheritdoc />
+        public async Task<Result<User>> GetUserByIdAsync(int id)
         {
-            return await _repository.GetUserByIdAsync(id);
+            try
+            {
+                var user = await _repository.GetUserByIdAsync(id);
+                return user != null
+                    ? Result<User>.Success(user)
+                    : Result<User>.Failure("User not found.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve user. Id={Id}", id);
+                return Result<User>.Failure("Error retrieving user.");
+            }
         }
-        public async Task<UserSavedSearch> AddUserSearchAsync(UserSavedSearch search)
+
+        /// <inheritdoc />
+        public async Task<Result<UserSavedSearch>> AddUserSearchAsync(UserSavedSearch search)
         {
-            await _unitOfWork.Users.AddUserSearchAsync(search);
-            await _unitOfWork.SaveChangesAsync();
-            return search;
+            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    await _unitOfWork.Users.AddUserSearchAsync(search);
+                    await _unitOfWork.SaveChangesAsync();
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    return Result<UserSavedSearch>.Success(search);
+                }
+                catch (Exception ex)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    _logger.LogError(ex, "Failed to add saved search. UserId={UserId}", search.userId);
+                    return Result<UserSavedSearch>.Failure("Failed to add saved search.");
+                }
+            });
         }
-        public async Task<List<string>> GetUserLikedVinsAsync(int id)
+
+        /// <inheritdoc />
+        public async Task<Result<List<string>>> GetUserLikedVinsAsync(int id)
         {
-            return await _repository.GetUserLikesVehicles(id);
+            try
+            {
+                var vins = await _repository.GetUserLikesVehicles(id);
+                return Result<List<string>>.Success(vins);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve liked VINs. UserId={UserId}", id);
+                return Result<List<string>>.Failure("Error retrieving liked VINs.");
+            }
         }
-        public async Task<List<string>> GetUserSavedSearches(int id)
+
+        /// <inheritdoc />
+        public async Task<Result<List<string>>> GetUserSavedSearchesAsync(int id)
         {
-            return await _repository.GetUserSavedSearches(id);
+            try
+            {
+                var searches = await _repository.GetUserSavedSearches(id);
+                return Result<List<string>>.Success(searches);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve saved searches. UserId={UserId}", id);
+                return Result<List<string>>.Failure("Error retrieving saved searches.");
+            }
         }
-        public async Task<UserInteractions> AddUserInteractionAsync(UserInteractions userInteractions)
+
+        /// <inheritdoc />
+        public async Task<Result<UserInteractions>> AddUserInteractionAsync(UserInteractions userInteractions)
         {
-            await _unitOfWork.Users.AddUserInteraction(userInteractions);
-            await _unitOfWork.SaveChangesAsync();
-            return userInteractions;
+            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
+
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await _unitOfWork.BeginTransactionAsync();
+                try
+                {
+                    await _unitOfWork.Users.AddUserInteraction(userInteractions);
+                    await _unitOfWork.SaveChangesAsync();
+                    await _unitOfWork.CommitTransactionAsync();
+
+                    return Result<UserInteractions>.Success(userInteractions);
+                }
+                catch (Exception ex)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    _logger.LogError(ex, "Failed to add user interaction. UserId={UserId}", userInteractions.UserId);
+                    return Result<UserInteractions>.Failure("Failed to add user interaction.");
+                }
+            });
         }
-        public async Task<int> GetAllUsersCountAsync()
+
+        /// <inheritdoc />
+        public async Task<Result<int>> GetAllUsersCountAsync()
         {
-            return await _unitOfWork.Users.GetAllUsersCountAsync();
+            try
+            {
+                var count = await _unitOfWork.Users.GetAllUsersCountAsync();
+                return Result<int>.Success(count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve user count.");
+                return Result<int>.Failure("Error retrieving user count.");
+            }
         }
-        public async Task<DateTime?> GetOldestUserCreatedDateAsync()
+
+        /// <inheritdoc />
+        public async Task<Result<DateTime?>> GetOldestUserCreatedDateAsync()
         {
-            return await _unitOfWork.Users.GetOldestUserCreatedDateAsync();
+            try
+            {
+                var date = await _unitOfWork.Users.GetOldestUserCreatedDateAsync();
+                return Result<DateTime?>.Success(date);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to retrieve oldest user creation date.");
+                return Result<DateTime?>.Failure("Error retrieving oldest user creation date.");
+            }
         }
     }
 }

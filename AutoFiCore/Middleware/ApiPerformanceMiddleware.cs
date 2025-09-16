@@ -1,4 +1,6 @@
-﻿public class ApiPerformanceMiddleware
+﻿using AutoFiCore.Data.Interfaces;
+
+public class ApiPerformanceMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ApiPerformanceMiddleware> _logger;
