@@ -1,5 +1,7 @@
 ﻿using AutoFiCore.BackgroundServices;
 using AutoFiCore.Data;
+using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Dto;
 using AutoFiCore.Hubs;
 using AutoFiCore.Middleware;
 using AutoFiCore.Models;
@@ -8,18 +10,17 @@ using AutoFiCore.Utilities;
 using AutoFiCore.Validator;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
+using Npgsql;
 using Polly;
 using Polly.Retry;
 using QuestPDF.Infrastructure;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
-using Npgsql;
-using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
-using AutoFiCore.Data.Interfaces;
 
 NpgsqlConnection.GlobalTypeMapper.EnableDynamicJson();
 WebApplicationBuilder builder;
@@ -64,17 +65,27 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "AutoFiCore_";
 });
 
-builder.Services.AddHttpClient("FastApi", client =>
-{
-    client.BaseAddress = new Uri("http://localhost:8000/api/ai/");
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
-
 builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
     .AddEnvironmentVariables();
+
+var fastApiBaseUrl = builder.Configuration["HttpClients:FastApi:BaseUrl"];
+
+builder.Services.AddServiceDiscovery();
+builder.Services.Configure<AIServiceSettings>(
+    builder.Configuration.GetSection("AIServiceSettings"));
+
+var aiSettings = builder.Configuration.GetSection("AIServiceSettings").Get<AIServiceSettings>();
+
+builder.Services.AddHttpClient("FastApi", client =>
+{
+    client.BaseAddress = new Uri(aiSettings.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(aiSettings.TimeoutSeconds);
+})
+.AddPolicyHandler(HttpClientPolicies.GetRetryPolicy(aiSettings.MaxRetryAttempts))
+.AddPolicyHandler(HttpClientPolicies.GetCircuitBreakerPolicy(aiSettings.CircuitBreakerThreshold));
 
 // Configure logging
 builder.Logging.ClearProviders();
@@ -180,6 +191,9 @@ if (!apiSettings.UseMockApi)
         .AddNpgSql(databaseSettings.ConnectionString, name: "database", timeout: TimeSpan.FromSeconds(10))
         .AddCheck<DatabaseHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
 
+    builder.Services.AddHealthChecks()
+    .AddCheck<FastApiHealthCheck>("fastapi-ai-service", timeout: TimeSpan.FromSeconds(5));
+
     // Log connection string info for debugging (without sensitive data)
     Console.WriteLine($"Database connection configured - Host: {GetHostFromConnectionString(databaseSettings.ConnectionString)}");
 }
@@ -188,6 +202,9 @@ else
     // Mock API mode - add basic health checks without database
     builder.Services.AddHealthChecks()
         .AddCheck<DatabaseHealthCheck>("vehicle-service", timeout: TimeSpan.FromSeconds(5));
+
+    builder.Services.AddHealthChecks()
+        .AddCheck<FastApiHealthCheck>("fastapi-ai-service", timeout: TimeSpan.FromSeconds(5));
 
     Console.WriteLine("Using Mock API - database connection not required");
 }
@@ -450,7 +467,6 @@ if (app.Environment.IsDevelopment())
         c.RoutePrefix = string.Empty;
     });
 }
-
 
 // Configure health check endpoints with detailed logging
 app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions

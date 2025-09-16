@@ -4,6 +4,7 @@ using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 
 namespace AutoFiCore.Controllers
 {
@@ -20,10 +21,7 @@ namespace AutoFiCore.Controllers
         private readonly IUserContextService _userContextService;
         private readonly ILogger<AIAssistantController> _logger;
 
-        public AIAssistantController(
-            IAIAssistantService aiService,
-            IUserContextService userContextService,
-            ILogger<AIAssistantController> logger)
+        public AIAssistantController(IAIAssistantService aiService, IUserContextService userContextService, ILogger<AIAssistantController> logger)
         {
             _aiService = aiService;
             _userContextService = userContextService;
@@ -48,7 +46,12 @@ namespace AutoFiCore.Controllers
                 correlationId, userId, payload.Query.Question);
 
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
+            var stopwatch = Stopwatch.StartNew();
             var result = await _aiService.QueryFastApiAsync(payload, correlationId, jwtToken);
+            stopwatch.Stop();
+
+            _logger.LogInformation("AI query took {ElapsedMs}ms. CorrelationId={CorrelationId}", stopwatch.ElapsedMilliseconds, correlationId);
 
             if (!result.IsSuccess)
             {
