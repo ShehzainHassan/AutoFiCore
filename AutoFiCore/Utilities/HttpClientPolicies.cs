@@ -6,11 +6,18 @@ public static class HttpClientPolicies
 {
     public static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy(int maxRetryAttempts = 3)
     {
+        var random = new Random();
+
         return HttpPolicyExtensions
             .HandleTransientHttpError()
             .WaitAndRetryAsync(
                 maxRetryAttempts,
-                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))
+                retryAttempt =>
+                {
+                    var baseDelay = TimeSpan.FromSeconds(Math.Pow(2, retryAttempt));
+                    var jitter = TimeSpan.FromMilliseconds(random.Next(0, 1000));
+                    return baseDelay + jitter;
+                }
             );
     }
 

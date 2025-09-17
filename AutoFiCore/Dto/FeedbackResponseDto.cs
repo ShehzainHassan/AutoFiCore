@@ -7,6 +7,9 @@ namespace AutoFiCore.Dto
     {
         [JsonPropertyName("message_id")]
         public int MessageId { get; set; }
+
+        [JsonPropertyName("feedback")]
+        [JsonConverter(typeof(JsonStringEnumConverter))]
         public QueryFeedback Feedback { get; set; }
     }
 }

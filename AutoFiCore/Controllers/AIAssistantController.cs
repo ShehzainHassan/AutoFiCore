@@ -4,6 +4,7 @@ using AutoFiCore.Services;
 using AutoFiCore.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Diagnostics;
 
 namespace AutoFiCore.Controllers
@@ -18,12 +19,14 @@ namespace AutoFiCore.Controllers
     public class AIAssistantController : SecureControllerBase
     {
         private readonly IAIAssistantService _aiService;
+        private readonly IUserQuotaService _userQuotaService;
         private readonly IUserContextService _userContextService;
         private readonly ILogger<AIAssistantController> _logger;
 
-        public AIAssistantController(IAIAssistantService aiService, IUserContextService userContextService, ILogger<AIAssistantController> logger)
+        public AIAssistantController(IAIAssistantService aiService, IUserQuotaService userQuotaService, IUserContextService userContextService, ILogger<AIAssistantController> logger)
         {
             _aiService = aiService;
+            _userQuotaService = userQuotaService;
             _userContextService = userContextService;
             _logger = logger;
         }
@@ -41,8 +44,23 @@ namespace AutoFiCore.Controllers
             if (payload.UserId != userId)
                 return Forbid("User ID mismatch between token and payload.");
 
+            var quotaResult = await _userQuotaService.TryConsumeAsync(userId);
+            if (!quotaResult.IsSuccess)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, new { error = quotaResult.Error });
+            }
+
+            if (!quotaResult.Value)
+            {
+                return StatusCode(StatusCodes.Status429TooManyRequests, new
+                {
+                    error = "Daily quota exceeded. Please try again tomorrow."
+                });
+            }
+
             var correlationId = GetCorrelationId()!;
-            _logger.LogInformation("AI Query initiated. CorrelationId={CorrelationId}, UserId={UserId}, Question={Question}",
+            _logger.LogInformation(
+                "AI Query initiated. CorrelationId={CorrelationId}, UserId={UserId}, Question={Question}",
                 correlationId, userId, payload.Query.Question);
 
             var jwtToken = HttpContext.Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
@@ -51,17 +69,27 @@ namespace AutoFiCore.Controllers
             var result = await _aiService.QueryFastApiAsync(payload, correlationId, jwtToken);
             stopwatch.Stop();
 
-            _logger.LogInformation("AI query took {ElapsedMs}ms. CorrelationId={CorrelationId}", stopwatch.ElapsedMilliseconds, correlationId);
+            _logger.LogInformation(
+                "AI query took {ElapsedMs}ms. CorrelationId={CorrelationId}",
+                stopwatch.ElapsedMilliseconds, correlationId);
 
             if (!result.IsSuccess)
             {
-                _logger.LogError("AI Query failed. CorrelationId={CorrelationId}, Error={Error}", correlationId, result.Error);
+                _logger.LogError(
+                    "AI Query failed. CorrelationId={CorrelationId}, Error={Error}",
+                    correlationId, result.Error);
+
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = result.Error });
             }
 
-            _logger.LogInformation("AI Query completed. CorrelationId={CorrelationId}, Answer={Answer}", correlationId, result.Value!.Answer);
+            _logger.LogInformation(
+                "AI Query completed. CorrelationId={CorrelationId}, Answer={Answer}",
+                correlationId, result.Value!.Answer);
+
             return Ok(result.Value);
         }
+
+
 
         /// <summary>
         /// Retrieves the user's auction and vehicle history to provide context for AI suggestions.
@@ -87,6 +115,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Retrieves contextual AI-generated suggestions based on the user's history.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpGet("contextual-suggestions/{userId}")]
         public async Task<IActionResult> GetContextualSuggestions(int userId)
@@ -112,6 +141,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Retrieves the list of chat titles for the current user.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpGet("chats")]
         public async Task<IActionResult> GetChatTitles()
@@ -133,6 +163,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Retrieves the full chat history for a specific session.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpGet("chats/{sessionId}")]
         public async Task<IActionResult> GetChat(string sessionId)
@@ -154,6 +185,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Deletes a specific chat session by ID.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpDelete("chats/{sessionId}")]
         public async Task<IActionResult> DeleteSession(string sessionId)
@@ -175,6 +207,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Deletes all chat sessions for the current user.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpDelete("chats")]
         public async Task<IActionResult> DeleteAllSessions()
@@ -196,6 +229,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Updates the title of a chat session.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpPut("chats/{sessionId}/title")]
         public async Task<IActionResult> UpdateSessionTitle(string sessionId, [FromBody] UpdateChatTitle request)
@@ -221,6 +255,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Submits user feedback for a specific AI query response.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpPost("feedback")]
         public async Task<IActionResult> SubmitFeedback([FromBody] AIQueryFeedbackDto feedbackDto)
@@ -244,6 +279,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Retrieves the top popular queries from the AI service.
         /// </summary>
+        [DisableRateLimiting]
         [Authorize]
         [HttpGet("popular-queries")]
         public async Task<ActionResult<List<PopularQueryDto>>> GetPopularQueries([FromQuery] int limit = 10)
@@ -263,6 +299,21 @@ namespace AutoFiCore.Controllers
 
             if (!result.IsSuccess)
                 return StatusCode(StatusCodes.Status503ServiceUnavailable, new { error = result.Error });
+
+            return Ok(result.Value);
+        }
+
+        [Authorize]
+        [HttpGet("quota")]
+        public async Task<IActionResult> GetQuota()
+        {
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized("Missing user context.");
+
+            var result = await _userQuotaService.GetRemainingAsync(userId);
+
+            if (!result.IsSuccess)
+                return StatusCode(StatusCodes.Status500InternalServerError, result.Error);
 
             return Ok(result.Value);
         }

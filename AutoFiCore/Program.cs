@@ -21,6 +21,7 @@ using QuestPDF.Infrastructure;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
+using StackExchange.Redis;
 
 NpgsqlConnection.GlobalTypeMapper.EnableDynamicJson();
 WebApplicationBuilder builder;
@@ -64,6 +65,12 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.Configuration = builder.Configuration.GetConnectionString("RedisConnection");
     options.InstanceName = "AutoFiCore_";
 });
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var config = builder.Configuration.GetConnectionString("RedisConnection");
+    return ConnectionMultiplexer.Connect(config!);
+});
+
 
 builder.Configuration
     .SetBasePath(Directory.GetCurrentDirectory())
@@ -118,6 +125,7 @@ builder.Services.AddCors(options =>
     });
 });
 
+
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
@@ -139,7 +147,6 @@ builder.Services.AddRateLimiter(options =>
         await context.HttpContext.Response.WriteAsync("Too many requests. Please try again later.", token);
     };
 });
-
 
 // Configure API settings first to determine if we need database
 var apiSettings = builder.Configuration.GetSection("ApiSettings").Get<ApiSettings>()
@@ -361,6 +368,9 @@ builder.Services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
 // Register Token Provider Service
 builder.Services.AddScoped<ITokenProvider, TokenProvider>();    
+
+// Regiser User Quota Service
+builder.Services.AddScoped<IUserQuotaService, UserQuotaService>();
 
 // Add services to the container.
 builder.Services.AddControllers();
