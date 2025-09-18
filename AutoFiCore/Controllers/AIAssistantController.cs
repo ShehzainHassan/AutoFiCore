@@ -34,6 +34,7 @@ namespace AutoFiCore.Controllers
         /// <summary>
         /// Sends a query payload to the AI service and returns the generated response.
         /// </summary>
+        [EnableRateLimiting("AIEndpointLimiter")]
         [Authorize]
         [HttpPost("query")]
         public async Task<ActionResult<AIResponseModel>> QueryAI([FromBody] EnrichedAIQuery payload)

@@ -1,4 +1,5 @@
 ﻿using AutoFiCore.BackgroundServices;
+using AutoFiCore.Configurations;
 using AutoFiCore.Data;
 using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
@@ -18,10 +19,10 @@ using Npgsql;
 using Polly;
 using Polly.Retry;
 using QuestPDF.Infrastructure;
+using StackExchange.Redis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Threading.RateLimiting;
-using StackExchange.Redis;
 
 NpgsqlConnection.GlobalTypeMapper.EnableDynamicJson();
 WebApplicationBuilder builder;
@@ -125,20 +126,31 @@ builder.Services.AddCors(options =>
     });
 });
 
+var rateLimitSettings = builder.Configuration.GetSection("RateLimiting").Get<RateLimitSettings>() ?? throw new InvalidOperationException("RateLimiting configuration is missing.");
+builder.Services.AddSingleton(rateLimitSettings);
 
 builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: context.User.Identity?.Name
-                         ?? context.Connection.RemoteIpAddress?.ToString()
-                         ?? "anonymous",
+            partitionKey: context.User.Identity?.Name ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
             factory: key => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 15,
-                Window = TimeSpan.FromMinutes(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0
+                PermitLimit = rateLimitSettings.Global.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimitSettings.Global.WindowSeconds),
+                QueueLimit = rateLimitSettings.Global.QueueLimit,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+
+    options.AddPolicy("AIEndpointLimiter", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter<string>(
+            partitionKey: "AI",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = rateLimitSettings.AI.PermitLimit,
+                Window = TimeSpan.FromSeconds(rateLimitSettings.AI.WindowSeconds),
+                QueueLimit = rateLimitSettings.AI.QueueLimit,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
             }));
 
     options.OnRejected = async (context, token) =>
@@ -374,7 +386,6 @@ builder.Services.AddScoped<IUserQuotaService, UserQuotaService>();
 
 // Add services to the container.
 builder.Services.AddControllers();
-
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
