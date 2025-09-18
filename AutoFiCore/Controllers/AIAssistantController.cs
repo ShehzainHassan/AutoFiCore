@@ -14,6 +14,7 @@ namespace AutoFiCore.Controllers
     /// Provides endpoints for querying AI, retrieving user context, managing chats, 
     /// and generating personalized AI-driven suggestions.
     /// </summary>
+    [ServiceFilter(typeof(AIFeatureToggleFilter))]
     [ApiController]
     [Route("api/[controller]")]
     public class AIAssistantController : SecureControllerBase
