@@ -1,3 +1,4 @@
+using AutoFiCore.Data;
 using AutoFiCore.Data.Interfaces;
 using AutoFiCore.Dto;
 using AutoFiCore.DTOs;
@@ -8,7 +9,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.Json;
+using Microsoft.IdentityModel.Tokens;
 using Newtonsoft.Json;
 using System.Globalization;
 using System.Text.Json;
@@ -28,6 +31,7 @@ namespace AutoFiCore.Controllers
         private readonly IEmailService _emailService;
         private readonly IPdfService _pdfService;
         private readonly ILogger<VehicleController> _logger;
+
 
         /// <summary>
         /// Initializes a new instance of the <see cref="VehicleController"/> class.
@@ -353,7 +357,7 @@ namespace AutoFiCore.Controllers
         public async Task<IActionResult> DeleteVehicle(int id)
         {
             var result = await _vehicleService.DeleteVehicleAsync(id);
-            if (!result.IsSuccess)                
+            if (!result.IsSuccess)
                 return NotFound($"Vehicle with ID {id} not found");
             return NoContent();
         }

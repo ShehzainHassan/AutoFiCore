@@ -387,7 +387,6 @@ builder.Services.AddScoped<IUserQuotaService, UserQuotaService>();
 // Register AI Feature Toggle Filter
 builder.Services.AddScoped<AIFeatureToggleFilter>();
 
-
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();

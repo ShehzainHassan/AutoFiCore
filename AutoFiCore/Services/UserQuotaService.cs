@@ -7,7 +7,7 @@ namespace AutoFiCore.Services
     public class UserQuotaService : IUserQuotaService
     {
         private readonly IDatabase _db;
-        private readonly int _dailyLimit = 5;
+        private readonly int _dailyLimit = 15;
 
         public UserQuotaService(IConnectionMultiplexer redis)
         {

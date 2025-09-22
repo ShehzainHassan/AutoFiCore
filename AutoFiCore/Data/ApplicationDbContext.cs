@@ -43,6 +43,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<ChatSession> ChatSessions { get; set; }
     public DbSet<PopularQueries> PopularQueries { get; set; } = null!;
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<VehicleFeatures> VehicleFeatures { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -356,6 +357,21 @@ public class ApplicationDbContext : DbContext
             entity.Property(r => r.Created).IsRequired();
         });
 
+        modelBuilder.Entity<VehicleFeatures>(entity =>
+        {
+            entity.HasKey(v => new { v.Make, v.Model, v.Year });
+            entity.Property(v => v.Make).IsRequired().HasMaxLength(50);
+            entity.Property(v => v.Model).IsRequired().HasMaxLength(50);
+            entity.Property(v => v.Year).IsRequired();
+            entity.Property(v => v.Drivetrain).HasMaxLength(200);
+            entity.Property(v => v.Engine).HasMaxLength(500);
+            entity.Property(v => v.FuelEconomy).HasMaxLength(200);
+            entity.Property(v => v.Performance).HasMaxLength(200);
+            entity.Property(v => v.Measurements).HasMaxLength(300);
+            entity.Property(v => v.Options).HasMaxLength(500);
+        });
+
+
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Model).HasDatabaseName("IX_Vehicles_Model");
@@ -421,6 +437,12 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<RefreshToken>().HasIndex(r => r.Token).IsUnique();
         modelBuilder.Entity<RefreshToken>().HasIndex(r => r.UserId);
+
+        modelBuilder.Entity<VehicleFeatures>().HasIndex(v => v.Make).HasDatabaseName("IX_VehicleFeatures_Make");
+        modelBuilder.Entity<VehicleFeatures>().HasIndex(v => v.Model).HasDatabaseName("IX_VehicleFeatures_Model");
+        modelBuilder.Entity<VehicleFeatures>().HasIndex(v => v.Year).HasDatabaseName("IX_VehicleFeatures_Year");
+        modelBuilder.Entity<VehicleFeatures>().HasIndex(v => v.Drivetrain).HasDatabaseName("IX_VehicleFeatures_Drivetrain");
+        modelBuilder.Entity<VehicleFeatures>().HasIndex(v => v.Engine).HasDatabaseName("IX_VehicleFeatures_Engine");
 
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()

@@ -5,6 +5,7 @@ using AutoFiCore.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using Polly;
 using System.Threading.Tasks;
 
 namespace AutoFiCore.Services;
