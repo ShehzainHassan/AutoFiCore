@@ -21,55 +21,39 @@ namespace AutoFiCore.Services
 
         public async Task<Result<Notification>> CreateNotificationAsync(int userId, NotificationType type, string title, string message, int? auctionId = null)
         {
-            var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();
-
             try
             {
-                return await strategy.ExecuteAsync(async () =>
+                var user = await _unitOfWork.Users.GetUserByIdAsync(userId);
+                if (user == null)
                 {
-                    await _unitOfWork.BeginTransactionAsync();
-                    try
-                    {
-                        var user = await _unitOfWork.Users.GetUserByIdAsync(userId);
-                        if (user == null)
-                        {
-                            _logger.LogWarning("User not found for notification creation: {UserId}", userId);
-                            return Result<Notification>.Failure("User not found.");
-                        }
+                    _logger.LogWarning("User not found for notification creation: {UserId}", userId);
+                    return Result<Notification>.Failure("User not found.");
+                }
 
-                        var notification = new Notification
-                        {
-                            UserId = userId,
-                            NotificationType = type,
-                            Title = title,
-                            Message = message,
-                            AuctionId = auctionId,
-                            IsRead = false,
-                            CreatedAt = DateTime.UtcNow,
-                            Priority = NotificationPriority.Normal
-                        };
+                var notification = new Notification
+                {
+                    UserId = userId,
+                    NotificationType = type,
+                    Title = title,
+                    Message = message,
+                    AuctionId = auctionId,
+                    IsRead = false,
+                    CreatedAt = DateTime.UtcNow,
+                    Priority = NotificationPriority.Normal
+                };
 
-                        var createdNotification = await _unitOfWork.Notification.CreateNotification(notification);
-                        await _unitOfWork.SaveChangesAsync();
-                        await _unitOfWork.CommitTransactionAsync();
-
-                        _logger.LogInformation("Notification created for UserId: {UserId}, Type: {Type}", userId, type);
-                        return Result<Notification>.Success(createdNotification);
-                    }
-                    catch (Exception ex)
-                    {
-                        await _unitOfWork.RollbackTransactionAsync();
-                        _logger.LogError(ex, "Failed to create notification for UserId: {UserId}", userId);
-                        return Result<Notification>.Failure("Unexpected error occurred while creating notification.");
-                    }
-                });
+                var createdNotification = await _unitOfWork.Notification.CreateNotification(notification);
+                await _unitOfWork.SaveChangesAsync();
+                _logger.LogInformation("Notification created for UserId: {UserId}, Type: {Type}", userId, type);
+                return Result<Notification>.Success(createdNotification);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Execution strategy failed during notification creation for UserId: {UserId}", userId);
-                return Result<Notification>.Failure("Execution strategy failed.");
+                _logger.LogError(ex, "Failed to create notification for UserId: {UserId}", userId);
+                return Result<Notification>.Failure("Unexpected error occurred while creating notification.");
             }
         }
+
         public async Task<Result<Notification>> MarkAsReadAsync(int notificationId)
         {
             var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();

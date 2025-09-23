@@ -16,7 +16,7 @@ namespace AutoFiCore.Data.Interfaces
         Task<List<ErrorStat>> GetCommonErrorStatsAsync(DateTime start, DateTime end);
         Task<List<SlowQueryEntry>> GetSlowQueriesAsync(DateTime start, DateTime end, TimeSpan threshold);
         Task<double> GetSystemUptimePercentageAsync(DateTime start, DateTime end);
-        Task<PagedResult<ErrorLog>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10);
+        Task<PagedResult<ErrorLog>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10, DateTime? startDate = null, DateTime? endDate = null);
         Task<List<ResponseTimePoint>> GetResponseTimePointsAsync(DateTime start, DateTime end);
         Task<DateTime?> GetOldestApiLogTimestampAsync();
     }

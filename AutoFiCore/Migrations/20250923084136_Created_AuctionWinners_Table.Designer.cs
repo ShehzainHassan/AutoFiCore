@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using AutoFiCore.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AutoFiCore.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250923084136_Created_AuctionWinners_Table")]
+    partial class Created_AuctionWinners_Table
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -294,18 +297,14 @@ namespace AutoFiCore.Migrations
                     b.Property<int>("VehicleId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("UserName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<decimal>("WinningBid")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTime>("WonAt")
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<int>("UserName")
+                        .HasMaxLength(100)
+                        .HasColumnType("integer");
 
                     b.HasKey("AuctionId", "UserId", "VehicleId");
 
@@ -1430,7 +1429,7 @@ namespace AutoFiCore.Migrations
                     b.HasOne("AutoFiCore.Models.Auction", "Auction")
                         .WithMany()
                         .HasForeignKey("AuctionId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("AutoFiCore.Models.User", "User")
                         .WithMany()
@@ -1551,7 +1550,7 @@ namespace AutoFiCore.Migrations
                     b.HasOne("AutoFiCore.Models.Auction", "Auction")
                         .WithMany("Notifications")
                         .HasForeignKey("AuctionId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("AutoFiCore.Models.User", "User")
                         .WithMany("Notifications")

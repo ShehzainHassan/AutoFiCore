@@ -1,4 +1,5 @@
 ﻿using AutoFiCore.Dto;
+using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -61,6 +62,12 @@ public static class AuctionQuery
             }
         }
 
-        return source.OrderBy(a => a.AuctionId);
+        return source
+            .OrderBy(a =>
+                a.Status == AuctionStatus.Active ? 0 :
+                a.Status == AuctionStatus.PreviewMode ? 1 :
+                a.Status == AuctionStatus.Ended ? 2 : 3)
+            .ThenByDescending(a => a.AuctionId);
     }
+
 }

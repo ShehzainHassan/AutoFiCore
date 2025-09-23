@@ -11,7 +11,6 @@ public class ReportingService : IReportingService
     private readonly IPdfService _pdfService;
     private readonly IDashboardService _dashboardService;
     private readonly ILogger<ReportingService> _logger;
-
     public ReportingService(IUnitOfWork uow, IPdfService pdfService, IDashboardService dashboardService, ILogger<ReportingService> logger)
     {
         _uow = uow;
@@ -19,7 +18,6 @@ public class ReportingService : IReportingService
         _dashboardService = dashboardService;
         _logger = logger;
     }
-
     public async Task<Result<RevenueReport>> GetRevenueReportAsync(DateTime start, DateTime end)
     {
         try
@@ -40,7 +38,6 @@ public class ReportingService : IReportingService
             return Result<RevenueReport>.Failure("Failed to generate revenue report.");
         }
     }
-
     public async Task<Result<List<CategoryPerformance>>> GetPopularCategoriesReportAsync(DateTime start, DateTime end)
     {
         try
@@ -54,7 +51,6 @@ public class ReportingService : IReportingService
             return Result<List<CategoryPerformance>>.Failure("Failed to fetch popular categories report.");
         }
     }
-
     public async Task<Result<FileResultDTO>> ExportReportAsync(ReportType reportType, DateTime startDate, DateTime endDate, string format = "csv")
     {
         try
@@ -146,7 +142,6 @@ public class ReportingService : IReportingService
             return Result<FileResultDTO>.Failure("Failed to export report.");
         }
     }
-
     public async Task<Result<List<AuctionAnalyticsTableDTO>>> GetAuctionAnalyticsAsync(DateTime start, DateTime end, string? category)
     {
         try
@@ -160,7 +155,6 @@ public class ReportingService : IReportingService
             return Result<List<AuctionAnalyticsTableDTO>>.Failure("Failed to fetch auction analytics.");
         }
     }
-
     public async Task<Result<List<UserAnalyticsTableDTO>>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate)
     {
         try
@@ -174,7 +168,6 @@ public class ReportingService : IReportingService
             return Result<List<UserAnalyticsTableDTO>>.Failure("Failed to fetch user analytics.");
         }
     }
-
     public async Task<Result<List<RevenueTableAnalyticsDTO>>> GetRevenueTableAnalyticsAsync(DateTime start, DateTime end)
     {
         try
@@ -188,7 +181,6 @@ public class ReportingService : IReportingService
             return Result<List<RevenueTableAnalyticsDTO>>.Failure("Failed to fetch revenue table analytics.");
         }
     }
-
     public async Task<Result<SummaryWithChange<decimal>>> GetSummaryAsync(string dataType, DateTime startDate, DateTime endDate)
     {
         try
@@ -221,7 +213,6 @@ public class ReportingService : IReportingService
             return Result<SummaryWithChange<decimal>>.Failure("Failed to fetch summary data.");
         }
     }
-
     public async Task<Result<PagedResult<RecentDownloads>>> GetRecentDownloadsAsync(int page, int pageSize)
     {
         try
@@ -235,7 +226,6 @@ public class ReportingService : IReportingService
             return Result<PagedResult<RecentDownloads>>.Failure("Failed to fetch recent downloads.");
         }
     }
-
     private async Task SaveReportDownload(ReportType type, DateTime start, DateTime end, string format)
     {
         await _uow.Report.AddRecentDownload(new RecentDownloads

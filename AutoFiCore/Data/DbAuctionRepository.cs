@@ -134,6 +134,20 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         _dbContext.Auctions.Update(auction);
         return auction;
     }
+    public async Task AddAuctionWinnerAsync(int userId, int auctionId, decimal winningBid, int vehicleId, string username)
+    {
+        var winner = new AuctionWinners
+        {
+            AuctionId = auctionId,
+            UserId = userId,
+            WinningBid = winningBid,
+            VehicleId = vehicleId,
+            UserName = username,
+            WonAt = DateTime.UtcNow
+        };
+
+        await _dbContext.AuctionWinners.AddAsync(winner);
+    }
     public async Task AddToWatchlistAsync(int userId, int auctionId)
     {
         if (!await IsWatchingAsync(userId, auctionId))

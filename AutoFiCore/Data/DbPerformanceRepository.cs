@@ -115,10 +115,17 @@ public class DbPerformanceRepository : IPerformanceRepository
 
         return (successfulRequests / (double)totalRequests) * 100;
     }
-    public async Task<PagedResult<ErrorLog>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10)
+    public async Task<PagedResult<ErrorLog>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10, DateTime? startDate = null, DateTime? endDate = null)
     {
-        var query = _db.ErrorLogs
-            .OrderByDescending(e => e.Timestamp);
+        var query = _db.ErrorLogs.AsQueryable();
+
+        if (startDate.HasValue)
+            query = query.Where(e => e.Timestamp >= startDate.Value);
+
+        if (endDate.HasValue)
+            query = query.Where(e => e.Timestamp <= endDate.Value);
+
+        query = query.OrderByDescending(e => e.Timestamp);
 
         var totalItems = await query.CountAsync();
 
@@ -135,6 +142,7 @@ public class DbPerformanceRepository : IPerformanceRepository
             PageSize = pageSize
         };
     }
+
     public async Task<List<ResponseTimePoint>> GetResponseTimePointsAsync(DateTime start, DateTime end)
     {
         const int bucketCount = 10;

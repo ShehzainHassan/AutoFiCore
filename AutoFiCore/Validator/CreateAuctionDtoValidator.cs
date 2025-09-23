@@ -19,8 +19,10 @@ public class CreateAuctionDtoValidator : AbstractValidator<CreateAuctionDTO>
             .NotEmpty().WithMessage("ScheduledStartTime cannot be empty.");
 
         RuleFor(x => x.EndUtc)
-            .NotEmpty().WithMessage("EndUtc cannot be empty.")
-            .GreaterThan(x => x.ScheduledStartTime).WithMessage("EndUtc must be > ScheduledStartTime.");
+           .NotEmpty().WithMessage("EndUtc cannot be empty.")
+           .GreaterThan(x => x.ScheduledStartTime).WithMessage("EndUtc must be > ScheduledStartTime.")
+           .Must(endUtc => endUtc > DateTime.UtcNow)
+           .WithMessage("EndUtc must be in the future.");
 
         RuleFor(x => x.StartingPrice)
             .GreaterThanOrEqualTo(0).WithMessage("Starting price must be non-negative.");

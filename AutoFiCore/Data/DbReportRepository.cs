@@ -215,33 +215,22 @@ namespace AutoFiCore.Data
         public async Task<List<UserAnalyticsTableDTO>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate)
         {
             var filteredUsers = await _db.Users
-                .Where(u =>
-                    u.CreatedUtc >= startDate && u.CreatedUtc <= endDate &&
-                    u.LastLoggedIn >= startDate && u.LastLoggedIn <= endDate)
+                .Where(u => u.LastLoggedIn >= startDate && u.LastLoggedIn <= endDate)
                 .OrderBy(u => u.Id)
                 .ToListAsync();
 
-            var winningBidUserIds = await _db.Auctions
-                .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet && a.ScheduledStartTime >= startDate && a.ScheduledStartTime <= endDate)
-                .Select(a => new
-                {
-                    a.AuctionId,
-                    LastBidUserId = _db.Bids
-                        .Where(b => b.AuctionId == a.AuctionId)
-                        .OrderByDescending(b => b.CreatedUtc)
-                        .Select(b => b.UserId)
-                        .FirstOrDefault()
-                })
+            var auctionWins = await _db.AuctionWinners
+                .Where(w => w.WonAt >= startDate && w.WonAt <= endDate)
                 .ToListAsync();
 
-            return filteredUsers.Select(user =>
-            {
-                var totalBids = _db.Bids.Count(b =>
-                    b.UserId == user.Id &&
-                    b.CreatedUtc >= startDate &&
-                    b.CreatedUtc <= endDate);
+            var bidsInRange = await _db.Bids
+                .Where(b => b.CreatedUtc >= startDate && b.CreatedUtc <= endDate)
+                .ToListAsync();
 
-                var totalWins = winningBidUserIds.Count(w => w.LastBidUserId == user.Id);
+            var analytics = filteredUsers.Select(user =>
+            {
+                var totalBids = bidsInRange.Count(b => b.UserId == user.Id);
+                var totalWins = auctionWins.Count(w => w.UserId == user.Id);
 
                 return new UserAnalyticsTableDTO
                 {
@@ -252,55 +241,40 @@ namespace AutoFiCore.Data
                     TotalWins = totalWins
                 };
             }).ToList();
+
+            return analytics;
         }
         public async Task<List<RevenueTableAnalyticsDTO>> GetRevenueTableAnalyticsAsync(DateTime start, DateTime end)
         {
             var auctions = await _db.Auctions
                 .Include(a => a.Vehicle)
-                .Include(a => a.Bids)
                 .Where(a => a.StartUtc >= start && a.StartUtc < end)
                 .ToListAsync();
 
-            var auctionWinners = await _db.Auctions
-                .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet)
-                .Select(a => new
-                {
-                    a.AuctionId,
-                    LastBidUserId = _db.Bids
-                        .Where(b => b.AuctionId == a.AuctionId)
-                        .OrderByDescending(b => b.CreatedUtc)
-                        .Select(b => b.UserId)
-                        .FirstOrDefault()
-                })
+            var auctionWinners = await _db.AuctionWinners
+                .Where(w => w.WonAt >= start && w.WonAt < end)
                 .ToListAsync();
 
-            var userIds = auctionWinners
-                .Select(w => w.LastBidUserId)
-                .Distinct()
-                .ToList();
+            var winnerLookup = auctionWinners.ToDictionary(w => w.AuctionId, w => w);
 
-            var users = await _db.Users
-                .Where(u => userIds.Contains(u.Id))
-                .ToDictionaryAsync(u => u.Id, u => u.Name);
-
-            var revenueList = auctions.Select(auction =>
-            {
-                var isSold = auction.Status == AuctionStatus.Ended && auction.IsReserveMet;
-                var winner = auctionWinners.FirstOrDefault(w => w.AuctionId == auction.AuctionId);
-                var buyerName = (isSold && winner != null && users.ContainsKey(winner.LastBidUserId))
-                    ? users[winner.LastBidUserId]
-                    : "---";
-
-                return new RevenueTableAnalyticsDTO
+            var revenueList = auctions
+                .Where(a => a.Status == AuctionStatus.Ended && a.IsReserveMet && winnerLookup.ContainsKey(a.AuctionId))
+                .Select(auction =>
                 {
-                    ScheduledStartTime = auction.StartUtc,
-                    AuctionId = auction.AuctionId,
-                    Vehicle = $"{auction.Vehicle?.Year} {auction.Vehicle?.Make} {auction.Vehicle?.Model}",
-                    Buyer = isSold ? buyerName : "---",
-                    Revenue = auction.CurrentPrice,
-                    Commission = Math.Round(auction.CurrentPrice * 0.10m, 2)
-                };
-            }).OrderBy(r => r.AuctionId).ToList();
+                    var winner = winnerLookup[auction.AuctionId];
+
+                    return new RevenueTableAnalyticsDTO
+                    {
+                        ScheduledStartTime = auction.StartUtc,
+                        AuctionId = auction.AuctionId,
+                        Vehicle = $"{auction.Vehicle?.Year} {auction.Vehicle?.Make} {auction.Vehicle?.Model}",
+                        Buyer = winner.UserName,
+                        Revenue = winner.WinningBid,
+                        Commission = Math.Round(winner.WinningBid * 0.10m, 2)
+                    };
+                })
+                .OrderBy(r => r.AuctionId)
+                .ToList();
 
             return revenueList;
         }

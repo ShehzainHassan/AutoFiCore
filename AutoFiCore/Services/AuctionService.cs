@@ -47,13 +47,9 @@ namespace AutoFiCore.Services
 
                         AuctionStatus status;
                         if (dto.ScheduledStartTime > now)
-                        {
                             status = previewTime <= now ? AuctionStatus.PreviewMode : AuctionStatus.Scheduled;
-                        }
                         else
-                        {
                             status = AuctionStatus.Active;
-                        }
 
                         decimal reservePrice = dto.ReservePrice ?? dto.StartingPrice;
                         bool isReserveMet = reservePrice <= dto.StartingPrice;
@@ -146,6 +142,7 @@ namespace AutoFiCore.Services
                 var filteredQuery = AuctionQuery.ApplyFilters(query, filters);
                 var sortedQuery = AuctionQuery.ApplySorting(filteredQuery, filters);
 
+                //Not showing scheduled auctions, if auction has preview time it will be shown in preview mode
                 var auctions = await sortedQuery
                     .Where(a => a.Status != AuctionStatus.Scheduled)
                     .AsNoTracking()
@@ -205,6 +202,13 @@ namespace AutoFiCore.Services
 
             bool reserveMet = ValidateBidAgainstReserve(auction, highestBid.Amount);
             if (reserveMet)
+            {
+                await _auctionLifecycleService.HandleAuctionWonAsync(auction, winningUser.Id);
+
+                await _uow.Auctions.AddAuctionWinnerAsync(winningUser.Id, auction.AuctionId, highestBid.Amount, auction.VehicleId, winningUser.Name);
+                await _uow.SaveChangesAsync();
+            }
+            if (reserveMet)
                 await _auctionLifecycleService.HandleAuctionWonAsync(auction, winningUser.Id);
 
             return Result<AuctionResultDTO?>.Success(new AuctionResultDTO
@@ -237,7 +241,7 @@ namespace AutoFiCore.Services
                             return Result<BidDTO>.Failure("User not found.");
 
                         if (auction.Status != AuctionStatus.Active || auction.EndUtc <= DateTime.UtcNow)
-                            return Result<BidDTO>.Failure("Auction has ended.");
+                            return Result<BidDTO>.Failure("Auction is not active or has already ended.");
 
                         var bids = await _uow.Bids.GetBidsByAuctionIdAsync(auctionId);
                         var previousBidders = await _uow.Bids.GetUniqueBidderIdsAsync(auctionId);
@@ -253,8 +257,10 @@ namespace AutoFiCore.Services
 
                         var validator = new BidValidator();
                         var validationResult = validator.Validate(bidValidationDto);
+
                         if (!validationResult.IsValid)
                         {
+                            await _uow.RollbackTransactionAsync();
                             var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
                             return Result<BidDTO>.Failure(errors);
                         }

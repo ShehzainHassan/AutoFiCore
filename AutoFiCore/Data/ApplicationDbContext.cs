@@ -44,6 +44,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<PopularQueries> PopularQueries { get; set; } = null!;
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<VehicleFeatures> VehicleFeatures { get; set; } = null!;
+
+    public DbSet<AuctionWinners> AuctionWinners { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -288,7 +290,6 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.ResponseTime).IsRequired();
             entity.Property(e => e.StatusCode).IsRequired();
             entity.Property(e => e.Timestamp).IsRequired();
-
         });
 
         modelBuilder.Entity<DBQueryLog>(entity =>
@@ -371,6 +372,12 @@ public class ApplicationDbContext : DbContext
             entity.Property(v => v.Options).HasMaxLength(500);
         });
 
+        modelBuilder.Entity<AuctionWinners>(entity =>
+        {
+            entity.HasKey(a => new { a.AuctionId, a.UserId, a.VehicleId });
+            entity.Property(a => a.UserName).HasMaxLength(100).IsRequired();
+            entity.Property(a => a.WonAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
 
         // Configure indexes
         modelBuilder.Entity<Vehicle>().HasIndex(v => v.Make).HasDatabaseName("IX_Vehicles_Make");
@@ -444,6 +451,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<VehicleFeatures>().HasIndex(v => v.Drivetrain).HasDatabaseName("IX_VehicleFeatures_Drivetrain");
         modelBuilder.Entity<VehicleFeatures>().HasIndex(v => v.Engine).HasDatabaseName("IX_VehicleFeatures_Engine");
 
+
         // Configure relationships and set up cascade delete
         modelBuilder.Entity<Vehicle>()
             .HasOne(v => v.Drivetrain)
@@ -511,12 +519,14 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<AutoBid>()
             .HasOne(ab => ab.Auction)
             .WithMany(a => a.AutoBids)
-            .HasForeignKey(ab => ab.AuctionId);
+            .HasForeignKey(ab => ab.AuctionId)
+            .OnDelete(DeleteBehavior.Cascade);   
 
         modelBuilder.Entity<AutoBid>()
             .HasOne(ab => ab.User)
             .WithMany(u => u.AutoBids)
-            .HasForeignKey(ab => ab.UserId);
+            .HasForeignKey(ab => ab.UserId)
+            .OnDelete(DeleteBehavior.Cascade);   
 
         modelBuilder.Entity<BidStrategy>()
             .HasOne(b => b.Auction)
@@ -535,11 +545,11 @@ public class ApplicationDbContext : DbContext
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<Notification>().HasOne(n => n.Auction)
-            .WithMany(a => a.Notifications)
+        modelBuilder.Entity<Auction>()
+            .HasMany(a => a.Notifications)
+            .WithOne(n => n.Auction)
             .HasForeignKey(n => n.AuctionId)
-            .IsRequired(false)
-            .OnDelete(DeleteBehavior.SetNull);
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<AnalyticsEvent>().HasOne(e => e.User)
             .WithMany()
@@ -549,17 +559,17 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<AnalyticsEvent>().HasOne(e => e.Auction)
             .WithMany()
             .HasForeignKey(e => e.AuctionId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<AuctionAnalytics>()
-            .HasOne(e => e.Auction)
-            .WithOne(a => a.AuctionAnalytics)
-            .HasForeignKey<AuctionAnalytics>(e => e.AuctionId)
             .OnDelete(DeleteBehavior.Cascade);
         
         modelBuilder.Entity<ChatMessage>().HasOne(e => e.ChatSession)
             .WithMany(s => s.Messages)
             .HasForeignKey(e => e.ChatSessionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Auction>()
+            .HasOne(a => a.AuctionAnalytics)
+            .WithOne(aa => aa.Auction)
+            .HasForeignKey<AuctionAnalytics>(aa => aa.AuctionId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

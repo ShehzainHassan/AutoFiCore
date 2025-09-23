@@ -86,11 +86,11 @@ public class SystemHealthService : ISystemHealthService
         }
     }
 
-    public async Task<Result<PagedResult<ErrorLog>>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10)
+    public async Task<Result<PagedResult<ErrorLog>>> GetErrorLogsPagedAsync(int page = 1, int pageSize = 10, DateTime? startDate = null, DateTime? endDate = null)
     {
         try
         {
-            var logs = await _repo.GetErrorLogsPagedAsync(page, pageSize);
+            var logs = await _repo.GetErrorLogsPagedAsync(page, pageSize, startDate, endDate);
             return Result<PagedResult<ErrorLog>>.Success(logs);
         }
         catch (Exception ex)
@@ -98,6 +98,7 @@ public class SystemHealthService : ISystemHealthService
             return Result<PagedResult<ErrorLog>>.Failure($"Failed to get error logs: {ex.Message}");
         }
     }
+
 
     public async Task<Result<List<ResponseTimePoint>>> GetResponseTimePointsAsync(DateTime start, DateTime end)
     {

@@ -403,19 +403,34 @@ namespace AutoFiCore.Controllers
         }
 
         /// <summary>
-        /// Retrieves a paginated list of system error logs.
+        /// Retrieves a paginated list of system error logs within the specified date range.
         /// </summary>
-        /// <param name="page">Page number.</param>
-        /// <param name="pageSize">Number of logs per page.</param>
+        /// <param name="startDate">Filter logs created after or equal to this date (required).</param>
+        /// <param name="endDate">Filter logs created before or equal to this date (required).</param>
+        /// <param name="page">Page number (optional).</param>
+        /// <param name="pageSize">Number of logs per page (optional).</param>
         /// <returns>Error log entries.</returns>
         [AllowAnonymous]
         [DisableRateLimiting]
         [HttpGet("error-logs")]
-        public async Task<IActionResult> GetErrorLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+        public async Task<IActionResult> GetErrorLogs(
+            [FromQuery] DateTime startDate,
+            [FromQuery] DateTime endDate,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10)
         {
-            var result = await _systemHealthService.GetErrorLogsPagedAsync(page, pageSize);
+            var utcStart = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+            var utcEnd = DateTime.SpecifyKind(endDate.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+
+            var result = await _systemHealthService.GetErrorLogsPagedAsync(page, pageSize, utcStart, utcEnd);
+
+            if (!result.IsSuccess)
+                return BadRequest(result.Error);
+
             return Ok(result.Value);
         }
+
+
 
         /// <summary>
         /// Retrieves response time data points for the specified date range.

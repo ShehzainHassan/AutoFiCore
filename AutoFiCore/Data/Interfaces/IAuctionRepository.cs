@@ -18,6 +18,6 @@ namespace AutoFiCore.Data.Interfaces
         Task<Auction?> UpdateAuctionEndTimeAsync(int auctionId, int extensionMinutes);
         Task<List<Auction>> GetEndedAuctions();
         Task<DateTime?> GetOldestAuctionDateAsync();
-
+        Task AddAuctionWinnerAsync(int userId, int auctionId, decimal winningBid, int vehicleId, string username);
     }
 }
