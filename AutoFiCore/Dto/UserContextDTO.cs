@@ -14,5 +14,8 @@ namespace AutoFiCore.Dto
 
         [JsonPropertyName("auto_bid_settings")]
         public List<UserAutoBidSettings> AutoBidSettings { get; set; } = new();
+
+        [JsonPropertyName("user_watchlist")]
+        public List<WatchlistDTO> UserWatchlists { get; set; } = new();
     }
 }

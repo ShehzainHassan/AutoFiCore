@@ -53,7 +53,6 @@ namespace AutoFiCore.Services
                 return Result<Notification>.Failure("Unexpected error occurred while creating notification.");
             }
         }
-
         public async Task<Result<Notification>> MarkAsReadAsync(int notificationId)
         {
             var strategy = _unitOfWork.DbContext.Database.CreateExecutionStrategy();

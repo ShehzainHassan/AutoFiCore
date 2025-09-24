@@ -108,12 +108,12 @@ namespace AutoFiCore.Services
                 }
 
                 _logger.LogInformation("Cache miss for user {UserId}. Fetching context...", userId);
-
                 var context = new UserContextDTO
                 {
                     SavedSearches = await _uow.Users.GetUserSavedSearches(userId).ConfigureAwait(false),
                     AuctionHistory = await GetUserAuctionHistoryAsync(userId).ConfigureAwait(false),
-                    AutoBidSettings = await _uow.AutoBid.GetUserAutoBidSettingsAsync(userId).ConfigureAwait(false)
+                    AutoBidSettings = await _uow.AutoBid.GetUserAutoBidSettingsAsync(userId).ConfigureAwait(false),
+                    UserWatchlists = await _uow.Watchlist.GetUserWatchlistAsync(userId).ConfigureAwait(false),
                 };
 
                 var serialized = JsonSerializer.Serialize(context, _serializerOptions);

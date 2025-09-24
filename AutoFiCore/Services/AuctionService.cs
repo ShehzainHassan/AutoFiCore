@@ -201,12 +201,18 @@ namespace AutoFiCore.Services
                 return Result<AuctionResultDTO?>.Failure("Winning user not found");
 
             bool reserveMet = ValidateBidAgainstReserve(auction, highestBid.Amount);
+
             if (reserveMet)
             {
-                await _auctionLifecycleService.HandleAuctionWonAsync(auction, winningUser.Id);
+                var existingWinner = await _uow.Auctions.GetAuctionWinnerAsync(
+                    auction.AuctionId, winningUser.Id, auction.VehicleId);
 
-                await _uow.Auctions.AddAuctionWinnerAsync(winningUser.Id, auction.AuctionId, highestBid.Amount, auction.VehicleId, winningUser.Name);
-                await _uow.SaveChangesAsync();
+                if (existingWinner == null)
+                {
+                    await _auctionLifecycleService.HandleAuctionWonAsync(auction, winningUser.Id);
+                    await _uow.Auctions.AddAuctionWinnerAsync(winningUser.Id, auction.AuctionId, highestBid.Amount, auction.VehicleId, winningUser.Name);
+                    await _uow.SaveChangesAsync();
+                }
             }
             if (reserveMet)
                 await _auctionLifecycleService.HandleAuctionWonAsync(auction, winningUser.Id);
@@ -459,17 +465,9 @@ namespace AutoFiCore.Services
             if (await _uow.Users.GetUserByIdAsync(userId) is null)
                 return Result<List<WatchlistDTO>>.Failure("User not found.");
 
-            var watchlists = await _uow.Watchlist.GetUserWatchlistAsync(userId);
+            var watchlistDtos = await _uow.Watchlist.GetUserWatchlistAsync(userId);
 
-            var dtos = watchlists.Select(w => new WatchlistDTO
-            {
-                WatchlistId = w.WatchlistId,
-                UserId = w.UserId,
-                AuctionId = w.AuctionId,
-                CreatedUtc = w.CreatedUtc
-            }).ToList();
-
-            return Result<List<WatchlistDTO>>.Success(dtos);
+            return Result<List<WatchlistDTO>>.Success(watchlistDtos);
         }
         public async Task<Result<List<WatchlistDTO>>> GetAuctionWatchersAsync(int auctionId)
         {

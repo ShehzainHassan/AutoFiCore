@@ -73,25 +73,75 @@ namespace AutoFiCore.Services
         }
 
 
-        public Task<Result<bool>> TrackAuctionViewAsync(int auctionId, int? userId, string source)
+        public async Task<Result<bool>> TrackAuctionViewAsync(int auctionId, int? userId, string source)
         {
-            return TrackEventAsync(AnalyticsEventType.AuctionView, userId, auctionId, new(), source);
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            var vehicle = auction!.Vehicle;
+            var message = $"Viewed Auction for {vehicle.Year} {vehicle.Make} {vehicle.Model}";
+
+
+            return await TrackEventAsync(
+                AnalyticsEventType.AuctionView,
+                userId,
+                auctionId,
+                new Dictionary<string, object>
+                {
+                    { "Viewed Auction", message }
+                },
+                source
+            );
         }
 
-        public Task<Result<bool>> TrackBidEventAsync(int auctionId, int userId, decimal bidAmount)
+        public async Task<Result<bool>> TrackBidEventAsync(int auctionId, int userId, decimal bidAmount)
         {
-            return TrackEventAsync(AnalyticsEventType.BidPlaced, userId, auctionId, new Dictionary<string, object> { { "BidAmount", bidAmount } }, "Web");
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            var vehicle = auction!.Vehicle;
+
+            var message = $"Placed Bid on {vehicle.Year} {vehicle.Make} {vehicle.Model} Auction, Bid Amount: {bidAmount}";
+
+            return await TrackEventAsync(
+                AnalyticsEventType.BidPlaced,
+                userId,
+                auctionId,
+                new Dictionary<string, object> { { "Placed Bid", message } },
+                "Web"
+            );
         }
 
-        public Task<Result<bool>> TrackAuctionCompletionAsync(int auctionId, bool isSuccessful, decimal finalPrice)
+        public async Task<Result<bool>> TrackAuctionCompletionAsync(int auctionId, bool isSuccessful, decimal finalPrice)
         {
-            return TrackEventAsync(AnalyticsEventType.AuctionCompleted, null, auctionId, new Dictionary<string, object> { { "Success", isSuccessful }, { "FinalPrice", finalPrice } }, "Web");
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            var vehicle = auction!.Vehicle;
+
+            string message = isSuccessful
+                ? $"{vehicle.Year} {vehicle.Make} {vehicle.Model} Auction completed, Final Price: {finalPrice}"
+                : $"{vehicle.Year} {vehicle.Make} {vehicle.Model} Auction did not sell, Final Price: {finalPrice}";
+
+            return await TrackEventAsync(
+                AnalyticsEventType.AuctionCompleted,
+                null,
+                auctionId,
+                new Dictionary<string, object> { { "Auction Result", message } },
+                "Web"
+            );
         }
 
-        public Task<Result<bool>> TrackPaymentCompletedAsync(int auctionId, int? userId, decimal finalPayment)
+        public async Task<Result<bool>> TrackPaymentCompletedAsync(int auctionId, int? userId, decimal finalPayment)
         {
-            return TrackEventAsync(AnalyticsEventType.PaymentCompleted, userId, auctionId, new Dictionary<string, object> { { "AmountPayed", finalPayment } }, "Web");
+            var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+            var vehicle = auction!.Vehicle;
+
+            var message = $"Amount Paid for {vehicle.Year} {vehicle.Make} {vehicle.Model} Auction: {finalPayment}";
+
+            return await TrackEventAsync(
+                AnalyticsEventType.PaymentCompleted,
+                userId,
+                auctionId,
+                new Dictionary<string, object> { { "Payment", message } },
+                "Web"
+            );
         }
+
 
         /// <summary>
         /// Checks if payment has been completed for an auction.

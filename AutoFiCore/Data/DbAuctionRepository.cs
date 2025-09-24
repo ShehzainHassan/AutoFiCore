@@ -1,5 +1,6 @@
 ﻿using AutoFiCore.Data;
 using AutoFiCore.Data.Interfaces;
+using AutoFiCore.Dto;
 using AutoFiCore.Enums;
 using AutoFiCore.Models;
 using Microsoft.EntityFrameworkCore;
@@ -134,6 +135,13 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
         _dbContext.Auctions.Update(auction);
         return auction;
     }
+    public Task<AuctionWinners?> GetAuctionWinnerAsync(int auctionId, int userId, int vehicleId)
+    {
+        return _dbContext.AuctionWinners
+            .FirstOrDefaultAsync(w => w.AuctionId == auctionId
+                                   && w.UserId == userId
+                                   && w.VehicleId == vehicleId);
+    }
     public async Task AddAuctionWinnerAsync(int userId, int auctionId, decimal winningBid, int vehicleId, string username)
     {
         var winner = new AuctionWinners
@@ -166,10 +174,17 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
             _dbContext.Watchlists.Remove(entry);
         }
     }
-    public async Task<List<Watchlist>> GetUserWatchlistAsync(int userId)
+    public async Task<List<WatchlistDTO>> GetUserWatchlistAsync(int userId)
     {
         return await _dbContext.Watchlists
             .Where(w => w.UserId == userId)
+            .Select(w => new WatchlistDTO
+            {
+                WatchlistId = w.WatchlistId,
+                UserId = w.UserId,
+                AuctionId = w.AuctionId,
+                CreatedUtc = w.CreatedUtc
+            })
             .ToListAsync();
     }
     public async Task<List<Watchlist>> GetAuctionWatchersAsync(int auctionId)
