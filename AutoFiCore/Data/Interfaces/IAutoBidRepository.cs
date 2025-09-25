@@ -16,5 +16,6 @@ namespace AutoFiCore.Data.Interfaces
         Task<List<AutoBid>> GetActiveAutoBidsByAuctionIdAsync(int auctionId);
         Task<BidStrategy> AddBidStrategyAsync(BidStrategy bidStrategy);
         Task<List<UserAutoBidSettings>> GetUserAutoBidSettingsAsync(int userId);
+        Task SetAllInactiveByAuctionIdAsync(int auctionId);
     }
 }

@@ -114,5 +114,20 @@ namespace AutoFiCore.Data
 
             return result;
         }
+        public async Task SetAllInactiveByAuctionIdAsync(int auctionId)
+        {
+            var autoBids = await _dbContext.AutoBids
+                .Where(ab => ab.AuctionId == auctionId && ab.IsActive)
+                .ToListAsync();
+
+            if (autoBids.Any())
+            {
+                foreach (var autoBid in autoBids)
+                {
+                    autoBid.IsActive = false;
+                    autoBid.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+        }
     }
 }

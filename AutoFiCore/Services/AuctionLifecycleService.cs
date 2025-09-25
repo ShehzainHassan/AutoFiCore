@@ -7,15 +7,13 @@ using Microsoft.Extensions.Configuration.UserSecrets;
 
 namespace AutoFiCore.Services
 {
-   
-    public class AuctionLifecycleService:IAuctionLifecycleService
+
+    public class AuctionLifecycleService : IAuctionLifecycleService
     {
         private readonly INotificationService _notificationService;
         private readonly ILogger<AuctionLifecycleService> _logger;
         private readonly IUnitOfWork _unitOfWork;
         private readonly IAuctionNotifier _notifier;
-
-
         public AuctionLifecycleService(INotificationService notificationService, ILogger<AuctionLifecycleService> logger, IUnitOfWork unitOfWork, IAuctionNotifier notifier)
         {
             _notificationService = notificationService;
@@ -73,7 +71,7 @@ namespace AutoFiCore.Services
                 message,
                 auction.AuctionId
             );
-            await _notifier.NotifyAuctionLost(userId, auction.AuctionId);   
+            await _notifier.NotifyAuctionLost(userId, auction.AuctionId);
         }
         public async Task HandleAuctionEndAsync(Auction auction)
         {
@@ -107,6 +105,8 @@ namespace AutoFiCore.Services
                     );
                 }
             }
+
+            await _unitOfWork.AutoBid.SetAllInactiveByAuctionIdAsync(auction.AuctionId);
 
             if (auction.IsReserveMet && winningUserId.HasValue)
             {
@@ -180,7 +180,7 @@ namespace AutoFiCore.Services
                     }
                 }
             }
-            await _notifier.NotifyReserveMet(auction.AuctionId); 
+            await _notifier.NotifyReserveMet(auction.AuctionId);
         }
         public async Task HandleAuctionExtended(Auction auction)
         {

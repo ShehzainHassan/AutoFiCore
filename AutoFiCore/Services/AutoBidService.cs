@@ -21,7 +21,6 @@ namespace AutoFiCore.Services
             _auctionService = auctionService;
             _auctionLifecycleService = auctionLifecycleService;
         }
-
         private async Task<bool> CanPlaceImmediateBid(AutoBid autoBid, int auctionId)
         {
             var bidStrategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(autoBid.UserId, auctionId);
@@ -173,7 +172,6 @@ namespace AutoFiCore.Services
             {
                 return await strategy.ExecuteAsync(async () =>
                 {
-                    await _uow.BeginTransactionAsync();
                     try
                     {
                         var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
@@ -251,18 +249,15 @@ namespace AutoFiCore.Services
                             if (bidPlaced)
                             {
                                 await _uow.SaveChangesAsync();
-                                await _uow.CommitTransactionAsync();
                                 _log.LogInformation("Auto-bid placed by user {UserId} on auction {AuctionId}", autoBid.UserId, auctionId);
                                 return Result<string>.Success($"Auto-bid placed by user {autoBid.UserId}.");
                             }
                         }
 
-                        await _uow.CommitTransactionAsync();
                         return Result<string>.Failure("No eligible auto-bid placed.");
                     }
                     catch (Exception ex)
                     {
-                        await _uow.RollbackTransactionAsync();
                         _log.LogError(ex, "Exception while processing auto-bid trigger for auction {AuctionId}", auctionId);
                         return Result<string>.Failure("Unexpected error occurred during auto-bid trigger.");
                     }
@@ -282,7 +277,6 @@ namespace AutoFiCore.Services
             {
                 return await strategy.ExecuteAsync(async () =>
                 {
-                    await _uow.BeginTransactionAsync();
                     try
                     {
                         var auction = await _uow.Auctions.GetAuctionByIdAsync(dto.AuctionId);
@@ -311,14 +305,13 @@ namespace AutoFiCore.Services
 
                             var updateResult = await UpdateAutoBidAsync(dto.AuctionId, dto.UserId, updateDto);
 
-                            var strategy = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, dto.AuctionId);
-                            if (strategy != null)
+                            var strategyEntity = await _uow.AutoBid.GetBidStrategyByUserAndAuctionAsync(dto.UserId, dto.AuctionId);
+                            if (strategyEntity != null)
                             {
-                                UpdateBidStrategyFromDto(strategy, dto, now);
+                                UpdateBidStrategyFromDto(strategyEntity, dto, now);
                             }
 
                             await _uow.SaveChangesAsync();
-                            await _uow.CommitTransactionAsync();
 
                             return updateResult.IsSuccess
                                 ? Result<CreateAutoBidDTO>.Success(dto)
@@ -342,14 +335,12 @@ namespace AutoFiCore.Services
                         await _uow.AutoBid.AddAutoBidAsync(autoBid);
                         await _uow.AutoBid.AddBidStrategyAsync(strategyToAdd);
                         await _uow.SaveChangesAsync();
-                        await _uow.CommitTransactionAsync();
 
                         _log.LogInformation("Auto-bid created for auction {Auction}", autoBid.AuctionId);
                         return Result<CreateAutoBidDTO>.Success(dto);
                     }
                     catch (Exception ex)
                     {
-                        await _uow.RollbackTransactionAsync();
                         _log.LogError(ex, "Failed to create/update AutoBid for auction {AuctionId} and user {UserId}", dto.AuctionId, dto.UserId);
                         return Result<CreateAutoBidDTO>.Failure("Unexpected error occurred while creating AutoBid.");
                     }
@@ -369,7 +360,6 @@ namespace AutoFiCore.Services
             {
                 return await strategy.ExecuteAsync(async () =>
                 {
-                    await _uow.BeginTransactionAsync();
                     try
                     {
                         var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
@@ -382,14 +372,12 @@ namespace AutoFiCore.Services
 
                         await _uow.AutoBid.SetInactiveAsync(userId, auctionId);
                         await _uow.SaveChangesAsync();
-                        await _uow.CommitTransactionAsync();
 
                         _log.LogInformation("Auto-bid and bid strategy removed for user {UserId} on auction {AuctionId}", userId, auctionId);
                         return Result<string>.Success("Auto-bid cancelled and bid strategy deleted successfully");
                     }
                     catch (Exception ex)
                     {
-                        await _uow.RollbackTransactionAsync();
                         _log.LogError(ex, "Failed to cancel AutoBid for user {UserId} on auction {AuctionId}", userId, auctionId);
                         return Result<string>.Failure("Unexpected error occurred while cancelling AutoBid.");
                     }
@@ -409,7 +397,6 @@ namespace AutoFiCore.Services
             {
                 return await strategy.ExecuteAsync(async () =>
                 {
-                    await _uow.BeginTransactionAsync();
                     try
                     {
                         var autoBid = await _uow.AutoBid.GetByIdAsync(userId, auctionId);
@@ -458,14 +445,12 @@ namespace AutoFiCore.Services
                         }
 
                         await _uow.SaveChangesAsync();
-                        await _uow.CommitTransactionAsync();
 
                         _log.LogInformation("Auto-bid updated for auction {Auction}", autoBid.AuctionId);
                         return Result<string>.Success("Auto-bid updated successfully");
                     }
                     catch (Exception ex)
                     {
-                        await _uow.RollbackTransactionAsync();
                         _log.LogError(ex, "Failed to update AutoBid for user {UserId} on auction {AuctionId}", userId, auctionId);
                         return Result<string>.Failure("Unexpected error occurred while updating AutoBid.");
                     }

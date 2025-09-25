@@ -52,41 +52,37 @@ namespace AutoFiCore.Services
         public async Task<Result<AIResponseModel>> QueryFastApiAsync(EnrichedAIQuery payload, string correlationId, string jwtToken)
         {
             var client = _httpClientFactory.CreateClient("FastApi");
+            client.DefaultRequestHeaders.Remove("X-Correlation-ID");
             client.DefaultRequestHeaders.Add("X-Correlation-ID", correlationId);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwtToken);
 
-            var userContextResult = await _userContextService.GetUserContextAsync(payload.UserId);
-            var userContext = userContextResult.IsSuccess ? userContextResult.Value : null;
+            var userContextTask = _userContextService.GetUserContextAsync(payload.UserId);
 
             var enrichedPayload = new
             {
-                query = new
-                {
-                    user_id = payload.UserId,
-                    question = payload.Query.Question
-                },
-                context = userContext,
+                query = new { user_id = payload.UserId, question = payload.Query.Question },
+                context = (await userContextTask).Value,
                 session_id = payload.SessionId,
             };
 
-            var content = new StringContent(
-                JsonSerializer.Serialize(enrichedPayload, _serializerOptions),
-                Encoding.UTF8,
-                "application/json"
-            );
+            using var content = JsonContent.Create(enrichedPayload, options: _serializerOptions);
 
             try
             {
                 var response = await client.PostAsync("query", content);
-                var resultJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("FastAPI query failed. StatusCode={StatusCode}, CorrelationId={CorrelationId}", response.StatusCode, correlationId);
+                    _logger.LogError("FastAPI query failed. StatusCode={StatusCode}, CorrelationId={CorrelationId}",
+                        response.StatusCode, correlationId);
                     return Result<AIResponseModel>.Failure($"FastAPI returned {response.StatusCode}");
                 }
 
-                var result = JsonSerializer.Deserialize<AIResponseModel>(resultJson, _serializerOptions)!;
+                var result = await response.Content.ReadFromJsonAsync<AIResponseModel>(_serializerOptions);
+
+                if (result is null)
+                    return Result<AIResponseModel>.Failure("Failed to parse AI response.");
+
                 var sessionId = await SaveChatHistoryAsync(payload, result);
                 result.SessionId = sessionId;
 
@@ -98,6 +94,7 @@ namespace AutoFiCore.Services
                 return Result<AIResponseModel>.Failure("AI service unavailable.");
             }
         }
+
 
         /// <summary>
         /// Retrieves AI-powered suggestions for a user, combining ML and .NET context.
