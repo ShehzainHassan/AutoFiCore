@@ -25,5 +25,6 @@ namespace AutoFiCore.Data.Interfaces
         Task<Result<bool>> DeleteVehicleAsync(int id);
         Task<Result<Questionnaire>> SaveQuestionnaireAsync(QuestionnaireDTO dto);
         Task<Result<List<VehicleOptionsDTO>>> GetVehicleOptionsAsync();
+        Task<Result<ListingNotification>> AddListingNotificationAsync(ListingNotificationDTO notification);
     }
 }

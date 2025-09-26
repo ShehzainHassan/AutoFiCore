@@ -286,4 +286,25 @@ public class MockVehicleRepository : IVehicleRepository
     {
         return _vehicles.Any(v => v.Id == id);
     }
-} 
+
+    public async Task<ListingNotification> AddListingNotificationAsync(ListingNotificationDTO dto)
+    {
+        var notification = new ListingNotification
+        {
+            VehicleId = dto.VehicleId,
+            UserEmail = dto.UserEmail,
+            UserId = dto.UserId,
+            CreatedAt = DateTime.UtcNow
+        };
+        return notification;
+    }
+
+
+    public async Task<bool> IsListingNotificationExistsAsync(int userId, int vehicleId)
+    {
+        await Task.CompletedTask;
+        return false;
+    }
+
+
+}

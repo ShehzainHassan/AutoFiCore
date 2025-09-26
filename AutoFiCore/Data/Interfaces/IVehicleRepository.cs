@@ -25,5 +25,7 @@ public interface IVehicleRepository
     Task<Questionnaire> SaveQuestionnaireAsync(QuestionnaireDTO dto);
     Task<List<VehicleOptionsDTO>> GetVehicleOptionsAsync();
     public bool VehicleExists(int id);
+    Task<ListingNotification> AddListingNotificationAsync(ListingNotificationDTO dto);
+    Task<bool> IsListingNotificationExistsAsync(int userId, int vehicleId);
 
 }

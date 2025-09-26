@@ -219,4 +219,26 @@ public class DbVehicleRepository : IVehicleRepository
     {
         return _dbContext.Vehicles.Any(v => v.Id == id);
     }
+    public async Task<ListingNotification> AddListingNotificationAsync(ListingNotificationDTO dto)
+    {
+        var notification = new ListingNotification
+        {
+            VehicleId = dto.VehicleId,
+            UserEmail = dto.UserEmail,
+            UserId = dto.UserId,
+            UserName = dto.UserName,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _dbContext.ListingNotifications.Add(notification);
+        await _dbContext.SaveChangesAsync();
+
+        return notification;
+    }
+    public async Task<bool> IsListingNotificationExistsAsync(int userId, int vehicleId)
+    {
+        return await _dbContext.ListingNotifications
+            .AnyAsync(n => n.UserId == userId && n.VehicleId == vehicleId);
+    }
+
 }

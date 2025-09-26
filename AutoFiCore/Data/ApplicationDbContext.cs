@@ -45,6 +45,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<VehicleFeatures> VehicleFeatures { get; set; } = null!;
 
+    public DbSet<ListingNotification> ListingNotifications { get; set; } = null!;
+
     public DbSet<AuctionWinners> AuctionWinners { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -377,6 +379,14 @@ public class ApplicationDbContext : DbContext
             entity.HasKey(a => new { a.AuctionId, a.UserId, a.VehicleId });
             entity.Property(a => a.UserName).HasMaxLength(100).IsRequired();
             entity.Property(a => a.WonAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        modelBuilder.Entity<ListingNotification>(entity =>
+        {
+            entity.HasKey(l => new { l.VehicleId, l.UserId });
+            entity.Property(l => l.UserEmail).HasMaxLength(100).IsRequired();
+            entity.Property(l => l.UserName).HasMaxLength(100).IsRequired();
+            entity.Property(l => l.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
         // Configure indexes

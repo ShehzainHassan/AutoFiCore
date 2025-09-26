@@ -324,4 +324,28 @@ public class VehicleService : IVehicleService
             }
         });
     }
+    public async Task<Result<ListingNotification>> AddListingNotificationAsync(ListingNotificationDTO notification)
+    {
+        try
+        {
+            var exists = await _repository.IsListingNotificationExistsAsync(notification.UserId, notification.VehicleId);
+            if (exists)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return Result<ListingNotification>.Failure("Email already exists for this vehicle.");
+            }
+
+            var result = await _repository.AddListingNotificationAsync(notification);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            return Result<ListingNotification>.Success(result);
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Failed to add listing notification. VehicleId={VehicleId}, UserId={UserId}", notification.VehicleId, notification.UserId);
+            return Result<ListingNotification>.Failure("Failed to add listing notification.");
+        }
+    }
 } 

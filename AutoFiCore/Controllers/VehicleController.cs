@@ -24,7 +24,7 @@ namespace AutoFiCore.Controllers
     /// </summary>
     [ApiController]
     [Route("[controller]")]
-    public class VehicleController : ControllerBase
+    public class VehicleController : SecureControllerBase
     {
         private readonly IVehicleService _vehicleService;
         private readonly ILoanService _loanService;
@@ -361,5 +361,34 @@ namespace AutoFiCore.Controllers
                 return NotFound($"Vehicle with ID {id} not found");
             return NoContent();
         }
+
+        /// <summary>
+        /// Creates a new listing notification for a vehicle and user.
+        /// </summary>
+        /// <param name="notification">ListingNotification payload.</param>
+        /// <returns>Created notification or error.</returns>
+        [Authorize]
+        [HttpPost("add-listing-notification")]
+        public async Task<IActionResult> AddListingNotification([FromBody] ListingNotificationDTO notification)
+        {
+            if (!IsUserContextValid(out var userId))
+                return Unauthorized(new { message = "Invalid token or user context." });
+
+            if (notification == null || notification.VehicleId <= 0 || string.IsNullOrWhiteSpace(notification.UserEmail))
+                return BadRequest(new { message = "Invalid request payload." });
+
+            var correlationId = GetCorrelationId();
+            _logger.LogInformation("AddListingNotification called. CorrelationId={CorrelationId}, UserId={UserId}, VehicleId={VehicleId}", correlationId, userId, notification.VehicleId);
+
+            notification.UserId = userId;
+
+            var result = await _vehicleService.AddListingNotificationAsync(notification);
+
+            if (!result.IsSuccess)
+                return BadRequest(new { message = result.Error });
+
+            return Ok(result.Value);
+        }
+
     }
 }
