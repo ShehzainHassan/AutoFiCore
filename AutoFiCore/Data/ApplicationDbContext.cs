@@ -288,6 +288,7 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<APIPerformanceLog>(entity =>
         {
+            entity.HasKey(e => e.Id);
             entity.Property(e => e.Endpoint).IsRequired().HasMaxLength(255);
             entity.Property(e => e.ResponseTime).IsRequired();
             entity.Property(e => e.StatusCode).IsRequired();
@@ -296,6 +297,7 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<DBQueryLog>(entity =>
         {
+            entity.HasKey(e => e.Id);
             entity.Property(e => e.QueryType).IsRequired().HasMaxLength(100);
             entity.Property(e => e.Duration).IsRequired();
             entity.Property(e => e.Timestamp).IsRequired();
@@ -303,6 +305,7 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<ErrorLog>(entity =>
         {
+            entity.HasKey(e => e.Id);
             entity.Property(e => e.ErrorCode).IsRequired();
             entity.Property(e => e.Message).IsRequired();
             entity.Property(e => e.Timestamp).IsRequired().HasDefaultValueSql("CURRENT_TIMESTAMP"); ;

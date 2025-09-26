@@ -9,6 +9,7 @@ public class APIPerformanceLog
     /// <summary>
     /// The unique identifier for the log entry.
     /// </summary>
+
     public int Id { get; set; }
 
     /// <summary>
