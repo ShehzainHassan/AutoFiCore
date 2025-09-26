@@ -17,17 +17,42 @@ public class SystemHealthService : ISystemHealthService
     {
         try
         {
+            var duration = end - start;
+            var previousStart = start - duration;
+            var previousEnd = start;
+
             var avgApiTime = await _repo.GetAverageApiResponseTimeAsync(start, end);
             var errorRate = await _repo.GetErrorRatePercentageAsync(start, end);
             var activeUsers = await _reportRepo.GetActiveUserCountAsync(start, end);
             var systemUptime = await _repo.GetSystemUptimePercentageAsync(start, end);
 
+            var prevAvgApiTime = await _repo.GetAverageApiResponseTimeAsync(previousStart, previousEnd);
+            var prevErrorRate = await _repo.GetErrorRatePercentageAsync(previousStart, previousEnd);
+            var prevActiveUsers = await _reportRepo.GetActiveUserCountAsync(previousStart, previousEnd);
+
+            double GetPercentageChange(double current, double previous)
+            {
+                if (previous == 0) return current > 0 ? 100 : 0;
+                return ((current - previous) / previous) * 100;
+            }
+
+            int GetAbsoluteChange(int current, int previous)
+            {
+                return current - previous;
+            }
+
             var dashboard = new SystemHealthDashboard
             {
                 AverageApiResponseTime = avgApiTime,
+                AverageApiResponseTimeChange = Math.Round(GetPercentageChange(avgApiTime, prevAvgApiTime), 2),
+
                 ErrorRate = errorRate,
+                ErrorRateChange = Math.Round(GetPercentageChange(errorRate, prevErrorRate), 2),
+
                 ActiveSessions = activeUsers,
-                SystemUptime = systemUptime,
+                ActiveSessionsChange = GetAbsoluteChange(activeUsers, prevActiveUsers),
+
+                SystemUptime = systemUptime
             };
 
             return Result<SystemHealthDashboard>.Success(dashboard);

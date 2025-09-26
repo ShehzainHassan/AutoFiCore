@@ -156,11 +156,11 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
 
         await _dbContext.AuctionWinners.AddAsync(winner);
     }
-    public async Task AddToWatchlistAsync(int userId, int auctionId)
+    public async Task AddToWatchlistAsync(int userId, int auctionId, int VehicleId)
     {
         if (!await IsWatchingAsync(userId, auctionId))
         {
-            var watch = new Watchlist { UserId = userId, AuctionId = auctionId };
+            var watch = new Watchlist { UserId = userId, AuctionId = auctionId, VehicleId = VehicleId };
             _dbContext.Watchlists.Add(watch);
         }
     }
@@ -183,6 +183,7 @@ public class DbAuctionRepository : IAuctionRepository, IBidRepository, IWatchlis
                 WatchlistId = w.WatchlistId,
                 UserId = w.UserId,
                 AuctionId = w.AuctionId,
+                VehicleId = w.VehicleId,
                 CreatedUtc = w.CreatedUtc
             })
             .ToListAsync();

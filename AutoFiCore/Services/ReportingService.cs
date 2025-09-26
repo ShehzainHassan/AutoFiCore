@@ -142,17 +142,41 @@ public class ReportingService : IReportingService
             return Result<FileResultDTO>.Failure("Failed to export report.");
         }
     }
-    public async Task<Result<List<AuctionAnalyticsTableDTO>>> GetAuctionAnalyticsAsync(DateTime start, DateTime end, string? category)
+    public async Task<Result<AuctionAnalyticsResponseDTO>> GetAuctionAnalyticsAsync(DateTime start, DateTime end, string? category)
     {
         try
         {
-            var data = await _uow.Report.GetAuctionAnalyticsTableAsync(start, end, category);
-            return Result<List<AuctionAnalyticsTableDTO>>.Success(data);
+            var duration = end - start;
+            var previousStart = start - duration;
+            var previousEnd = start;
+
+            var currentData = await _uow.Report.GetAuctionAnalyticsTableAsync(start, end, category);
+            var previousData = await _uow.Report.GetAuctionAnalyticsTableAsync(previousStart, previousEnd, category);
+            var currentCount = currentData.Count;
+            var previousCount = previousData.Count;
+
+            double percentageChange;
+            if (previousCount == 0)
+            {
+                percentageChange = currentCount > 0 ? 100 : 0;
+            }
+            else
+            {
+                percentageChange = ((double)(currentCount - previousCount) / previousCount) * 100;
+            }
+
+            var response = new AuctionAnalyticsResponseDTO
+            {
+                CurrentPeriodData = currentData,
+                PercentageChange = Math.Round(percentageChange, 2)
+            };
+
+            return Result<AuctionAnalyticsResponseDTO>.Success(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error while fetching auction analytics.");
-            return Result<List<AuctionAnalyticsTableDTO>>.Failure("Failed to fetch auction analytics.");
+            return Result<AuctionAnalyticsResponseDTO>.Failure("Failed to fetch auction analytics.");
         }
     }
     public async Task<Result<List<UserAnalyticsTableDTO>>> GetUserAnalyticsAsync(DateTime startDate, DateTime endDate)

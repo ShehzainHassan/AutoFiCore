@@ -9,8 +9,13 @@ public class Watchlist
     [Required]
     public int UserId { get; set; }
     public User User { get; set; } = null!;
-    [Required] public int AuctionId { get; set; }
+
+    [Required] 
+    public int AuctionId { get; set; }
     public Auction Auction { get; set; } = null!;
+
+    [Required]
+    public int VehicleId { get; set; }
 
     [Required]
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;

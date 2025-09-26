@@ -205,8 +205,10 @@ namespace AutoFiCore.Data
                     Bids = bids,
                     FinalPrice = a.CurrentPrice,
                     Status = a.Status == AuctionStatus.Ended
-                        ? (a.IsReserveMet ? "Sold" : "Unsold")
-                        : "Pending"
+                    ? (a.IsReserveMet && a.CurrentPrice >= a.StartingPrice
+                    ? "Sold" : "Unsold") 
+                    : "Pending"
+
                 });
             }
 

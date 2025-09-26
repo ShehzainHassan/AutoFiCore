@@ -397,13 +397,14 @@ namespace AutoFiCore.Services
                     await _uow.BeginTransactionAsync();
                     try
                     {
-                        if (await _uow.Auctions.GetAuctionByIdAsync(auctionId) is null)
+                        var auction = await _uow.Auctions.GetAuctionByIdAsync(auctionId);
+                        if (auction is null)
                             return Result<string>.Failure("Auction not found.");
 
                         if (await _uow.Users.GetUserByIdAsync(userId) is null)
                             return Result<string>.Failure("User not found.");
 
-                        await _uow.Watchlist.AddToWatchlistAsync(userId, auctionId);
+                        await _uow.Watchlist.AddToWatchlistAsync(userId, auctionId, auction.VehicleId);
                         await _uow.SaveChangesAsync();
                         await _uow.CommitTransactionAsync();
 

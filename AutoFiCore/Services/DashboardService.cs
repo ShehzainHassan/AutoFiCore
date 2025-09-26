@@ -108,7 +108,9 @@ public class DashboardService : IDashboardService
             var report = new AuctionPerformanceReport
             {
                 TotalAuctions = total,
-                SuccessRate = total == 0 ? 0 : (double)successful / endedAuctions.Count * 100,
+                SuccessRate = endedAuctions.Count == 0
+                    ? 0
+                    : (double)successful / endedAuctions.Count * 100,
                 AverageViews = avgViews,
                 AverageBids = avgBids,
                 AverageFinalPrice = avgPrice,
@@ -122,6 +124,7 @@ public class DashboardService : IDashboardService
             return Result<AuctionPerformanceReport>.Failure("Failed to fetch auction dashboard.");
         }
     }
+
 
     public async Task<Result<UserActivityReport>> GetUserDashboardAsync(DateTime start, DateTime end)
     {
