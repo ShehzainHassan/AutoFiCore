@@ -22,12 +22,39 @@ public class ReportingService : IReportingService
     {
         try
         {
+            var duration = end - start;
+            var previousStart = start - duration;
+            var previousEnd = start;
+
+            var totalRevenue = await _uow.Metrics.GetRevenueTotalAsync(start, end);
+            var commissionEarned = await _uow.Report.GetCommissionEarnedAsync(start, end);
+            var averageSalePrice = await _uow.Report.GetAverageAuctionPriceAsync(start, end);
+            var successfulPayments = await _uow.Report.GetSuccessfulPaymentPercentageAsync(start, end);
+
+            var prevTotalRevenue = await _uow.Metrics.GetRevenueTotalAsync(previousStart, previousEnd);
+            var prevCommissionEarned = await _uow.Report.GetCommissionEarnedAsync(previousStart, previousEnd);
+            var prevAverageSalePrice = await _uow.Report.GetAverageAuctionPriceAsync(previousStart, previousEnd);
+            var prevSuccessfulPayments = await _uow.Report.GetSuccessfulPaymentPercentageAsync(previousStart, previousEnd);
+
+            decimal GetPercentageChange(decimal current, decimal previous)
+            {
+                if (previous == 0) return current > 0 ? 100 : 0;
+                return ((current - previous) / previous) * 100;
+            }
+
             var report = new RevenueReport
             {
-                TotalRevenue = await _uow.Metrics.GetRevenueTotalAsync(start, end),
-                CommissionEarned = await _uow.Report.GetCommissionEarnedAsync(start, end),
-                AverageSalePrice = await _uow.Report.GetAverageAuctionPriceAsync(start, end),
-                SuccessfulPaymentsPercentage = await _uow.Report.GetSuccessfulPaymentPercentageAsync(start, end)
+                TotalRevenue = totalRevenue,
+                TotalRevenueChange = Math.Round(GetPercentageChange(totalRevenue, prevTotalRevenue), 2),
+
+                CommissionEarned = commissionEarned,
+                CommissionEarnedChange = Math.Round(GetPercentageChange(commissionEarned, prevCommissionEarned), 2),
+
+                AverageSalePrice = averageSalePrice,
+                AverageSalePriceChange = Math.Round(GetPercentageChange(averageSalePrice, prevAverageSalePrice), 2),
+
+                SuccessfulPaymentsPercentage = successfulPayments,
+                SuccessfulPaymentsPercentageChange = Math.Round(GetPercentageChange(successfulPayments, prevSuccessfulPayments), 2)
             };
 
             return Result<RevenueReport>.Success(report);
