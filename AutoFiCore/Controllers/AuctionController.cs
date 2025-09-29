@@ -147,6 +147,7 @@ namespace AutoFiCore.Controllers
         /// </summary>
         /// <param name="auctionId">ID of the auction.</param>
         /// <returns>Returns the bid history or a not found error.</returns>
+        [AllowAnonymous]
         [HttpGet("{id}/bids")]
         [DisableRateLimiting]
         public async Task<IActionResult> GetBidHistory([FromRoute(Name = "id")] int auctionId)
